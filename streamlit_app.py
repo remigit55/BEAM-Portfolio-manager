@@ -71,7 +71,7 @@ with tabs[0]:
                 return None
 
         if "Valeur" not in df.columns:
-            df["Valeur"] = df["Quantité"] * df["Acquisition"]
+            df["Valeur"] = pd.to_numeric(df["Quantité"], errors="coerce") * pd.to_numeric(df["Acquisition"], errors="coerce")
 
         df["Taux FX"] = df["Devise"].apply(lambda d: get_fx_rate(d, devise_cible))
         df["Taux FX Num"] = pd.to_numeric(df["Taux FX"], errors="coerce").fillna(0.0)
@@ -79,10 +79,11 @@ with tabs[0]:
         df["Valeur (devise cible)"] = df["Valeur"].astype(float) * df["Taux FX Num"].astype(float)
 
         # Format des colonnes
-        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{float(x):.4f}")
-        df["Taux FX"] = df["Taux FX Num"].map(lambda x: f"{x:.4f}")
-        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}")
-        df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}")
+        df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
+        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:.4f}" if pd.notnull(x) else "")
+        df["Taux FX"] = df["Taux FX Num"].map(lambda x: f"{x:.4f}" if pd.notnull(x) else "")
+        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+        df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
         # Ajoute le nom de la participation (duplique la colonne Actions si besoin)
         df.insert(1, "Nom", df["Actions"])
