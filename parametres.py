@@ -30,6 +30,5 @@ def afficher_parametres():
             df = pd.read_csv(csv_url)
             st.session_state.df = df
             st.success("Données importées avec succès")
-            st.write(df.head())  # DEBUG uniquement
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
