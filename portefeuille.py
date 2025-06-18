@@ -95,8 +95,8 @@ def afficher_portefeuille():
         ("Quantité", 0),
         ("Acquisition", 4),
         ("Valeur", 2),
-        ("currentPrice", 2),
-        ("fiftyTwoWeekHigh", 2),
+        ("currentPrice", 4),  # 4 décimales pour Prix Actuel
+        ("fiftyTwoWeekHigh", 4),  # 4 décimales pour Haut 52 Semaines
         ("Valeur_H52", 2),
         ("Valeur_Actuelle", 2)
     ]:
@@ -111,9 +111,9 @@ def afficher_portefeuille():
         "Acquisition_fmt",
         "Valeur_fmt",
         "currentPrice_fmt",
+        "Valeur_Actuelle_fmt",
         "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt",
-        "Valeur_Actuelle_fmt",
         "Devise"
     ]
     labels = [
@@ -123,9 +123,9 @@ def afficher_portefeuille():
         "Prix d'Acquisition",
         "Valeur",
         "Prix Actuel",
+        "Valeur Actuelle",
         "Haut 52 Semaines",
         "Valeur H52",
-        "Valeur Actuelle",
         "Devise"
     ]
     df_disp = df[cols].copy()
@@ -154,9 +154,9 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Prix d'Acquisition */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Valeur */
       .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Prix Actuel */
-      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Haut 52 Semaines */
-      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur H52 */
-      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ /* Valeur Actuelle */
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Valeur Actuelle */
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Haut 52 Semaines */
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ /* Valeur H52 */
         width: 10%;
       }}
       .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
@@ -179,7 +179,7 @@ def afficher_portefeuille():
     html += "<tr class='total-row'><td>TOTAL</td>"
     html += "<td></td><td></td><td></td>"  # Pour Nom, Quantité, Prix d'Acquisition
     html += f"<td>{total_str}</td>"  # Valeur
-    html += "<td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix Actuel, Haut 52 Semaines, Valeur H52, Valeur Actuelle, Devise
+    html += "<td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
     html += "</tbody></table></div>"
 
     st.markdown(html, unsafe_allow_html=True)
