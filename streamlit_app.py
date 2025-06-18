@@ -39,7 +39,7 @@ st.markdown(f"""
 
 
 # Titre principal
-st.markdown("<h1 style='font-size: 24px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 36px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
 
 # Initialisation des variables session
 if "df" not in st.session_state:
