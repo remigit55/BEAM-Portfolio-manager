@@ -13,24 +13,14 @@ def afficher_parametres():
         index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
     )
 
+    # URL Google Sheets du portefeuille (CSV)
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
     st.markdown(f"#### Source des données : [Google Sheets CSV]({csv_url})")
 
-    # Chargement automatique si df non encore présent
-    if st.session_state.df is None:
+    if st.button("Rafraîchir les données du portefeuille"):
         try:
             df = pd.read_csv(csv_url)
             st.session_state.df = df
-            st.success("Données chargées automatiquement.")
+            st.success("Données importées avec succès.")
         except Exception as e:
-            st.error(f"Erreur lors du chargement automatique : {e}")
-
-    # Rechargement manuel
-    if st.button("Rafraîchir les données"):
-    try:
-        df = pd.read_csv(csv_url)
-        st.session_state.df = df
-        st.success("Données importées avec succès.")
-    except Exception as e:
-        st.error(f"Erreur lors de l'import : {e}")
-
+            st.error(f"Erreur lors de l'import : {e}")
