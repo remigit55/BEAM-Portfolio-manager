@@ -29,16 +29,14 @@ st.markdown(f"""
             padding: 10px;
             border-radius: 0 0 10px 10px;
             margin-bottom: 25px;
+            margin-top: -35px;  /* Remontée des onglets */
         }}
-        .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {{
-            display: none;
+        section.main > div:nth-child(1) {{
+            margin-top: -35px;  /* Sécurité pour tous les cas */
         }}
-        .st-emotion-cache-18ni7ap {
-    margin-top: -35px;
-}
-
     </style>
 """, unsafe_allow_html=True)
+
 
 # Titre principal
 st.markdown("<h1 style='font-size: 24px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
