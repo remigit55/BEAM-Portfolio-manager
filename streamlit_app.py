@@ -87,13 +87,9 @@ with onglets[3]:
         st.info("Aucune transaction enregistrée.")
 
 # Onglet : Taux de change
+from parametres import afficher_taux_change
 with onglets[4]:
-    st.subheader("💱 Taux de change")
-    if st.session_state.fx_rates:
-        st.markdown(f"Taux appliqués pour conversion en {st.session_state.devise_cible} au {datetime.date.today()}")
-        st.dataframe(pd.DataFrame(list(st.session_state.fx_rates.items()), columns=["Conversion", "Taux"]))
-    else:
-        st.info("Aucun taux de change utilisé pour l’instant.")
+    afficher_taux_change()
 
 # Onglet : Paramètres
 from parametres import afficher_parametres
