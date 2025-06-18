@@ -21,6 +21,12 @@ def afficher_portefeuille():
     if "Valeur" not in df.columns and "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
+
+    def formater_nombre_fr(x, decimales=2):
+    if pd.isnull(x):
+        return ""
+    return f"{x:,.{decimales}f}".replace(",", "X").replace(".", ",").replace("X", " ")
+    
     # Mise en forme avec espaces pour les milliers
     df["Quantité_fmt"] = df["Quantité"].map(lambda x: formater_nombre_fr(x, decimales=0))
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: formater_nombre_fr(x, decimales=4))
