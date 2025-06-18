@@ -2,30 +2,26 @@
 import streamlit as st
 import pandas as pd
 
-st.subheader("Paramètres")
+st.subheader("Paramètres globaux")
 
-# Devise cible
+# Définir la devise cible par défaut si non définie
 if "devise_cible" not in st.session_state:
     st.session_state.devise_cible = "EUR"
 
+# Choix de la devise de consolidation
 st.session_state.devise_cible = st.selectbox(
     "Devise de référence pour consolidation",
     options=["USD", "EUR", "CAD", "CHF"],
     index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
 )
 
-# Import depuis Google Sheets CSV
-st.markdown("### Import du portefeuille")
-csv_url = st.text_input("Lien vers le CSV Google Sheets (onglet Portefeuille)")
+# Zone d’import de portefeuille depuis un lien Google Sheets
+st.markdown("#### Importer le portefeuille depuis Google Sheets (export CSV public)")
+csv_url = st.text_input("Lien vers le fichier CSV exporté de Google Sheets")
 
 if csv_url:
     try:
         st.session_state.df = pd.read_csv(csv_url)
-        st.success("✅ Données importées depuis le lien CSV")
-        if "df" in st.session_state and st.session_state.df is not None:
-            st.markdown("### Aperçu des données importées")
-            st.dataframe(st.session_state.df.head(), use_container_width=True)
+        st.success("Données importées avec succès depuis le lien CSV.")
     except Exception as e:
-        st.error(f"❌ Erreur lors de l'import : {e}")
-else:
-    st.info("Veuillez entrer un lien CSV public depuis Google Sheets pour charger les données du portefeuille.")
+        st.error(f"Erreur lors de l'import : {e}")
