@@ -22,43 +22,38 @@ def afficher_portefeuille():
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formattage style français : 1 234,56
+    # Format français : 1 234,56
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
         return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", " ")
 
+    # Colonnes formatées pour affichage
     if "Quantité" in df.columns:
-        df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+        df["Quantité affichée"] = df["Quantité"].map(lambda x: format_fr(x, 0))
     if "Acquisition" in df.columns:
-        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+        df["Acquisition affichée"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     if "Valeur" in df.columns:
-        df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+        df["Valeur affichée"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Préparer les colonnes d’affichage
+    # Ordre des colonnes à afficher (les colonnes brutes peuvent rester masquées si besoin)
     colonnes_affichage = []
     for col in df.columns:
-        if col == "Acquisition_fmt":
-            colonnes_affichage.append("Acquisition_fmt")
-        elif col == "Valeur_fmt":
-            colonnes_affichage.append("Valeur_fmt")
-        elif col in ["Acquisition", "Valeur"]:
+        if col in ["Quantité", "Acquisition", "Valeur"]:
             continue
-        elif col == "Quantité_fmt":
-            colonnes_affichage.append("Quantité_fmt")
-        elif col == "Quantité":
-            continue
-        else:
+        colonnes_affichage.append(col)
+    for col in ["Quantité affichée", "Acquisition affichée", "Valeur affichée"]:
+        if col in df.columns:
             colonnes_affichage.append(col)
 
-    # Renommer colonnes formatées pour affichage
+    # Renommer proprement
     df_affichage = df[colonnes_affichage].rename(columns={
-        "Quantité_fmt": "Quantité",
-        "Acquisition_fmt": "Acquisition",
-        "Valeur_fmt": "Valeur"
+        "Quantité affichée": "Quantité",
+        "Acquisition affichée": "Acquisition",
+        "Valeur affichée": "Valeur"
     })
 
-    # Alignement CSS à droite
+    # CSS pour aligner à droite
     st.markdown("""
         <style>
             .stDataFrame td {
