@@ -65,5 +65,19 @@ def afficher_portefeuille():
     for col in ["Quantité", "Acquisition", "Valeur"]:
         if col in df_affichage.columns:
             df_affichage[col] = df_affichage[col].astype(str)
+    
+    st.markdown("""
+        <style>
+            /* Aligner tout le contenu des cellules à droite */
+            .st-emotion-cache-1xw8zd0 .element-container .stDataFrame td {
+                text-align: right !important;
+            }
+            /* Aligner aussi les en-têtes si souhaité */
+            .st-emotion-cache-1xw8zd0 .element-container .stDataFrame th {
+                text-align: right !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
+    
     st.dataframe(df_affichage, use_container_width=True)
