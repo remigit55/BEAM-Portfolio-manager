@@ -65,7 +65,6 @@ def afficher_portefeuille():
             padding: 6px;
             text-align: right;
             border-bottom: 1px solid transparent;
-            color: black;
             font-family: "Aptos narrow", Helvetica;
             font-size: 11px;
         }
@@ -78,7 +77,7 @@ def afficher_portefeuille():
         .total-row {
             background-color: #A49B6D !important;
             font-weight: bold;
-            color: white !important;
+            color: white;
         }
     </style>
     <div class="table-container">
