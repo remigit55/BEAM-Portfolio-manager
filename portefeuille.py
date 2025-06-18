@@ -172,8 +172,8 @@ def afficher_portefeuille():
     </tbody>
     <tfoot>
       <tr class="total-row">
-        <td>TOTAL</td><td></td><td></td><td></td>
-        <td>{total_str}</td><td></td><td></td><td></td><td></td><td></td><td></td>
+        <td>TOTAL</td><td></td><td></td><td></td><td></td>
+        <td>{total_str}</td><td></td><td></td><td></td><td></td><td></td>
       </tr>
     </tfoot>
   </table>
