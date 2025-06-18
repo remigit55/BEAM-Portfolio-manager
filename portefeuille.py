@@ -193,4 +193,6 @@ function sortTable(n) {{
 }}
 </script>
 """
-    st.markdown(html, unsafe_allow_html=True)
+    import streamlit.components.v1 as components
+components.html(html, height=600, scrolling=True)
+
