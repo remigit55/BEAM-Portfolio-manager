@@ -5,5 +5,3 @@ forex-python
 gdown
 gspread
 oauth2client
-
-Add requirements.txt to install dependencies
