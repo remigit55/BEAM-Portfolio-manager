@@ -3,79 +3,98 @@ import pandas as pd
 from forex_python.converter import CurrencyRates
 import datetime
 
-st.set_page_config(page_title="Portefeuille d'investissement", layout="wide")
+st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 st.title("BEAM Portfolio Manager")
 
-uploaded_file = st.file_uploader("Importer le fichier Excel du portefeuille", type=["xlsx"])
+if "df" not in st.session_state:
+    st.session_state.df = None
+if "fx_rates" not in st.session_state:
+    st.session_state.fx_rates = {}
+if "devise_cible" not in st.session_state:
+    st.session_state.devise_cible = "EUR"
 
-if uploaded_file:
-    xls = pd.ExcelFile(uploaded_file)
-    onglets_disponibles = xls.sheet_names
+# Onglets de navigation
+tabs = st.tabs(["Importer", "Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
 
-    # Devise cible - toujours affichée dans la sidebar
-    devise_cible = st.sidebar.selectbox("💶 Devise de référence", options=["USD", "EUR", "CAD", "CHF"], index=1)
-    st.sidebar.markdown(f"Affichage consolidé en **{devise_cible}**")
+# Onglet Import
+with tabs[0]:
+    uploaded_file = st.file_uploader("Importer le fichier Excel du portefeuille", type=["xlsx"])
+    if uploaded_file:
+        xls = pd.ExcelFile(uploaded_file)
+        st.session_state.onglets_disponibles = xls.sheet_names
+        if "Portefeuille" in xls.sheet_names:
+            st.session_state.df = pd.read_excel(xls, sheet_name="Portefeuille")
+        if "Performance" in xls.sheet_names:
+            st.session_state.performance = pd.read_excel(xls, sheet_name="Performance")
+        if "OD_Comptables" in xls.sheet_names:
+            st.session_state.od = pd.read_excel(xls, sheet_name="OD_Comptables")
+        if "Transactions_M&A" in xls.sheet_names:
+            st.session_state.ma = pd.read_excel(xls, sheet_name="Transactions_M&A")
+        if "Taux_FX" in xls.sheet_names:
+            st.session_state.fx = pd.read_excel(xls, sheet_name="Taux_FX")
 
-    # Navigation entre les onglets
-    menu = st.sidebar.radio(
-        "Navigation",
-        ["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change"]
-    )
+# Onglet Portefeuille
+with tabs[1]:
+    if st.session_state.df is not None:
+        st.subheader("Portefeuille consolidé")
 
-    if menu == "Portefeuille":
-        if "Portefeuille" in onglets_disponibles:
-            df = pd.read_excel(xls, sheet_name="Portefeuille")
+        # Application du taux de change
+        df = st.session_state.df.copy()
+        cr = CurrencyRates()
+        fx_rates_utilisés = {}
+        devise_cible = st.session_state.devise_cible
 
-            # Récupération automatique des taux de change
-            cr = CurrencyRates()
-            fx_rates_utilisés = {}
+        def get_fx_rate(devise_origine, devise_cible):
+            if devise_origine == devise_cible:
+                return 1.0
+            try:
+                rate = cr.get_rate(devise_origine, devise_cible)
+                fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = rate
+                return rate
+            except:
+                fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = "Erreur"
+                return None
 
-            def get_fx_rate(devise_origine, devise_cible):
-                if devise_origine == devise_cible:
-                    return 1.0
-                try:
-                    rate = cr.get_rate(devise_origine, devise_cible)
-                    fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = rate
-                    return rate
-                except:
-                    fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = "Erreur"
-                    return None
+        if "Valeur" not in df.columns:
+            df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-            # Application des taux de change
-            df["Taux FX"] = df["Devise"].apply(lambda d: get_fx_rate(d, devise_cible))
-            df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX"]
+        df["Taux FX"] = df["Devise"].apply(lambda d: get_fx_rate(d, devise_cible))
+        df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX"]
 
-            # Affichage
-            st.subheader("Portefeuille converti en devise cible")
-            st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True)
 
-            st.markdown(f"**Taux de change utilisés** (vers {devise_cible}) - *{datetime.date.today()}*")
-            st.dataframe(pd.DataFrame(list(fx_rates_utilisés.items()), columns=["Conversion", "Taux"]), use_container_width=True)
+        st.session_state.fx_rates = fx_rates_utilisés
 
-    elif menu == "Performance":
-        if "Performance" in onglets_disponibles:
-            perf = pd.read_excel(xls, sheet_name="Performance")
-            st.subheader("Performance historique")
-            st.line_chart(perf.set_index(perf.columns[0]))
+# Onglet Performance
+with tabs[2]:
+    if "performance" in st.session_state:
+        perf = st.session_state.performance
+        st.subheader("Performance historique")
+        st.line_chart(perf.set_index(perf.columns[0]))
 
-    elif menu == "OD Comptables":
-        if "OD_Comptables" in onglets_disponibles:
-            od = pd.read_excel(xls, sheet_name="OD_Comptables")
-            st.subheader("OD Comptables")
-            st.dataframe(od, use_container_width=True)
+# Onglet OD Comptables
+with tabs[3]:
+    if "od" in st.session_state:
+        st.subheader("OD Comptables")
+        st.dataframe(st.session_state.od, use_container_width=True)
 
-    elif menu == "Transactions M&A":
-        if "Transactions_M&A" in onglets_disponibles:
-            ma = pd.read_excel(xls, sheet_name="Transactions_M&A")
-            st.subheader("Transactions minières")
-            st.dataframe(ma, use_container_width=True)
+# Onglet Transactions M&A
+with tabs[4]:
+    if "ma" in st.session_state:
+        st.subheader("Transactions minières")
+        st.dataframe(st.session_state.ma, use_container_width=True)
 
-    elif menu == "Taux de change":
-        if "Taux_FX" in onglets_disponibles:
-            fx = pd.read_excel(xls, sheet_name="Taux_FX")
-            st.subheader("Taux de change (manuel)")
-            st.dataframe(fx, use_container_width=True)
+# Onglet Taux de change
+with tabs[5]:
+    if st.session_state.fx_rates:
+        st.subheader("Taux de change utilisés")
+        st.markdown(f"Taux appliqués pour conversion en {st.session_state.devise_cible} au {datetime.date.today()}")
+        st.dataframe(pd.DataFrame(list(st.session_state.fx_rates.items()), columns=["Conversion", "Taux"]))
+    elif "fx" in st.session_state:
+        st.subheader("Taux de change")
+        st.dataframe(st.session_state.fx, use_container_width=True)
 
-else:
-    st.info("Veuillez importer un fichier Excel (.xlsx) structuré avec les bons onglets.")
-
+# Onglet Paramètres
+with tabs[6]:
+    st.subheader("Paramètres globaux")
+    st.session_state.devise_cible = st.selectbox("Devise de référence pour consolidation", options=["USD", "EUR", "CAD", "CHF"], index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible))
