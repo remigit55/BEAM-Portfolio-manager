@@ -8,40 +8,56 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Conversion brute
-    df["Quantité"] = pd.to_numeric(df.get("Quantité", 0), errors="coerce")
-    df["Acquisition"] = pd.to_numeric(df.get("Acquisition", 0), errors="coerce")
-    df["Valeur"] = df["Quantité"] * df["Acquisition"]
+    # Nettoyage des colonnes
+    for col in ["Quantité", "Acquisition"]:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.replace(" ", "", regex=False)
+                .str.replace(",", ".", regex=False)
+                .astype(float)
+            )
 
-    # Formatage en style français
+    # Calcul de la valeur
+    if "Quantité" in df.columns and "Acquisition" in df.columns:
+        df["Valeur"] = df["Quantité"] * df["Acquisition"]
+
+    # Formatage style français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
         return f"{x:,.{dec}f}".replace(",", " ").replace(".", ",")
 
-    df["Quantité"] = df["Quantité"].map(lambda x: format_fr(x, 0))
-    df["Acquisition"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
-    df["Valeur"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Colonnes à afficher dans l'ordre souhaité
-    colonnes = []
-    for col in ["Tickers", "Quantité", "Acquisition", "Valeur"]:
-        if col in df.columns:
-            colonnes.append(col)
+    # Ordre des colonnes à afficher
+    colonnes_affichage = []
+    if "Tickers" in df.columns:
+        colonnes_affichage.append("Tickers")
+    colonnes_affichage += ["Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
     if "Devise" in df.columns:
-        colonnes.append("Devise")
+        colonnes_affichage.append("Devise")
 
-    # Affichage
-    st.dataframe(df[colonnes], use_container_width=True)
+    # Préparer le DataFrame pour affichage
+    df_affichage = df[colonnes_affichage].rename(columns={
+        "Quantité_fmt": "Quantité",
+        "Acquisition_fmt": "Acquisition",
+        "Valeur_fmt": "Valeur"
+    })
 
-    # Alignement à droite
+    # CSS pour alignement à droite
     st.markdown("""
         <style>
-        .st-emotion-cache-1xarl3l td {
-            text-align: right !important;
-        }
-        .st-emotion-cache-1xarl3l th {
-            text-align: right !important;
-        }
+            .st-emotion-cache-1xarl3l td {
+                text-align: right !important;
+            }
+            .st-emotion-cache-1xarl3l th {
+                text-align: right !important;
+            }
         </style>
     """, unsafe_allow_html=True)
+
+    st.dataframe(df_affichage, use_container_width=True)
