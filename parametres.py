@@ -15,7 +15,13 @@ def afficher_parametres():
     )
 
     st.markdown("#### Lien Google Sheets exporté en CSV (public)")
-    csv_url = st.text_input("Lien CSV", key="csv_url_input")
+    
+    # Initialiser csv_input_value si absent
+    if "csv_input_value" not in st.session_state:
+        st.session_state.csv_input_value = ""
+    
+    # Utiliser st.text_input avec value lié à csv_input_value
+    csv_url = st.text_input("Lien CSV", value=st.session_state.csv_input_value, key="csv_url_input")
 
     if csv_url:
         # Vérifier si le lien a déjà été traité
@@ -35,9 +41,8 @@ def afficher_parametres():
                 df = pd.read_csv(csv_url)
                 st.session_state.df = df
                 st.session_state.last_csv_url = csv_url  # Mettre à jour le dernier lien traité
+                st.session_state.csv_input_value = ""  # Réinitialiser pour le prochain rendu
                 st.success("Données importées avec succès")
-                # Réinitialiser le champ de saisie
-                st.session_state.csv_url_input = ""
                 st.rerun()  # Relancer pour mettre à jour l'affichage
             except Exception as e:
                 st.error(f"Erreur lors de l'import : {e}")
