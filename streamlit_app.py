@@ -32,7 +32,7 @@ st.markdown(f"""
             padding: 10px;
             border-radius: 0 0 10px 10px;
             margin-bottom: 25px;
-            margin-top: -35px;
+            margin-top: -55px;
         }}
         section.main > div:nth-child(1) {{
             margin-top: -55px;
