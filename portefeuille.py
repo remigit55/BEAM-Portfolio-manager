@@ -89,6 +89,20 @@ def afficher_portefeuille():
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
 
+    def convertir(val, devise):
+        if pd.isnull(val) or pd.isnull(devise): return 0
+        if devise == devise_cible: return val
+        taux = fx_rates.get(devise.upper())
+        return val * taux if taux else 0
+
+    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
+    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
+    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
+
+    total_valeur = df["Valeur_conv"].sum()
+    total_actuelle = df["Valeur_Actuelle_conv"].sum()
+    total_h52 = df["Valeur_H52_conv"].sum()
+
     cols = [
         ticker_col,
         "shortName",
@@ -136,6 +150,9 @@ def afficher_portefeuille():
     text-align: left;
   }}
   .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+  .total-row td {{
+    background: #A49B6D; color: white; font-weight: bold;
+  }}
 </style>
 <div class="table-container">
   <table class="portfolio-table">
@@ -153,8 +170,19 @@ def afficher_portefeuille():
             html_code += f"<td>{html.escape(val_str)}</td>"
         html_code += "</tr>"
 
-    html_code += """
+    html_code += f"""
     </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td>TOTAL ({devise_cible})</td><td></td><td></td><td></td><td></td>
+        <td>{format_fr(total_valeur, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_actuelle, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_h52, 2)}</td>
+        <td></td>
+      </tr>
+    </tfoot>
   </table>
 </div>
 <script>
