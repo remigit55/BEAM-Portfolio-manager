@@ -123,11 +123,24 @@ def afficher_portefeuille():
   .table-container { max-height: 500px; overflow-y: auto; }
   .portfolio-table { width: 100%; border-collapse: collapse; table-layout: auto; }
   .portfolio-table th {
-    background: #363636; color: white; padding: 6px; text-align: center; border: none;
-    position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
+    background: #363636;
+    color: white;
+    padding: 6px;
+    text-align: center;
+    border: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
   .portfolio-table td {
-    padding: 6px; text-align: right; border: none; font-size: 11px;
+    padding: 6px;
+    text-align: right;
+    border: none;
+    font-size: 11px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
   .portfolio-table td:first-child,
   .portfolio-table td:nth-child(2),
@@ -136,7 +149,9 @@ def afficher_portefeuille():
   }
   .portfolio-table tr:nth-child(even) { background: #efefef; }
   .total-row td {
-    background: #A49B6D; color: white; font-weight: bold;
+    background: #A49B6D;
+    color: white;
+    font-weight: bold;
   }
 </style>
 <div class="table-container">
