@@ -27,9 +27,10 @@ def afficher_parametres():
 
     # Rechargement manuel
     if st.button("Rafraîchir les données"):
-        try:
-            df = pd.read_csv(csv_url)
-            st.session_state.df = df
-            st.success("Données importées avec succès.")
-        except Exception as e:
-            st.error(f"Erreur lors de l'import : {e}")
+    try:
+        df = pd.read_csv(csv_url)
+        st.session_state.df = df
+        st.success("Données importées avec succès.")
+    except Exception as e:
+        st.error(f"Erreur lors de l'import : {e}")
+
