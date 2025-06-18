@@ -38,7 +38,7 @@ def afficher_portefeuille():
 
     total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
 
-    # HTML avec zébrage ciblé et TOTAL préservé
+    # HTML final
     html = """
     <style>
         .table-container {
@@ -76,7 +76,7 @@ def afficher_portefeuille():
             background-color: #efefef;
         }
         .total-row {
-            background-color: #A49B6D;
+            background-color: #A49B6D !important;
             font-weight: bold;
             color: white;
         }
@@ -89,6 +89,7 @@ def afficher_portefeuille():
         <tbody>
     """
 
+    # Lignes normales avec classe data-row
     for _, row in df.iterrows():
         html += '<tr class="data-row">'
         for col in colonnes:
@@ -96,6 +97,7 @@ def afficher_portefeuille():
             html += f"<td>{val}</td>"
         html += "</tr>"
 
+    # Ligne total non affectée par zébrage
     html += f"""
         <tr class="total-row">
             <td style="text-align:left;">TOTAL</td>
