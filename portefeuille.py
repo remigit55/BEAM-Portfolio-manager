@@ -8,7 +8,7 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Nettoyage des colonnes numériques
+    # Nettoyage des données numériques
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
@@ -23,7 +23,7 @@ def afficher_portefeuille():
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage style français : 1 234,56
+    # Format français avec séparateurs
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
@@ -33,10 +33,15 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
+    # Ajout colonne Ticker propre
     if "Tickers" in df.columns:
         df["Ticker"] = df["Tickers"]
 
-    colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
+    # Sélection et renommage
+    colonnes = []
+    if "Ticker" in df.columns:
+        colonnes.append("Ticker")
+    colonnes += ["Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
     if "Devise" in df.columns:
         colonnes.append("Devise")
 
@@ -46,33 +51,27 @@ def afficher_portefeuille():
         "Valeur_fmt": "Valeur"
     })
 
-    # Générer le HTML pour Streamlit
-    html_table = df_affichage.to_html(index=False, escape=False, classes="styled-table")
+    # Construction du tableau HTML avec alignement à droite
+    def df_to_html(df):
+        return df.to_html(index=False, escape=False, classes="styled-table", justify="right")
 
-    # Ajouter style CSS avec retour à la ligne
+    # Style HTML intégré
     style = """
     <style>
-        .styled-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        .styled-table th, .styled-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: right;
-        }
-        .styled-table th:first-child, .styled-table td:first-child {
-            text-align: left;
-        }
-        .styled-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .styled-table tr:hover {
-            background-color: #f1f1f1;
-        }
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    .styled-table th, .styled-table td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        text-align: right;
+    }
+    .styled-table th:first-child, .styled-table td:first-child {
+        text-align: left;
+    }
     </style>
     """
 
-    st.markdown(style + html_table, unsafe_allow_html=True)
+    st.markdown(style + df_to_html(df_affichage), unsafe_allow_html=True)
