@@ -136,45 +136,49 @@ def afficher_portefeuille():
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
     # Construction HTML
-    html = f"""
+    html = """
     <style>
-      .table-container {{ max-height:400px; overflow-y:auto; }}
-      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:auto; }}
-      .portfolio-table th {{
+      .table-container { max-height:400px; overflow-y:auto; }
+      .portfolio-table { width:100%; border-collapse:collapse; table-layout:auto; }
+      .portfolio-table th {
         background:#363636; color:white; padding:6px; text-align:center; border:none;
         position:sticky; top:0; z-index:2;
         font-family:"Aptos narrow",Helvetica; font-size:12px;
         cursor:pointer;
-      }}
-      .portfolio-table th:hover {{
+      }
+      .portfolio-table th:hover {
         background:#4a4a4a;
-      }}
-      .portfolio-table td {{
+      }
+      .portfolio-table td {
         padding:6px; text-align:right; border:none;
         font-family:"Aptos narrow",Helvetica; font-size:11px;
-      }}
-      .portfolio-table td:first-child {{ text-align:left; }}
-      .portfolio-table td:nth-child(2) {{ text-align:left; }}
-      .portfolio-table td:nth-child(3) {{ text-align:left; }}
+      }
+      .portfolio-table td:first-child { text-align:left; }
+      .portfolio-table td:nth-child(2) { text-align:left; }
+      .portfolio-table td:nth-child(3) { text-align:left; }
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4),
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5),
       .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6),
       .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7),
       .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8),
       .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9),
-      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{
+      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {
         width: 9%;
-      }}
-      .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
-      .total-row td {{
+      }
+      .portfolio-table tr:nth-child(even) { background:#efefef; }
+      .total-row td {
         background:#A49B6D; color:white; font-weight:bold;
-      }}
+      }
     </style>
     <div class="table-container">
       <table class="portfolio-table" id="portfolioTable">
         <thead>
           <tr>
-            {"".join(f'<th onclick="sortTable({i})">{label}</th>' for i, label in enumerate(labels))}
+    """
+    # Ajout des en-têtes avec onclick
+    for i, label in enumerate(labels):
+        html += f'<th onclick="sortTable({i})">{label}</th>'
+    html += """
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -188,63 +192,65 @@ def afficher_portefeuille():
         html += "</tr>"
 
     # Ligne TOTAL
-    html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
-    html += f"<td>{total_str}</td>"  # Prix d'Acquisition
-    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Valeur, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
-    html += """
+    html += f"""
+        <tr class='total-row'>
+          <td>TOTAL</td>
+          <td></td><td></td><td></td>
+          <td>{total_str}</td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
         </tbody>
       </table>
     </div>
     <script>
-    function sortTable(n) {
-      var table = document.getElementById("portfolioTable");
-      var tbody = document.getElementById("tableBody");
-      var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1); // Exclure la ligne TOTAL
-      var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
-      dir = (dir === "asc") ? "desc" : "asc"; // Toggle direction
-      table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+      function sortTable(n) {
+        var table = document.getElementById("portfolioTable");
+        var tbody = document.getElementById("tableBody");
+        var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1); // Exclure la ligne TOTAL
+        var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+        dir = (dir === "asc") ? "desc" : "asc"; // Toggle direction
+        table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
 
-      // Reset sort indicators
-      var headers = table.getElementsByTagName("TH");
-      for (var i = 0; i < headers.length; i++) {
-        headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
-      }
-      // Add sort indicator
-      headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
-
-      // Sort rows
-      rows.sort((rowA, rowB) => {
-        var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
-        var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
-
-        // Handle empty cells
-        if (x === "" && y === "") return 0;
-        if (x === "") return dir === "asc" ? -1 : 1;
-        if (y === "") return dir === "asc" ? 1 : -1;
-
-        // Try parsing as numbers
-        var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
-        var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
-
-        // If both are valid numbers, compare numerically
-        if (!isNaN(xValue) && !isNaN(yValue)) {
-          return dir === "asc" ? xValue - yValue : yValue - xValue;
+        // Reset sort indicators
+        var headers = table.getElementsByTagName("TH");
+        for (var i = 0; i < headers.length; i++) {
+          headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
         }
+        // Add sort indicator
+        headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
 
-        // Otherwise, compare as strings
-        xValue = x.toLowerCase();
-        yValue = y.toLowerCase();
-        return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
-      });
+        // Sort rows
+        rows.sort((rowA, rowB) => {
+          var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+          var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
 
-      // Re-attach sorted rows
-      tbody.innerHTML = "";
-      rows.forEach(row => tbody.appendChild(row));
-      // Re-attach TOTAL row
-      var totalRow = table.getElementsByTagName("tr")[rows.length];
-      tbody.appendChild(totalRow);
-    }
+          // Handle empty cells
+          if (x === "" && y === "") return 0;
+          if (x === "") return dir === "asc" ? -1 : 1;
+          if (y === "") return dir === "asc" ? 1 : -1;
+
+          // Try parsing as numbers
+          var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+          var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+
+          // If both are valid numbers, compare numerically
+          if (!isNaN(xValue) && !isNaN(yValue)) {
+            return dir === "asc" ? xValue - yValue : yValue - xValue;
+          }
+
+          // Otherwise, compare as strings
+          xValue = x.toLowerCase();
+          yValue = y.toLowerCase();
+          return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
+        });
+
+        // Re-attach sorted rows
+        tbody.innerHTML = "";
+        rows.forEach(row => tbody.appendChild(row));
+        // Re-attach TOTAL row
+        var totalRow = table.getElementsByTagName("tr")[rows.length];
+        tbody.appendChild(totalRow);
+      }
     </script>
     """
 
