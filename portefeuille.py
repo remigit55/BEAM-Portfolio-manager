@@ -8,7 +8,7 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Nettoyage des colonnes numériques
+    # Normaliser les colonnes numériques
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
@@ -18,53 +18,63 @@ def afficher_portefeuille():
             )
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Calcul de la colonne "Valeur"
+    # Calcul de la valeur
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage français : 1 234,56
+    # Formatage français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
         return f"{x:,.{dec}f}".replace(",", " ").replace(".", ",")
 
-    if "Quantité" in df.columns:
-        df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
-    if "Acquisition" in df.columns:
-        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
-    if "Valeur" in df.columns:
-        df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Sélection des colonnes dans l'ordre souhaité
-    colonnes_base = {
-        "Ticker": "Ticker",
-        "Quantité_fmt": "Quantité",
-        "Acquisition_fmt": "Acquisition",
-        "Valeur_fmt": "Valeur",
-        "Devise": "Devise"
-    }
-    colonnes_existantes = [col for col in colonnes_base if col in df.columns]
+    # Ordre des colonnes
+    colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
+    noms = ["Ticker", "Quantité", "Acquisition", "Valeur", "Devise"]
 
-    df_affichage = df[colonnes_existantes].rename(columns={k: colonnes_base[k] for k in colonnes_existantes})
-
-    # CSS personnalisé
-    style = """
+    # Générer HTML manuellement
+    html = """
     <style>
-        .styled-table {
+        .portfolio-table {
             border-collapse: collapse;
             width: 100%;
+            font-family: sans-serif;
             font-size: 14px;
         }
-        .styled-table th, .styled-table td {
-            border: 1px solid #ccc;
+        .portfolio-table th {
+            background-color: #f4f4f4;
+            padding: 8px;
+            text-align: right;
+            border-bottom: 2px solid #ccc;
+        }
+        .portfolio-table td {
             padding: 6px 10px;
+            border-bottom: 1px solid #ddd;
             text-align: right;
         }
-        .styled-table td:first-child, .styled-table th:first-child {
+        .portfolio-table td:first-child,
+        .portfolio-table th:first-child {
             text-align: left;
         }
     </style>
+    <table class="portfolio-table">
+        <thead>
+            <tr>""" + "".join(f"<th>{name}</th>" for name in noms) + """</tr>
+        </thead>
+        <tbody>
     """
 
-    html_table = df_affichage.to_html(index=False, classes="styled-table")
-    st.markdown(style + html_table, unsafe_allow_html=True)
+    for _, row in df.iterrows():
+        html += "<tr>"
+        for col in colonnes:
+            val = row.get(col, "")
+            html += f"<td>{val}</td>"
+        html += "</tr>"
+
+    html += "</tbody></table>"
+
+    st.markdown(html, unsafe_allow_html=True)
