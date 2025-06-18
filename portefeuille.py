@@ -19,12 +19,12 @@ def afficher_portefeuille():
         df["Quantité"] = df["Quantité"].map(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
     if "Acquisition" in df.columns:
         df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
-        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
+        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
     if "Valeur" in df.columns:
         df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce")
-        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
+        df["Valeur_fmt"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
 
-        # Construction du tableau à afficher
+    # Construction du tableau à afficher
     colonnes_affichage = []
     for col in df.columns:
         if col == "Acquisition_fmt":
@@ -51,6 +51,4 @@ def afficher_portefeuille():
     """, unsafe_allow_html=True)
 
     st.dataframe(df_affichage, use_container_width=True)
-    """, unsafe_allow_html=True)
 
-    st.dataframe(df, use_container_width=True)
