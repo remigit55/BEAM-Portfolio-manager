@@ -203,56 +203,7 @@ def afficher_portefeuille():
     </tbody>
   </table>
 </div>
-<script>
-function sortTable(n) {
-  var table = document.getElementById("portfolioTable");
-  var tbody = document.getElementById("tableBody");
-  var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1); // Exclure la ligne TOTAL
-  var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
-  dir = (dir === "asc") ? "desc" : "asc"; // Toggle direction
-  table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
 
-  // Reset sort indicators
-  var headers = table.getElementsByTagName("TH");
-  for (var i = 0; i < headers.length; i++) {
-    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
-  }
-  // Add sort indicator
-  headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
-
-  // Sort rows
-  rows.sort((rowA, rowB) => {
-    var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
-    var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
-
-    // Handle empty cells
-    if (x === "" && y === "") return 0;
-    if (x === "") return dir === "asc" ? -1 : 1;
-    if (y === "") return dir === "asc" ? 1 : -1;
-
-    // Try parsing as numbers
-    var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
-    var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
-
-    // If both are valid numbers, compare numerically
-    if (!isNaN(xValue) && !isNaN(yValue)) {
-      return dir === "asc" ? xValue - yValue : yValue - xValue;
-    }
-
-    // Otherwise, compare as strings
-    xValue = x.toLowerCase();
-    yValue = y.toLowerCase();
-    return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
-  });
-
-  // Re-attach sorted rows
-  tbody.innerHTML = "";
-  rows.forEach(row => tbody.appendChild(row));
-  // Re-attach TOTAL row
-  var totalRow = table.getElementsByTagName("tr")[rows.length];
-  tbody.appendChild(totalRow);
-}
-</script>
 """
 
     st.markdown(html, unsafe_allow_html=True)
