@@ -2,7 +2,7 @@ import streamlit as st
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Titre avant tout
-st.title("BEAM Portfolio Manager")
+st.title("BEAM Portfolio")
 
 # Thème
 PRIMARY_COLOR = "#363636"
