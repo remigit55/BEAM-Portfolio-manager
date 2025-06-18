@@ -37,6 +37,25 @@ st.markdown(f"""
         section.main > div:nth-child(1) {{
             margin-top: -55px;
         }}
+        /* Onglet actif */
+        .stTabs [data-baseweb="tab"] {
+            background-color: #E8E8E8 !important;
+            color: #363636 !important;
+            border-radius: 5px 5px 0 0 !important;
+        }
+        
+        /* Onglet inactif */
+        .stTabs [data-baseweb="tab"]:not(:hover):not([aria-selected="true"]) {
+            background-color: #f5f5f5 !important;
+            color: #888 !important;
+        }
+        
+        /* Contour autour de l’onglet actif */
+        .stTabs [data-baseweb="tab"][aria-selected="true"] {
+            border-bottom: 3px solid #A49B6D !important;
+            font-weight: bold !important;
+        }
+
     </style>
 """, unsafe_allow_html=True)
 
