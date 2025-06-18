@@ -68,9 +68,14 @@ onglets = st.tabs([
 ])
 
 # Onglet : Portefeuille
+import streamlit as st
 from portefeuille import afficher_portefeuille
-with onglets[0]:
+
+st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
+st.title("BEAM Portfolio Manager")
+
     afficher_portefeuille()
+
 
 # Onglet : Performance
 from performance import afficher_performance
