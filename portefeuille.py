@@ -38,7 +38,7 @@ def afficher_portefeuille():
 
     total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
 
-    # HTML avec style et tableau scrollable
+    # HTML avec style
     html = """
     <style>
         .table-container {
@@ -72,11 +72,11 @@ def afficher_portefeuille():
         .portfolio-table td:first-child {
             text-align: left;
         }
-        .portfolio-table tr:nth-child(even) {
+        .portfolio-table tr.zebra:nth-child(even) {
             background-color: #efefef;
         }
         .total-row {
-            background-color: #A49B6D;
+            background-color: #A49B6D !important;
             font-weight: bold;
             color: white;
             border-top: 1px solid transparent;
@@ -92,7 +92,7 @@ def afficher_portefeuille():
     """
 
     for _, row in df.iterrows():
-        html += "<tr>"
+        html += '<tr class="zebra">'
         for col in colonnes:
             val = row.get(col, "")
             html += f"<td>{val}</td>"
@@ -100,7 +100,7 @@ def afficher_portefeuille():
 
     html += f"""
         <tr class="total-row">
-            <td colspan="1" style="text-align:left";">TOTAL</td>
+            <td colspan="1" style="text-align:left;">TOTAL</td>
             <td></td>
             <td></td>
             <td></td>
