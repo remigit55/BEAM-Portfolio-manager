@@ -16,13 +16,13 @@ def afficher_portefeuille():
     # Mise en forme des colonnes numériques si présentes
     if "Quantité" in df.columns:
         df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
-        df["Quantité"] = df["Valeur"].map(lambda x: f"{x: .0f}" if pd.notnull(x) else "")
+        df["Quantité"] = df["Valeur"].map(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
     if "Acquisition" in df.columns:
         df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
-        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x: .4f}" if pd.notnull(x) else "")
+        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
     if "Valeur" in df.columns:
         df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce")
-        df["Valeur"] = df["Valeur"].map(lambda x: f"{x: .2f}" if pd.notnull(x) else "")
+        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
 
     # Alignement à droite (via CSS personnalisé)
     st.markdown("""
