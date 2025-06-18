@@ -8,7 +8,7 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Nettoyage des colonnes
+    # Nettoyage des colonnes numériques
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
@@ -23,7 +23,7 @@ def afficher_portefeuille():
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage style français
+    # Format français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
@@ -36,19 +36,20 @@ def afficher_portefeuille():
     # Ordre des colonnes à afficher
     colonnes_affichage = []
     if "Tickers" in df.columns:
-        colonnes_affichage.append("Tickers")
+        df["Ticker"] = df["Tickers"]  # pour afficher avec un nom plus propre
+        colonnes_affichage.append("Ticker")
     colonnes_affichage += ["Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
     if "Devise" in df.columns:
         colonnes_affichage.append("Devise")
 
-    # Préparer le DataFrame pour affichage
+    # Construction du DataFrame final
     df_affichage = df[colonnes_affichage].rename(columns={
         "Quantité_fmt": "Quantité",
         "Acquisition_fmt": "Acquisition",
         "Valeur_fmt": "Valeur"
     })
 
-    # CSS pour alignement à droite
+    # CSS alignement à droite
     st.markdown("""
         <style>
             .st-emotion-cache-1xarl3l td {
