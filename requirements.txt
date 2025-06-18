@@ -3,3 +3,5 @@ streamlit
 openpyxl
 forex-python
 gdown
+gspread
+oauth2client
