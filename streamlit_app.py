@@ -32,7 +32,7 @@ st.markdown(f"""
             margin-top: -35px;  /* Remontée des onglets */
         }}
         section.main > div:nth-child(1) {{
-            margin-top: -35px;  /* Sécurité pour tous les cas */
+            margin-top: -55px;  /* Sécurité pour tous les cas */
         }}
     </style>
 """, unsafe_allow_html=True)
