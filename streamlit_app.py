@@ -41,3 +41,8 @@ onglets = st.tabs([
     "Paramètres"
 ])
 
+# Importer les scripts correspondant à chaque onglet
+with onglets[0]:
+    import portefeuille
+
+
