@@ -116,10 +116,52 @@ with tabs[0]:
         st.session_state.fx_rates = fx_rates_utilisés
 
 with tabs[1]:
-    if "performance" in st.session_state:
-        st.subheader("Performance historique")
-        perf = st.session_state.performance
-        st.line_chart(perf.set_index(perf.columns[0]))
+    st.subheader("Historique de valorisation du portefeuille")
+
+    if st.session_state.df is not None:
+        tickers = st.session_state.df["Tickers"].dropna().unique().tolist()
+        date_range = st.date_input("Plage de dates", [datetime.date.today() - datetime.timedelta(days=180), datetime.date.today()])
+
+        full_history = pd.DataFrame()
+
+        for ticker in tickers:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+            params = {
+                "period1": int(date_range[0].strftime("%s")),
+                "period2": int(date_range[1].strftime("%s")),
+                "interval": "1d"
+            }
+            headers = {"User-Agent": "Mozilla/5.0"}
+            try:
+                r = requests.get(url, params=params, headers=headers)
+                if r.ok:
+                    data = r.json()
+                    result = data["chart"]["result"][0]
+                    timestamps = result["timestamp"]
+                    closes = result["indicators"]["quote"][0]["close"]
+                    df_temp = pd.DataFrame({
+                        "Date": pd.to_datetime(timestamps, unit="s"),
+                        ticker: closes
+                    }).dropna()
+                    if full_history.empty:
+                        full_history = df_temp
+                    else:
+                        full_history = pd.merge(full_history, df_temp, on="Date", how="outer")
+            except:
+                pass
+
+        if not full_history.empty:
+            df_base = st.session_state.df.set_index("Tickers")["Quantité"].to_dict()
+            for ticker in tickers:
+                if ticker in df_base:
+                    full_history[ticker] = full_history[ticker] * df_base[ticker]
+            full_history["Total Portefeuille"] = full_history[tickers].sum(axis=1)
+            full_history.sort_values("Date", inplace=True)
+            st.line_chart(full_history.set_index("Date")["Total Portefeuille"])
+        else:
+            st.info("Aucune donnée récupérée sur Yahoo Finance.")
+    else:
+        st.info("Veuillez d'abord importer un portefeuille dans l'onglet Paramètres.")
 
 with tabs[2]:
     if "od" in st.session_state:
