@@ -73,7 +73,7 @@ def afficher_portefeuille():
             text-align: left;
         }
         .portfolio-table tr:nth-child(even) {
-            background-color: #ffffff;
+            background-color: #efefef;
         }
         .total-row {
             background-color: #A49B6D;
