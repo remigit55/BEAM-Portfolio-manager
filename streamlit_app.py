@@ -94,7 +94,10 @@ with tabs[0]:
                 return "Non trouvé"
 
             noms = df["Tickers"].apply(get_name)
-            df.insert(1, "Nom", noms)
+        if "Tickers" in df.columns:
+        index_ticker = df.columns.get_loc("Tickers")
+        df.insert(index_ticker + 1, "Nom", noms)
+
 
         st.dataframe(df, use_container_width=True)
         st.session_state.fx_rates = fx_rates_utilisés
