@@ -5,7 +5,7 @@ import datetime
 import requests
 import time
 
-st.header("Transactions comparables")
+def afficher_transactions():
 
 if "df" not in st.session_state or st.session_state.df is None:
     st.warning("Veuillez importer un fichier portefeuille dans l'onglet Paramètres.")
