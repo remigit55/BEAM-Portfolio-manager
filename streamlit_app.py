@@ -21,7 +21,7 @@ menu = st.sidebar.radio("Navigation", [
 
 # Gestion des onglets via import de fichiers séparés
 if menu == "Portefeuille":
-    import portfolio
+    import portefeuille
 elif menu == "Performance":
     import performance
 elif menu == "OD Comptables":
