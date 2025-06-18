@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 
 def afficher_parametres():
-    st.header("⚙️ Paramètres")
 
     # Définir la devise cible par défaut si non définie
     if "devise_cible" not in st.session_state:
