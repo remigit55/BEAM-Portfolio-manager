@@ -8,56 +8,40 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Nettoyage et conversion
+    # Conversion brute
     df["Quantité"] = pd.to_numeric(df.get("Quantité", 0), errors="coerce")
     df["Acquisition"] = pd.to_numeric(df.get("Acquisition", 0), errors="coerce")
     df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage français
+    # Formatage en style français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
-        return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", " ")
+        return f"{x:,.{dec}f}".replace(",", " ").replace(".", ",")
 
-    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
-    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
-    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+    df["Quantité"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    df["Acquisition"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    df["Valeur"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Création du tableau HTML
-    tableau = "<table><thead><tr>"
-    colonnes = ["Tickers", "Quantité", "Acquisition", "Valeur", "Devise"]
-    for col in colonnes:
-        tableau += f"<th>{col}</th>"
-    tableau += "</tr></thead><tbody>"
-
-    for _, row in df.iterrows():
-        tableau += "<tr>"
-        tableau += f"<td style='text-align: left'>{row.get('Tickers', '')}</td>"
-        tableau += f"<td style='text-align: right'>{row.get('Quantité_fmt', '')}</td>"
-        tableau += f"<td style='text-align: right'>{row.get('Acquisition_fmt', '')}</td>"
-        tableau += f"<td style='text-align: right'>{row.get('Valeur_fmt', '')}</td>"
-        tableau += f"<td style='text-align: left'>{row.get('Devise', '')}</td>"
-        tableau += "</tr>"
-
-    tableau += "</tbody></table>"
-
-    # CSS pour bordures et alignement
-    st.markdown("""
-        <style>
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            th, td {
-                padding: 8px;
-                border-bottom: 1px solid #ddd;
-                font-family: monospace;
-            }
-            thead {
-                background-color: #f0f0f0;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    # Colonnes à afficher dans l'ordre souhaité
+    colonnes = []
+    for col in ["Tickers", "Quantité", "Acquisition", "Valeur"]:
+        if col in df.columns:
+            colonnes.append(col)
+    if "Devise" in df.columns:
+        colonnes.append("Devise")
 
     # Affichage
-    st.markdown(tableau, unsafe_allow_html=True)
+    st.dataframe(df[colonnes], use_container_width=True)
+
+    # Alignement à droite
+    st.markdown("""
+        <style>
+        .st-emotion-cache-1xarl3l td {
+            text-align: right !important;
+        }
+        .st-emotion-cache-1xarl3l th {
+            text-align: right !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
