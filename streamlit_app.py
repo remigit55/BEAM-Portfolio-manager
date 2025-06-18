@@ -46,7 +46,7 @@ if "ticker_data_cache" not in st.session_state:
     st.session_state.ticker_data_cache = {}
 
 # Onglets
-tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions", "Taux de change", "Paramètres"])
+tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
 
 with tabs[0]:
     if st.session_state.df is not None:
@@ -90,7 +90,7 @@ with tabs[0]:
                 r = requests.get(url, headers=headers)
                 if r.ok:
                     data = r.json()
-                    meta = data["chart"]["result"][0]["meta"]
+                    meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
                     result = {
                         "Nom": meta.get("symbol", "Non trouvé"),
                         "Cours": meta.get("regularMarketPrice", ""),
@@ -108,8 +108,9 @@ with tabs[0]:
             info = df["Tickers"].apply(get_yahoo_data).apply(pd.Series)
             idx = df.columns.get_loc("Tickers") + 1
             for col in ["Nom", "Cours", "Devise Confirmée", "Plus Haut 52s"]:
-                df.insert(idx, col, info[col])
-                idx += 1
+                if col not in df.columns:
+                    df.insert(idx, col, info.get(col, ""))
+                    idx += 1
 
         st.dataframe(df, use_container_width=True)
         st.session_state.fx_rates = fx_rates_utilisés
