@@ -45,7 +45,7 @@ def afficher_portefeuille():
             max-height: 600px;
             overflow-y: auto;
             border-radius: 10px;
-            border: 1px solid #ccc;
+            border-style: none;
         }
         .portfolio-table {
             border-collapse: collapse;
@@ -65,7 +65,6 @@ def afficher_portefeuille():
         .portfolio-table td {
             padding: 6px;
             text-align: right;
-            border-bottom: 1px solid #eee;
             color: black;
             font-family: "Aptos narrow", Helvetica;
             font-size: 11px;
