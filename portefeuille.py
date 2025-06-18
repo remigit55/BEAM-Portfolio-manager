@@ -12,13 +12,13 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Conversion des colonnes numériques
-    if "Quantité" in df.columns:
-        df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
-    if "Acquisition" in df.columns:
-        df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
+    # Conversion des colonnes numériques (virgules françaises → points anglais si besoin)
+    for col in ["Quantité", "Acquisition"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(" ", "").str.replace(",", ".")
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Calcul de la valeur
+    # Calcul Valeur
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
