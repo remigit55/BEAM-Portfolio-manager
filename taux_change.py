@@ -79,9 +79,9 @@ def afficher_taux_change():
     html_code += """
     </tbody>
   </table>
-  components.html(html_code, height=400, scrolling=True)
+  st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
 </div>
 """
-    
+components.html(html_code, height=400, scrolling=True)    
 
-st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
+
