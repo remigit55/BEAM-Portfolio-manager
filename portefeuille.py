@@ -137,7 +137,7 @@ def afficher_portefeuille():
     html = f"""
     <style>
       .table-container {{ max-height:400px; overflow-y:auto; }}
-      .portfolio-table {{ width:100%; border-collapse:collapse; }}
+      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; }}
       .portfolio-table th {{
         background:#363636; color:white; padding:6px; text-align:center; border:none;
         position:sticky; top:0; z-index:2;
@@ -148,7 +148,17 @@ def afficher_portefeuille():
         font-family:"Aptos narrow",Helvetica; font-size:11px;
       }}
       .portfolio-table td:first-child {{ text-align:left; }}
-      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour la colonne Nom */
+      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
+      /* Largeur fixe pour les colonnes numériques */
+      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3), /* Quantité */
+      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Prix d'Acquisition */
+      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Valeur */
+      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Prix Actuel */
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Haut 52 Semaines */
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur H52 */
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ /* Valeur Actuelle */
+        width: 10%;
+      }}
       .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
       .total-row td {{
         background:#A49B6D; color:white; font-weight:bold;
@@ -167,8 +177,8 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td>"  # Pour Nom, Quantité, Prix d'Acquisition
-    html += f"<td>{total_str}</td></td><td>"  # Valeur
+    html += "<td></td><td></td><td></td>"  # Pour Nom, Quantité, Prix d'Acquisition
+    html += f"<td>{total_str}</td>"  # Valeur
     html += "<td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix Actuel, Haut 52 Semaines, Valeur H52, Valeur Actuelle, Devise
     html += "</tbody></table></div>"
 
