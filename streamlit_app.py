@@ -50,7 +50,7 @@ with col1:
         logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         st.markdown(
             f"""
-            <div style="display: flex; align-items: center; height: 100%; width: 50px;">
+            <div style="display: flex; align-items: center; height: 100%;">
                 <img src="data:image/png;base64,{logo_base64}" style="margin-right: 0px; width:64px;" />
             </div>
             """,
@@ -61,7 +61,7 @@ with col1:
 with col2:
     st.markdown(
         """
-        <div style="display: flex; align-items: left; height: 100%; padding-left: 10px;">
+        <div style="display: flex; align-items: center; height: 100%; padding-left: 10px;">
             <h1 style='font-size: 36px; margin-bottom: 0;'>BEAM Portfolio Manager</h1>
         </div>
         """,
