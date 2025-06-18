@@ -16,7 +16,7 @@ def afficher_portefeuille():
     # Mise en forme des colonnes numériques si présentes
     if "Quantité" in df.columns:
         df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
-        df["Quantité"] = df["Quantité"].map(lambda x: f"{x:" ".0f}" if pd.notnull(x) else "")
+        df["Quantité"] = df["Quantité"].map(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
     if "Acquisition" in df.columns:
         df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
         df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
