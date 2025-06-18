@@ -6,7 +6,7 @@ def afficher_parametres():
         st.session_state.devise_cible = "EUR"
 
     # Titre séparé de la sélection
-    st.markdown("#### Devise de référence")
+    st.markdown("#### Paramètres généraux")
 
     st.session_state.devise_cible = st.selectbox(
         "Sélectionnez la devise de référence",
