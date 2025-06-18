@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+import streamlit.components.v1 as components
 
 def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
