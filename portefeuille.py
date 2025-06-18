@@ -95,7 +95,10 @@ def afficher_portefeuille():
     html += f"""
         <tr class="total-row">
             <td colspan="1" style="text-align:right;">TOTAL</td>
-            <td colspan="4">{total_valeur_fmt}</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td colspan="1">{total_valeur_fmt}</td>
             <td></td>
         </tr>
         </tbody>
