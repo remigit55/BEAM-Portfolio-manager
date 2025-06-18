@@ -50,7 +50,7 @@ def afficher_portefeuille():
             text-align: center;
             border-bottom: px solid #ccc;
             color: white;
-            font-family: "Aptos narrow";
+            font-family: "Aptos narrow", Helvetica;
             font-size: 12px;
         }
         .portfolio-table td {
@@ -58,7 +58,7 @@ def afficher_portefeuille():
             text-align: right;
             border-bottom: 1px solid #eee;
             color: black;
-            font-family: "Aptos narrow";
+            font-family: "Aptos narrow", Helvetica;
             font-size: 31px;
         }
         .portfolio-table td:first-child {
