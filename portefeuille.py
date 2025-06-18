@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import requests
@@ -11,14 +12,19 @@ def afficher_portefeuille():
     df = st.session_state.df.copy()
 
     # Normalisation numérique
-    for col in ["Quantité", "Acquisition"]:
-        if col in df.columns:
-            df[col] = (
-                df[col].astype(str)
-                      .str.replace(" ", "", regex=False)
-                      .str.replace(",", ".", regex=False)
-            )
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    try:
+        for col in ["Quantité", "Acquisition"]:
+            if col in df.columns:
+                df[col] = (
+                    df[col].astype(str)
+                    .str.replace(" ", "", regex=False)
+                    .str.replace(",", ".", regex=False)
+                )
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+    except Exception as e:
+        print(f"Erreur lors de la normalisation numérique : {e}")
+        st.error(f"Erreur lors de la normalisation des données : {e}")
+        return
 
     # Calcul de la valeur
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
@@ -26,9 +32,9 @@ def afficher_portefeuille():
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV
     if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")  # Convertir en string, gérer NaN
+        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
-        df["Catégorie"] = ""  # Colonne vide si F n'existe pas
+        df["Catégorie"] = ""
 
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -47,14 +53,14 @@ def afficher_portefeuille():
 
             if not t or not t.replace(".", "").isalnum():
                 print(f"Ticker invalide ignoré : {t}")
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
-        
+                return {"ticker": None, "shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
                 }
-                r = requests.get(url, headers=headers, timeout=5)
+                r = requests.get(url, headers=headers, timeout=10)
                 r.raise_for_status()
 
                 data = r.json()
@@ -62,20 +68,20 @@ def afficher_portefeuille():
                 name = meta.get("shortName", "")
                 current_price = meta.get("regularMarketPrice", None)
                 fifty_two_week_high = meta.get("fiftyTwoWeekHigh", None)
-                
+
                 if not name:
                     name = f"https://finance.yahoo.com/quote/{t}"
-                
-                result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
+
+                result = {"ticker": t, "shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
                 st.session_state.ticker_names_cache[t] = result
                 time.sleep(0.5)
                 return result
             except Exception as e:
                 print(f"Erreur pour {t}: {e}")
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+                return {"ticker": t, "shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
         yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
-        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"] if isinstance(x, dict) else f"https://finance.yahoo.com/quote/{t}")
+        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"] if isinstance(x, dict) else f"https://finance.yahoo.com/quote/{x}")
         df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"] if isinstance(x, dict) else None)
         df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"] if isinstance(x, dict) else None)
 
@@ -87,7 +93,8 @@ def afficher_portefeuille():
 
     # Formatage : français + création des colonnes *_fmt
     def format_fr(x, dec):
-        if pd.isnull(x): return ""
+        if pd.isnull(x):
+            return ""
         s = f"{x:,.{dec}f}"
         return s.replace(",", " ").replace(".", ",")
 
@@ -130,13 +137,22 @@ def afficher_portefeuille():
         "Valeur H52",
         "Devise"
     ]
-    df_disp = df[cols].copy()
-    df_disp.columns = labels
+    try:
+        df_disp = df[cols].copy()
+        df_disp.columns = labels
+    except Exception as e:
+        print(f"Erreur lors de la préparation du DataFrame d'affichage : {e}")
+        st.error(f"Erreur lors de la préparation des données : {e}")
+        return
 
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
-        # Construction HTML
+    # Construction HTML
     html_parts = []
+
+    # Vérification des données
+    print("DataFrame shape:", st.session_state.df.shape if st.session_state.df is not None else "None")
+    print("DataFrame columns:", st.session_state.df.columns.tolist() if st.session_state.df is not None else "None")
 
     # CSS
     html_parts.append("""
@@ -183,9 +199,9 @@ def afficher_portefeuille():
       <tr>
 """)
 
-    # En-têtes
+    # En-têtes avec onclick
     for i, label in enumerate(labels):
-        html_parts.append(f'<th>{label}</th>')
+        html_parts.append(f'<th onclick="sortTable({i})">{label}</th>')
 
     # Fin des en-têtes et début du corps
     html_parts.append("""
@@ -195,12 +211,21 @@ def afficher_portefeuille():
 """)
 
     # Lignes de données
-    for _, row in df_disp.iterrows():
-        html_parts.append("<tr>")
-        for label in labels:
-            cell_value = row[label] if pd.notnull(row[label]) else ''
-            html_parts.append(f"<td>{cell_value}</td>")
-        html_parts.append("</tr>")
+    try:
+        if df_disp.empty:
+            print("DataFrame vide")
+            st.warning("Le DataFrame est vide, aucune donnée à afficher.")
+            return
+        for _, row in df_disp.iterrows():
+            html_parts.append("<tr>")
+            for label in labels:
+                cell_value = str(row[label]) if pd.notnull(row[label]) else ''
+                html_parts.append(f"<td>{cell_value}</td>")
+            html_parts.append("</tr>")
+    except Exception as e:
+        print(f"Erreur lors de la génération des lignes : {e}")
+        st.error(f"Erreur lors de la génération du tableau : {e}")
+        return
 
     # Ligne TOTAL
     html_parts.append(f"""
@@ -265,34 +290,16 @@ function sortTable(n) {
     console.error("Error in sortTable: " + e.message);
   }
 }
-
-// Fonction pour attacher les écouteurs
-function attachListeners() {
-  console.log("Attaching event listeners");
-  var headers = document.querySelectorAll("#portfolioTable th");
-  console.log("Headers found: " + headers.length);
-  headers.forEach((header, index) => {
-    header.addEventListener("click", () => {
-      console.log("Header clicked, column: " + index);
-      sortTable(index);
-    });
-  });
-}
-
-
-// Attachement initial
-attachListeners();
-
-// MutationObserver pour les re-rendus
-var observer = new MutationObserver(() => {
-  console.log("MutationObserver triggered");
-  attachListeners();
-});
-observer.observe(document.getElementById("portfolioTable") || document.body, { childList: true, subtree: true });
 </script>
 """)
 
     # Combiner toutes les parties
-    html = "".join(html_parts)
-
-    st.markdown(html, unsafe_allow_html=True)
+    try:
+        html = "".join(html_parts)
+        print("HTML length:", len(html))
+        st.markdown(html, unsafe_allow_html=True)
+    except Exception as e:
+        print(f"Erreur lors du rendu HTML : {e}")
+        st.error(f"Erreur lors du rendu du tableau : {e}")
+        return
+```
