@@ -1,9 +1,11 @@
+# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import datetime
 import requests
+from PIL import Image
 
-# Configuration de la page (à mettre en tout début)
+# Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Thème personnalisé
@@ -28,36 +30,26 @@ st.markdown(f"""
             padding: 10px;
             border-radius: 0 0 10px 10px;
             margin-bottom: 25px;
-            margin-top: -35px;  /* Remontée des onglets */
+            margin-top: -35px;
         }}
         section.main > div:nth-child(1) {{
             margin-top: -55px;
-        }}
-        .header-container {{
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 10px;
-        }}
-        .header-container img {{
-            height: 48px;
-        }}
-        .header-container h1 {{
-            font-size: 36px;
-            margin: 0;
         }}
     </style>
 """, unsafe_allow_html=True)
 
 # Titre avec logo
-st.markdown("""
-<div class="header-container">
-    <img src="logo.png" alt="Logo">
-    <h1>BEAM Portfolio Manager</h1>
-</div>
-""", unsafe_allow_html=True)
+col1, col2 = st.columns([1, 6])
+with col1:
+    try:
+        logo = Image.open("logo.png")
+        st.image(logo, width=48)
+    except Exception:
+        st.markdown("⚠️ Logo non trouvé.")
+with col2:
+    st.markdown("<h1 style='font-size: 36px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
 
-# Initialisation des variables session
+# Initialisation session_state
 if "df" not in st.session_state:
     st.session_state.df = None
 if "fx_rates" not in st.session_state:
@@ -67,10 +59,7 @@ if "devise_cible" not in st.session_state:
 if "ticker_names_cache" not in st.session_state:
     st.session_state.ticker_names_cache = {}
 
-# La devise de référence sera désormais gérée uniquement dans l’onglet "Paramètres"
-pass
-
-# Importation des modules fonctionnels
+# Importation des modules
 from portefeuille import afficher_portefeuille
 from performance import afficher_performance
 from transactions import afficher_transactions
@@ -78,7 +67,7 @@ from taux_change import afficher_taux_change
 from parametres import afficher_parametres
 from od_comptables import afficher_od_comptables
 
-# Onglets horizontaux
+# Onglets
 onglets = st.tabs([
     "Portefeuille", 
     "Performance", 
@@ -88,26 +77,20 @@ onglets = st.tabs([
     "Paramètres"
 ])
 
-# Onglet : Portefeuille
 with onglets[0]:
     afficher_portefeuille()
 
-# Onglet : Performance
 with onglets[1]:
     afficher_performance()
 
-# Onglet : OD Comptables
 with onglets[2]:
     afficher_od_comptables()
 
-# Onglet : Transactions
 with onglets[3]:
     afficher_transactions()
 
-# Onglet : Taux de change
 with onglets[4]:
     afficher_taux_change()
 
-# Onglet : Paramètres
 with onglets[5]:
     afficher_parametres()
