@@ -52,7 +52,6 @@ tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&
 with tabs[0]:
     if st.session_state.df is not None:
         
-
         df = st.session_state.df.copy()
         cr = CurrencyRates()
         fx_rates_utilisés = {}
