@@ -1,4 +1,4 @@
-""import streamlit as st
+import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
 import datetime
@@ -51,7 +51,6 @@ tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&
 # Onglet Portefeuille
 with tabs[0]:
     if st.session_state.df is not None:
-       st.subheader("Portefeuille consolidé")
         
         df = st.session_state.df.copy()
         cr = CurrencyRates()
