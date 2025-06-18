@@ -1,4 +1,4 @@
-import streamlit as st
+rimport streamlit as st
 import pandas as pd
 
 def afficher_portefeuille():
@@ -48,7 +48,7 @@ def afficher_portefeuille():
         .portfolio-table th {
             background-color: #f4f4f4;
             padding: 8px;
-            text-align: right;
+            text-align: center;
             border-bottom: 2px solid #ccc;
         }
         .portfolio-table td {
