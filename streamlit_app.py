@@ -33,11 +33,15 @@ st.markdown(f"""
         .st-emotion-cache-1v0mbdj, .st-emotion-cache-1avcm0n {{
             display: none;
         }}
+        .st-emotion-cache-18ni7ap {
+    margin-top: -35px;
+}
+
     </style>
 """, unsafe_allow_html=True)
 
 # Titre principal
-st.title("BEAM Portfolio Manager")
+st.markdown("<h1 style='font-size: 24px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
 
 # Initialisation des variables session
 if "df" not in st.session_state:
