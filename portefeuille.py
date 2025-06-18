@@ -25,10 +25,10 @@ def afficher_portefeuille():
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV
-    if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")  # Convertir en string, gérer NaN
+    if len(df.columns) > 5:
+        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
-        df["Catégorie"] = ""  # Colonne vide si F n'existe pas
+        df["Catégorie"] = ""
 
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -133,128 +133,107 @@ def afficher_portefeuille():
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
+    # Gestion du tri
+    if "sort_column" not in st.session_state:
+        st.session_state.sort_column = None
+    if "sort_direction" not in st.session_state:
+        st.session_state.sort_direction = "asc"
+
+    # Créer une ligne pour les en-têtes avec boutons de tri
+    header_cols = st.columns(len(labels))
+    for idx, (col, header_col) in enumerate(zip(labels, header_cols)):
+        with header_col:
+            button_key = f"sort_{col}_{idx}"
+            if st.button(
+                f"{col} {'▲' if st.session_state.sort_column == col and st.session_state.sort_direction == 'asc' else '▼' if st.session_state.sort_column == col else ''}",
+                key=button_key
+            ):
+                if st.session_state.sort_column == col:
+                    # Inverser la direction si la même colonne est cliquée
+                    st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
+                else:
+                    # Nouvelle colonne, trier par ordre croissant
+                    st.session_state.sort_column = col
+                    st.session_state.sort_direction = "asc"
+
+    # Appliquer le tri
+    if st.session_state.sort_column:
+        sort_key = {
+            "Quantité": "Quantité",
+            "Prix d'Acquisition": "Acquisition",
+            "Valeur": "Valeur",
+            "Prix Actuel": "currentPrice",
+            "Valeur Actuelle": "Valeur_Actuelle",
+            "Haut 52 Semaines": "fiftyTwoWeekHigh",
+            "Valeur H52": "Valeur_H52"
+        }.get(st.session_state.sort_column, st.session_state.sort_column)
+        # Utiliser la colonne non formatée pour les colonnes numériques
+        if sort_key in df.columns:
+            df_disp = df_disp.sort_values(
+                by=st.session_state.sort_column,
+                ascending=(st.session_state.sort_direction == "asc"),
+                key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce") if x.name in [
+                    "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines", "Valeur H52"
+                ] else x.str.lower()
+            )
+        else:
+            df_disp = df_disp.sort_values(
+                by=st.session_state.sort_column,
+                ascending=(st.session_state.sort_direction == "asc"),
+                key=lambda x: x.str.lower() if x.name in ["Ticker", "Nom", "Catégorie", "Devise"] else x
+            )
+
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
     # Construction HTML
-    html_parts = []
+    html = f"""
+    <style>
+      .table-container {{ max-height:400px; overflow-y:auto; }}
+      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; }}
+      .portfolio-table th {{
+        background:#363636; color:white; padding:6px; text-align:center; border:none;
+        position:sticky; top:0; z-index:2;
+        font-family:"Aptos narrow",Helvetica; font-size:12px;
+      }}
+      .portfolio-table td {{
+        padding:6px; text-align:right; border:none;
+        font-family:"Aptos narrow",Helvetica; font-size:11px;
+      }}
+      .portfolio-table td:first-child {{ text-align:left; }}
+      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
+      .portfolio-table td:nth-child(3) {{ text-align:left; }} /* Alignement à gauche pour Catégorie */
+      /* Largeur fixe pour les colonnes numériques */
+      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
+      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
+      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Prix Actuel */
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
+      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
+        width: 9%;
+      }}
+      .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
+      .total-row td {{
+        background:#A49B6D; color:white; font-weight:bold;
+      }}
+    </style>
+    <div class="table-container">
+      <table class="portfolio-table">
+        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead>
+        <tbody>
+    """
 
-    # CSS
-    html_parts.append("""
-<style>
-  .table-container { max-height:400px; overflow-y:auto; }
-  .portfolio-table { width:100%; border-collapse:collapse; table-layout:auto; }
-  .portfolio-table th {
-    background:#363636; color:white; padding:6px; text-align:center; border:none;
-    position:sticky; top:0; z-index:2;
-    font-family:"Aptos narrow",Helvetica; font-size:12px;
-    cursor:pointer;
-  }
-  .portfolio-table th:hover {
-    background:#4a4a4a;
-  }
-  .portfolio-table td {
-    padding:6px; text-align:right; border:none;
-    font-family:"Aptos narrow",Helvetica; font-size:11px;
-  }
-  .portfolio-table td:first-child { text-align:left; }
-  .portfolio-table td:nth-child(2) { text-align:left; }
-  .portfolio-table td:nth-child(3) { text-align:left; }
-  .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4),
-  .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5),
-  .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6),
-  .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7),
-  .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8),
-  .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9),
-  .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {
-    width: 9%;
-  }
-  .portfolio-table tr:nth-child(even) { background:#efefef; }
-  .total-row td {
-    background:#A49B6D; color:white; font-weight:bold;
-  }
-</style>
-""")
-
-    # Début du tableau
-    html_parts.append("""
-<div class="table-container">
-  <table class="portfolio-table" id="portfolioTable">
-    <thead>
-      <tr>
-""")
-
-    # En-têtes
-    for i, label in enumerate(labels):
-        html_parts.append(f'<th onclick="sortTable({i})">{label}</th>')
-
-    # Fin des en-têtes et début du corps
-    html_parts.append("""
-      </tr>
-    </thead>
-    <tbody id="tableBody">
-""")
-
-        # Lignes de données
     for _, row in df_disp.iterrows():
-        html_parts.append("<tr>")
-        for label in labels:
-            cell_value = row[label] if pd.notnull(row[label]) else ''
-            html_parts.append(f"<td>{cell_value}</td>")
-        html_parts.append("</tr>")
+        html += "<tr>"
+        for lbl in labels:
+            html += f"<td>{row[lbl] or ''}</td>"
+        html += "</tr>"
 
-    html_parts.append("""
-    </tbody>
-    <tfoot>
-      <tr class="total-row">
-        <td>TOTAL</td>
-        <td></td><td></td><td></td>
-        <td></td><td>{}</td>
-        <td></td><td></td><td></td><td></td><td></td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-""".format(total_str))  # total_str injecté ici
+    # Ligne TOTAL
+    html += "<tr class='total-row'><td>TOTAL</td>"
+    html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
+    html += f"<td>{total_str}</td>"  # Valeur
+    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix d'Acquisition, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
+    html += "</tbody></table></div>"
 
-    # JavaScript mis à jour
-    html_parts.append("""
-<script>
-function sortTable(n) {
-  var table = document.getElementById("portfolioTable");
-  var tbody = document.getElementById("tableBody");
-  var rows = Array.from(tbody.getElementsByTagName("tr"));
-  var th = table.getElementsByTagName("TH")[n];
-  var dir = th.getAttribute("data-sort-dir") || "asc";
-  dir = (dir === "asc") ? "desc" : "asc";
-  th.setAttribute("data-sort-dir", dir);
-
-  // Supprimer les flèches précédentes
-  var headers = table.getElementsByTagName("TH");
-  for (var i = 0; i < headers.length; i++) {
-    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/g, "");
-  }
-  th.innerHTML += (dir === "asc") ? " ▲" : " ▼";
-
-  rows.sort((rowA, rowB) => {
-    var x = rowA.getElementsByTagName("TD")[n].textContent.trim();
-    var y = rowB.getElementsByTagName("TD")[n].textContent.trim();
-    if (x === "" && y === "") return 0;
-    if (x === "") return dir === "asc" ? -1 : 1;
-    if (y === "") return dir === "asc" ? 1 : -1;
-    var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
-    var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
-    if (!isNaN(xValue) && !isNaN(yValue)) {
-      return dir === "asc" ? xValue - yValue : yValue - xValue;
-    }
-    xValue = x.toLowerCase();
-    yValue = y.toLowerCase();
-    return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
-  });
-
-  tbody.innerHTML = "";
-  rows.forEach(row => tbody.appendChild(row));
-}
-</script>
-""")
-
-    st.markdown("".join(html_parts), unsafe_allow_html=True)
+    st.markdown(html, unsafe_allow_html=True)
