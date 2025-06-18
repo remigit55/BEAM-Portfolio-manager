@@ -32,13 +32,13 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Ordre des colonnes
+    # Colonnes
     colonnes = ["Ticker", "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
     noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
     total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
 
-    # HTML avec style
+    # HTML avec zébrage ciblé et TOTAL préservé
     html = """
     <style>
         .table-container {
@@ -72,15 +72,13 @@ def afficher_portefeuille():
         .portfolio-table td:first-child {
             text-align: left;
         }
-        .portfolio-table tr.zebra:nth-child(even) {
+        .data-row:nth-child(even) {
             background-color: #efefef;
         }
         .total-row {
-            background-color: #A49B6D !important;
+            background-color: #A49B6D;
             font-weight: bold;
             color: white;
-            border-top: 1px solid transparent;
-            border-bottom: 1px solid transparent;
         }
     </style>
     <div class="table-container">
@@ -92,7 +90,7 @@ def afficher_portefeuille():
     """
 
     for _, row in df.iterrows():
-        html += '<tr class="zebra">'
+        html += '<tr class="data-row">'
         for col in colonnes:
             val = row.get(col, "")
             html += f"<td>{val}</td>"
@@ -100,7 +98,7 @@ def afficher_portefeuille():
 
     html += f"""
         <tr class="total-row">
-            <td colspan="1" style="text-align:left;">TOTAL</td>
+            <td style="text-align:left;">TOTAL</td>
             <td></td>
             <td></td>
             <td></td>
