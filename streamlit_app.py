@@ -44,5 +44,15 @@ onglets = st.tabs([
 # Importer les scripts correspondant à chaque onglet
 with onglets[0]:
     import portefeuille
+with onglets[1]:
+    import performance
+with onglets[2]:
+    import od_comptables
+with onglets[3]:
+    import transactions
+with onglets[4]:
+    import taux_change
+with onglets[5]:
+    import parametres
 
 
