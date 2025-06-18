@@ -3,31 +3,33 @@ import streamlit as st
 import pandas as pd
 
 def afficher_parametres():
+    st.subheader("Paramètres")
 
-    st.markdown("#### Paramètres généraux")
-    # Définir la devise cible par défaut si non définie
+    # Devise cible par défaut
     if "devise_cible" not in st.session_state:
         st.session_state.devise_cible = "EUR"
 
-    # Choix de la devise de consolidation
     st.session_state.devise_cible = st.selectbox(
-        "Devise de référence pour consolidation",
-        options=["USD", "EUR", "CAD", "CHF"],
+        "Devise de référence",
+        ["USD", "EUR", "CAD", "CHF"],
         index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
     )
 
-    # Zone d’import de portefeuille depuis un lien Google Sheets
-    st.markdown("#### Importer le portefeuille depuis Google Sheets (export CSV public)")
-    csv_url = st.text_input("Lien vers le fichier CSV exporté de Google Sheets")
+    st.markdown("#### Lien Google Sheets exporté en CSV (public)")
+    csv_url = st.text_input("Lien CSV")
 
     if csv_url:
         try:
-            st.session_state.df = pd.read_csv(csv_url)
-            st.success("Données importées avec succès depuis le lien CSV.")
+            # Ajout vérification si lien Google Sheets, transformer en lien CSV si besoin
+            if "docs.google.com" in csv_url and "output=csv" not in csv_url:
+                if "/edit" in csv_url:
+                    csv_url = csv_url.split("/edit")[0] + "/export?format=csv"
+                elif "?usp=sharing" in csv_url:
+                    csv_url = csv_url.split("?usp=sharing")[0] + "export?format=csv"
+
+            df = pd.read_csv(csv_url)
+            st.session_state.df = df
+            st.success("Données importées avec succès")
+            st.write(df.head())  # DEBUG uniquement
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
-
-    st.session_state.df = pd.read_csv(csv_url)
-    st.success("Données importées avec succès depuis le lien CSV.")
-    st.write(st.session_state.df.head())  # DEBUG
-
