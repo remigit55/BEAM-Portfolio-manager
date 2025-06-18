@@ -1,9 +1,7 @@
-# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import datetime
 import requests
-
 
 # Configuration de la page (à mettre en tout début)
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -33,14 +31,31 @@ st.markdown(f"""
             margin-top: -35px;  /* Remontée des onglets */
         }}
         section.main > div:nth-child(1) {{
-            margin-top: -55px;  /* Sécurité pour tous les cas */
+            margin-top: -55px;
+        }}
+        .header-container {{
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 10px;
+        }}
+        .header-container img {{
+            height: 48px;
+        }}
+        .header-container h1 {{
+            font-size: 36px;
+            margin: 0;
         }}
     </style>
 """, unsafe_allow_html=True)
 
-
-# Titre principal
-st.markdown("<h1 style='font-size: 36px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
+# Titre avec logo
+st.markdown("""
+<div class="header-container">
+    <img src="logo.png" alt="Logo">
+    <h1>BEAM Portfolio Manager</h1>
+</div>
+""", unsafe_allow_html=True)
 
 # Initialisation des variables session
 if "df" not in st.session_state:
@@ -61,6 +76,7 @@ from performance import afficher_performance
 from transactions import afficher_transactions
 from taux_change import afficher_taux_change
 from parametres import afficher_parametres
+from od_comptables import afficher_od_comptables
 
 # Onglets horizontaux
 onglets = st.tabs([
@@ -81,7 +97,6 @@ with onglets[1]:
     afficher_performance()
 
 # Onglet : OD Comptables
-from od_comptables import afficher_od_comptables
 with onglets[2]:
     afficher_od_comptables()
 
