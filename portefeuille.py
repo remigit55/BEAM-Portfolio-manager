@@ -24,13 +24,13 @@ def afficher_portefeuille():
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Récupération de shortName via Yahoo Finance (v8/chart)
+    # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance (v8/chart)
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     if ticker_col:
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
 
-        def fetch_shortname(t):
+        def fetch_yahoo_data(t):
             t = str(t).strip().upper()
             if t in st.session_state.ticker_names_cache:
                 return st.session_state.ticker_names_cache[t]
@@ -46,18 +46,25 @@ def afficher_portefeuille():
                 data = r.json()
                 meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
                 name = meta.get("shortName", "")
+                current_price = meta.get("regularMarketPrice", None)
+                fifty_two_week_high = meta.get("fiftyTwoWeekHigh", None)
                 
                 if not name:
                     name = f"https://finance.yahoo.com/quote/{t}"
                 
-                st.session_state.ticker_names_cache[t] = name
+                result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
+                st.session_state.ticker_names_cache[t] = result
                 time.sleep(0.5)  # Délai pour éviter le rate limiting
-                return name
+                return result
             except Exception as e:
                 print(f"Erreur pour {t}: {e}")
-                return f"https://finance.yahoo.com/quote/{t}"
+                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
-        df["shortName"] = df[ticker_col].apply(fetch_shortname)
+        # Appliquer fetch_yahoo_data et créer les colonnes
+        yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
+        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"])
+        df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"])
+        df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"])
 
     # Formatage : français + création des colonnes *_fmt
     def format_fr(x, dec):
@@ -65,13 +72,13 @@ def afficher_portefeuille():
         s = f"{x:,.{dec}f}"
         return s.replace(",", " ").replace(".", ",")
 
-    for col, dec in [("Quantité", 0), ("Acquisition", 4), ("Valeur", 2)]:
+    for col, dec in [("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 2), ("fiftyTwoWeekHigh", 2)]:
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
 
     # Préparer colonnes pour affichage
-    cols = [ticker_col, "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
-    labels = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
+    cols = [ticker_col, "shortName", "Quantité_fmt", "Acquisition_fmt", "currentPrice_fmt", "fiftyTwoWeekHigh_fmt", "Valeur_fmt", "Devise"]
+    labels = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Prix Actuel", "Haut 52 Semaines", "Valeur", "Devise"]
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
@@ -111,7 +118,7 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td></td>"
+    html += "<td></td><td></td><td></td><td></td><td></td>"  # Ajusté pour les nouvelles colonnes
     html += f"<td>{total_str}</td><td></td></tr>"
     html += "</tbody></table></div>"
 
