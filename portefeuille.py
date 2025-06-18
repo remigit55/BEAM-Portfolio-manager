@@ -268,6 +268,7 @@ function sortTable(n) {
 
 // Fonction pour attacher les écouteurs
 function attachListeners() {
+  setTimeout(attachListeners, 1000);
   console.log("Attaching event listeners");
   var headers = document.querySelectorAll("#portfolioTable th");
   console.log("Headers found: " + headers.length);
