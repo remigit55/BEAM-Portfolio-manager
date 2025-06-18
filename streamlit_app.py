@@ -51,7 +51,7 @@ tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&
 # Onglet Portefeuille
 with tabs[0]:
     if st.session_state.df is not None:
-        st.subheader("Portefeuille consolidé")
+        
 
         df = st.session_state.df.copy()
         cr = CurrencyRates()
