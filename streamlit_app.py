@@ -78,12 +78,9 @@ with onglets[1]:
     afficher_performance()
 
 # Onglet : OD Comptables
+from od_comptables import afficher_od_comptables
 with onglets[2]:
-    st.subheader("📋 OD Comptables")
-    if "od" in st.session_state:
-        st.dataframe(st.session_state.od, use_container_width=True)
-    else:
-        st.info("Aucune OD comptable enregistrée.")
+    afficher_od_comptables()
 
 # Onglet : Transactions
 from transactions import afficher_transactions
