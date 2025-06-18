@@ -1,6 +1,5 @@
 # streamlit_app.py
 import streamlit as st
-import importlib  # Nécessaire si tu veux forcer le rechargement
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
@@ -43,24 +42,22 @@ onglets = st.tabs([
 # Import dynamique et exécution
 with onglets[0]:
     import portefeuille
-    importlib.reload(portefeuille)
 
 with onglets[1]:
     import performance
-    importlib.reload(performance)
 
 with onglets[2]:
     import od_comptables
-    importlib.reload(od_comptables)
 
 with onglets[3]:
     import transactions
-    importlib.reload(transactions)
 
 with onglets[4]:
     import taux_change
-    importlib.reload(taux_change)
 
 with onglets[5]:
     import parametres
-    importlib.reload(parametres)  # <-- Force l'exécution même si déjà chargé
+    with onglets[5]:
+    st.write("✅ L'onglet Paramètres fonctionne")
+
+
