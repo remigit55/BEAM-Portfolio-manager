@@ -81,7 +81,7 @@ with onglets[2]:
 # Onglet : Transactions
 from transactions import afficher_transactions
 with onglets[3]:
-    afficher_transations()
+    afficher_transactions()
 
 # Onglet : Taux de change
 from taux_change import afficher_taux_change
