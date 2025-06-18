@@ -43,6 +43,8 @@ def afficher_portefeuille():
             border-collapse: collapse;
             width: 100%;
             overflow: hidden;
+            font-family: "Aptos narrow";
+            font-size: 11px;
         }
         .portfolio-table th {
             background-color: #363636;
