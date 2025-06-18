@@ -59,7 +59,7 @@ def afficher_portefeuille():
             border-bottom: 1px solid #eee;
             color: black;
             font-family: "Aptos narrow", Helvetica;
-            font-size: 31px;
+            font-size: 11px;
         }
         .portfolio-table td:first-child {
             text-align: left;
