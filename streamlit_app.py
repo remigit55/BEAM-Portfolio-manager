@@ -68,10 +68,12 @@ onglets = st.tabs([
 ])
 
 # Onglet : Portefeuille
+from portefeuille import afficher_portefeuille
 with onglets[0]:
     afficher_portefeuille()
 
 # Onglet : Performance
+from performance import afficher_performance
 with onglets[1]:
     afficher_performance()
 
@@ -84,13 +86,16 @@ with onglets[2]:
         st.info("Aucune OD comptable enregistrée.")
 
 # Onglet : Transactions
+from transactions import afficher_transactions
 with onglets[3]:
     afficher_transactions()
 
 # Onglet : Taux de change
+from taux_change import afficher_taux_change
 with onglets[4]:
     afficher_taux_change()
 
 # Onglet : Paramètres
+from parametres import afficher_parametres
 with onglets[5]:
     afficher_parametres()
