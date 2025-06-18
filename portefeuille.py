@@ -43,14 +43,13 @@ def afficher_portefeuille():
             border-collapse: collapse;
             width: 100%;
             overflow: hidden;
-            color: white;
         }
         .portfolio-table th {
             background-color: #363636;
             padding: 8px;
             text-align: center;
             border-bottom: px solid #ccc;
-            color: black;
+            color: white;
         }
         .portfolio-table td {
             padding: 8px;
