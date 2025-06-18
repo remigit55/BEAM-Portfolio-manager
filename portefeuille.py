@@ -46,33 +46,4 @@ def afficher_portefeuille():
         "Valeur_fmt": "Valeur"
     })
 
-    # Générer le HTML pour Streamlit
-    html_table = df_affichage.to_html(index=False, escape=False, classes="styled-table")
-
-    # Ajouter style CSS avec retour à la ligne
-    style = """
-    <style>
-        .styled-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        .styled-table th, .styled-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: right;
-        }
-        .styled-table th:first-child, .styled-table td:first-child {
-            text-align: left;
-        }
-        .styled-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .styled-table tr:hover {
-            background-color: #f1f1f1;
-        }
-    </style>
-    """
-
-    st.markdown(style + html_table, unsafe_allow_html=True)
+   
