@@ -2,6 +2,10 @@
 import streamlit as st
 import pandas as pd
 
+import streamlit as st
+st.write("🛠️ Chargement des paramètres...")
+
+
 st.subheader("Paramètres")
 
 # Définir la devise cible par défaut si non définie
