@@ -8,11 +8,12 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Conversion des colonnes numériques
+    # Nettoyage et conversion
     df["Quantité"] = pd.to_numeric(df.get("Quantité", 0), errors="coerce")
     df["Acquisition"] = pd.to_numeric(df.get("Acquisition", 0), errors="coerce")
     df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
+    # Formatage français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
@@ -22,29 +23,41 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Sélection et renommage des colonnes pour affichage
-    df_affichage = df[["Tickers", "Devise", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]].rename(columns={
-        "Quantité_fmt": "Quantité",
-        "Acquisition_fmt": "Acquisition",
-        "Valeur_fmt": "Valeur"
-    })
+    # Création du tableau HTML
+    tableau = "<table><thead><tr>"
+    colonnes = ["Tickers", "Devise", "Quantité", "Acquisition", "Valeur"]
+    for col in colonnes:
+        tableau += f"<th>{col}</th>"
+    tableau += "</tr></thead><tbody>"
 
-    # Affichage HTML avec alignement à droite
+    for _, row in df.iterrows():
+        tableau += "<tr>"
+        tableau += f"<td style='text-align: left'>{row.get('Tickers', '')}</td>"
+        tableau += f"<td style='text-align: left'>{row.get('Devise', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Quantité_fmt', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Acquisition_fmt', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Valeur_fmt', '')}</td>"
+        tableau += "</tr>"
+
+    tableau += "</tbody></table>"
+
+    # CSS pour bordures et alignement
     st.markdown("""
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px 12px;
-            text-align: right;
-            border-bottom: 1px solid #ddd;
-        }
-        th:first-child, td:first-child {
-            text-align: left;
-        }
-    </style>
+        <style>
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                padding: 8px;
+                border-bottom: 1px solid #ddd;
+                font-family: monospace;
+            }
+            thead {
+                background-color: #f0f0f0;
+            }
+        </style>
     """, unsafe_allow_html=True)
 
-    st.markdown(df_affichage.to_html(index=False, escape=False), unsafe_allow_html=True)
+    # Affichage
+    st.markdown(tableau, unsafe_allow_html=True)
