@@ -82,20 +82,29 @@ with tabs[0]:
         df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
         df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
-        # Ajouter colonne Nom via récupération Yahoo Finance
+        # Ajouter colonne Nom via récupération Yahoo Finance avec cache en mémoire
         if "Tickers" in df.columns:
-            def get_name(ticker):
+            if "ticker_names_cache" not in st.session_state:
+                st.session_state.ticker_names_cache = {}
+        
+            def get_name_cached(ticker):
+                if ticker in st.session_state.ticker_names_cache:
+                    return st.session_state.ticker_names_cache[ticker]
                 try:
                     response = requests.get(f"{yf_base_url}{ticker}")
                     if response.ok:
-                        return response.json()['quoteResponse']['result'][0].get('shortName', 'Non trouvé')
+                        name = response.json()['quoteResponse']['result'][0].get('shortName', 'Non trouvé')
+                    else:
+                        name = "Erreur requête"
                 except:
-                    return "Erreur nom"
-                return "Non trouvé"
+                    name = "Erreur nom"
+                st.session_state.ticker_names_cache[ticker] = name
+                return name
         
-            noms = df["Tickers"].apply(get_name)
+            noms = df["Tickers"].apply(get_name_cached)
             index_ticker = df.columns.get_loc("Tickers")
             df.insert(index_ticker + 1, "Nom", noms)
+
 
         st.dataframe(df, use_container_width=True)
         st.session_state.fx_rates = fx_rates_utilisés
