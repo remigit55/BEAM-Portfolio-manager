@@ -1,6 +1,9 @@
 # parametres.py
 import streamlit as st
 import pandas as pd
+from forex_python.converter import CurrencyRates
+import datetime
+import requests
 
 st.header("Paramètres")
 
