@@ -1,35 +1,63 @@
 # taux_change.py
 import streamlit as st
 import pandas as pd
+import yfinance as yf
+import time
 import datetime
-from forex_python.converter import CurrencyRates
 
 def afficher_taux_change():
-    st.header("Taux de change")
+    st.header("Taux de change (actualisation automatique toutes les 30 secondes)")
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
     devises_sources = ["USD", "CAD", "JPY"]
 
-    def maj_taux():
-        try:
-            c = CurrencyRates()
-            for dev in devises_sources:
-                if dev != devise_cible:
-                    taux = c.get_rate(dev, devise_cible)
-                    st.session_state.fx_rates[dev] = taux
-            st.success(f"Taux mis à jour vers la devise cible : {devise_cible}")
-        except Exception as e:
-            st.error(f"Erreur lors de la récupération des taux : {e}")
+    # Mapping vers les tickers Yahoo correspondants
+    tickers_map = {
+        ("USD", "EUR"): "EURUSD=X",
+        ("CAD", "EUR"): "EURCAD=X",
+        ("JPY", "EUR"): "EURJPY=X",
+        ("EUR", "USD"): "USDEUR=X",
+        ("CAD", "USD"): "USDCAD=X",
+        ("JPY", "USD"): "USDJPY=X",
+        # Ajoute plus de combinaisons ici si besoin
+    }
 
-    if st.button("🔄 Rafraîchir les taux"):
-        maj_taux()
+    fx_rates = {}
+    for src in devises_sources:
+        if src == devise_cible:
+            fx_rates[src] = 1.0
+        else:
+            key = (devise_cible, src)
+            inv = False
+            if key in tickers_map:
+                ticker = tickers_map[key]
+            else:
+                key = (src, devise_cible)
+                ticker = tickers_map.get(key)
+                inv = True
 
-    if "fx_rates" in st.session_state and st.session_state.fx_rates:
-        fx_df = pd.DataFrame(
-            list(st.session_state.fx_rates.items()),
-            columns=["Devise source → " + devise_cible, "Taux"]
-        )
-        st.markdown(f"Taux appliqués pour conversion en **{devise_cible}** au **{datetime.date.today()}** :")
-        st.dataframe(fx_df, use_container_width=True)
-    else:
-        st.info("Aucun taux de change disponible. Cliquez sur le bouton ci-dessus pour les récupérer.")
+            if ticker:
+                try:
+                    data = yf.download(ticker, period="1d", interval="1m")
+                    last = data["Close"].dropna().iloc[-1]
+                    fx_rates[src] = 1 / last if inv else last
+                except Exception:
+                    fx_rates[src] = None
+            else:
+                fx_rates[src] = None
+
+    # Enregistrement dans la session
+    st.session_state.fx_rates = fx_rates
+
+    # Affichage
+    fx_df = pd.DataFrame([
+        {"De": dev, "Vers": devise_cible, "Taux": round(taux, 6) if taux else "Erreur"}
+        for dev, taux in fx_rates.items()
+    ])
+
+    st.markdown(f"Taux au **{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}**")
+    st.dataframe(fx_df, use_container_width=True)
+
+    # Rafraîchissement automatique (30s)
+    st.experimental_rerun() if st.button("⟳ Rafraîchir manuellement") else time.sleep(30)
+    st.experimental_rerun()
