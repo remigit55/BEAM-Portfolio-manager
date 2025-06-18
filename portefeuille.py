@@ -34,7 +34,7 @@ def afficher_portefeuille():
             if t in st.session_state.ticker_names_cache:
                 return st.session_state.ticker_names_cache[t]
             try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{Ticker}"
+                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 r = requests.get(url, timeout=5)
                 name = ""
                 if r.ok:
