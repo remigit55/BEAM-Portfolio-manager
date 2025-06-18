@@ -42,14 +42,14 @@ onglets = st.tabs([
 ])
 
 with onglets[0]:
-    import portefeuille
+    import portefeuille.py
 with onglets[1]:
-    import performance
+    import performance.py
 with onglets[2]:
     import od_comptables
 with onglets[3]:
-    import transactions_ma
+    import transactions
 with onglets[4]:
     import taux_change
 with onglets[5]:
-    import parametres
+    import parametres.py
