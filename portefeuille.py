@@ -24,25 +24,27 @@ def afficher_portefeuille():
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
+    # Ajout de la colonne Catégorie depuis la colonne F du CSV
+    if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
+        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")  # Convertir en string, gérer NaN
+    else:
+        df["Catégorie"] = ""  # Colonne vide si F n'existe pas
+
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     if ticker_col:
-        # Réinitialiser le cache pour éviter les anciennes valeurs non-dictionnaires
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
 
         def fetch_yahoo_data(t):
             t = str(t).strip().upper()
-            # Vérifier le cache et valider que l'entrée est un dictionnaire
             if t in st.session_state.ticker_names_cache:
                 cached = st.session_state.ticker_names_cache[t]
                 if isinstance(cached, dict) and "shortName" in cached:
                     return cached
                 else:
-                    # Supprimer les entrées de cache invalides
                     del st.session_state.ticker_names_cache[t]
 
-            # Ignorer les tickers invalides
             if not t or not t.replace(".", "").isalnum():
                 print(f"Ticker invalide ignoré : {t}")
                 return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
@@ -66,20 +68,18 @@ def afficher_portefeuille():
                 
                 result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
                 st.session_state.ticker_names_cache[t] = result
-                time.sleep(0.5)  # Délai pour éviter le rate limiting
+                time.sleep(0.5)
                 return result
             except Exception as e:
                 print(f"Erreur pour {t}: {e}")
                 return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
-        # Appliquer fetch_yahoo_data et extraire les colonnes
         yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
-        # Vérifier que chaque élément est un dictionnaire avant d'extraire
         df["shortName"] = yahoo_data.apply(lambda x: x["shortName"] if isinstance(x, dict) else f"https://finance.yahoo.com/quote/{t}")
         df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"] if isinstance(x, dict) else None)
         df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"] if isinstance(x, dict) else None)
 
-    # Calcul des nouvelles colonnes Valeur H52 et Valeur Actuelle
+    # Calcul des colonnes Valeur H52 et Valeur Actuelle
     if all(c in df.columns for c in ["Quantité", "fiftyTwoWeekHigh"]):
         df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
     if all(c in df.columns for c in ["Quantité", "currentPrice"]):
@@ -107,6 +107,7 @@ def afficher_portefeuille():
     cols = [
         ticker_col,
         "shortName",
+        "Catégorie",
         "Quantité_fmt",
         "Acquisition_fmt",
         "Valeur_fmt",
@@ -119,6 +120,7 @@ def afficher_portefeuille():
     labels = [
         "Ticker",
         "Nom",
+        "Catégorie",
         "Quantité",
         "Prix d'Acquisition",
         "Valeur",
@@ -149,15 +151,16 @@ def afficher_portefeuille():
       }}
       .portfolio-table td:first-child {{ text-align:left; }}
       .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
+      .portfolio-table td:nth-child(3) {{ text-align:left; }} /* Alignement à gauche pour Catégorie */
       /* Largeur fixe pour les colonnes numériques */
-      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3), /* Quantité */
-      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Prix d'Acquisition */
-      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Valeur */
-      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Prix Actuel */
-      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Valeur Actuelle */
-      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Haut 52 Semaines */
-      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ /* Valeur H52 */
-        width: 10%;
+      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
+      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
+      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Prix Actuel */
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
+      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
+        width: 9%;
       }}
       .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
       .total-row td {{
@@ -177,9 +180,9 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td></td>"  # Pour Nom, Quantité, Prix d'Acquisition
-    html += f"<td>{total_str}</td>"  # Valeur
-    html += "<td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
+    html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
+    html += f"<td>{total_str}</td>"  # Prix d'Acquisition
+    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Valeur, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
     html += "</tbody></table></div>"
 
     st.markdown(html, unsafe_allow_html=True)
