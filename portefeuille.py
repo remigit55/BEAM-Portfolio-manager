@@ -42,8 +42,9 @@ def afficher_portefeuille():
     html = """
     <style>
         .table-container {
-            max-height: 50%;
+            max-height: 600px;
             overflow-y: auto;
+            border-radius: 10px;
         }
         .portfolio-table {
             border-collapse: collapse;
@@ -59,11 +60,12 @@ def afficher_portefeuille():
             position: sticky;
             top: 0;
             z-index: 1;
+            border-bottom: 1px solid transparent;
         }
         .portfolio-table td {
             padding: 6px;
             text-align: right;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid transparent;
             color: black;
             font-family: "Aptos narrow", Helvetica;
             font-size: 11px;
@@ -75,6 +77,8 @@ def afficher_portefeuille():
             background-color: #A49B6D;
             font-weight: bold;
             color: white;
+            border-top: 1px solid transparent;
+            border-bottom: 1px solid transparent;
         }
     </style>
     <div class="table-container">
@@ -94,11 +98,8 @@ def afficher_portefeuille():
 
     html += f"""
         <tr class="total-row">
-            <td colspan="1" style="text-align:left;">TOTAL</td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td colspan="1">{total_valeur_fmt}</td>
+            <td colspan="4" style="text-align:right;">TOTAL</td>
+            <td>{total_valeur_fmt}</td>
             <td></td>
         </tr>
         </tbody>
