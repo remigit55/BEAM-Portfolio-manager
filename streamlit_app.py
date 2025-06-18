@@ -71,8 +71,13 @@ with tabs[0]:
             df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
         df["Taux FX"] = df["Devise"].apply(lambda d: get_fx_rate(d, devise_cible))
-        df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX"]
 
+        # Remplace les erreurs ou None par 0 pour éviter les plantages
+        df["Taux FX Num"] = pd.to_numeric(df["Taux FX"], errors="coerce").fillna(0)
+        
+        # Calcul de la valeur convertie
+        df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX Num"]
+        
         st.dataframe(df, use_container_width=True)
 
         st.session_state.fx_rates = fx_rates_utilisés
