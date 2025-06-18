@@ -40,33 +40,28 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Titre avec logo centré verticalement
-col1, col2 = st.columns([1, 8])
-with col1:
-    try:
-        logo = Image.open("Logo.png.png")  # vérifie bien le nom exact du fichier
-        buffer = BytesIO()
-        logo.save(buffer, format="PNG")
-        logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        st.markdown(
-            f"""
-            <div style="display: flex; align-items: center; height: 100%;">
-                <img src="data:image/png;base64,{logo_base64}" style="margin-right: 0px; width:64px;" />
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    except Exception:
-        st.markdown("⚠️ Logo non trouvé.")
-with col2:
-    st.markdown(
-        """
-        <div style="display: flex; align-items: center; height: 100%; padding-left: 10px;">
-            <h1 style='font-size: 36px; margin-bottom: 0;'>BEAM Portfolio Manager</h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+from PIL import Image
+import base64
+from io import BytesIO
+
+try:
+    logo = Image.open("Logo.png.png")  # ajuste le nom si besoin
+    buffer = BytesIO()
+    logo.save(buffer, format="PNG")
+    logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+except Exception:
+    logo_base64 = ""
+
+st.markdown(
+    f"""
+    <div style="display: flex; align-items: center; margin-top: -10px; margin-bottom: 20px;">
+        <img src="data:image/png;base64,{logo_base64}" style="height: 50px; margin-right: 12px;" />
+        <h1 style='font-size: 32px; margin: 0;'>BEAM Portfolio Manager</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 # Initialisation des variables de session
 if "df" not in st.session_state:
