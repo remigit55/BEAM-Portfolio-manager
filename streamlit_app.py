@@ -32,6 +32,9 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# Onglets de navigationMore actions
+tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions", "Taux de change", "Paramètres"])
+
 # Bandeau horizontal de navigation
 menu = st.selectbox("Navigation", [
     "Portefeuille", 
