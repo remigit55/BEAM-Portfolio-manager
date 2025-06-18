@@ -28,20 +28,23 @@ def afficher_taux_change():
         st.info("Aucun portefeuille chargé.")
         return
 
+    st.markdown("#### Taux de change")
+
     devise_cible = st.session_state.get("devise_cible", "EUR")
     devises_uniques = sorted(set(df["Devise"].dropna().unique()))
     taux_dict = {}
 
-    with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
-        for d in devises_uniques:
-            taux = obtenir_taux(d, devise_cible)
-            if taux:
-                taux_dict[d] = taux
+    if st.button("🔄 Rafraîchir les taux de change"):
+        with st.spinner("Mise à jour des taux depuis Yahoo Finance..."):
+            for d in devises_uniques:
+                taux = obtenir_taux(d, devise_cible)
+                if taux:
+                    taux_dict[d] = taux
+        st.session_state.fx_rates = taux_dict
 
-    st.session_state.fx_rates = taux_dict
-
+    taux_dict = st.session_state.get("fx_rates", {})
     if not taux_dict:
-        st.warning("Aucun taux de change valide récupéré.")
+        st.warning("Aucun taux de change disponible. Cliquez sur le bouton pour les charger.")
         return
 
     taux_df = pd.DataFrame(list(taux_dict.items()), columns=["Devise Source", f"Taux vers {devise_cible}"])
@@ -111,5 +114,5 @@ function sortTable(n) {
 </script>
 """
 
-    st.markdown(f"#### Taux de change appliqués vers la devise de référence **{devise_cible}** – _{datetime.datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}_")
+    st.markdown(f"Taux de change vers la devise **{devise_cible}** – _{datetime.datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}_")
     components.html(html_code, height=500, scrolling=True)
