@@ -66,13 +66,9 @@ with onglets[0]:
     afficher_portefeuille()
 
 # Onglet : Performance
+from performanxe import afficher_performance
 with onglets[1]:
-    st.subheader("📈 Performance")
-    if "performance" in st.session_state:
-        perf = st.session_state.performance
-        st.line_chart(perf.set_index(perf.columns[0]))
-    else:
-        st.info("Aucune donnée de performance disponible.")
+    afficher_performance()
 
 # Onglet : OD Comptables
 with onglets[2]:
