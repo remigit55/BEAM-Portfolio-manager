@@ -42,25 +42,26 @@ def afficher_portefeuille():
         .portfolio-table {
             border-collapse: collapse;
             width: 100%;
-            font-family: sans-serif;
-            font-size: 12px;
-            border-radius: 30px;
-            overflow: hiden;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #ddd;
         }
         .portfolio-table th {
             background-color: #f4f4f4;
             padding: 8px;
             text-align: center;
-            border-bottom: 1px solid #ccc;
+            border-bottom: 2px solid #ccc;
         }
         .portfolio-table td {
-            padding: 6px 10px;
-            border-bottom: 1px solid #ddd;
+            padding: 8px;
             text-align: right;
+            border-bottom: 1px solid #eee;
         }
-        .portfolio-table td:first-child,
-        .portfolio-table th:first-child {
+        .portfolio-table td:first-child {
             text-align: left;
+        }
+        .portfolio-table tr:last-child td {
+            border-bottom: none;
         }
     </style>
     <table class="portfolio-table">
