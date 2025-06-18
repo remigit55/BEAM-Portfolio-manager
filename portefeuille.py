@@ -1,5 +1,3 @@
-# portefeuille.py
-
 import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
@@ -13,42 +11,29 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Mise en forme des colonnes numériques si présentes
+    # Formatage
     if "Quantité" in df.columns:
         df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
-        df["Quantité"] = df["Quantité"].map(lambda x: f"{x:,.0f}" if pd.notnull(x) else "")
+
     if "Acquisition" in df.columns:
         df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
-        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
-    if "Valeur" in df.columns:
-        df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce")
-        df["Valeur_fmt"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
 
-    # Construction du tableau à afficher
-    colonnes_affichage = []
-    for col in df.columns:
-        if col == "Acquisition_fmt":
-            colonnes_affichage.append("Acquisition_fmt")
-        elif col == "Valeur_fmt":
-            colonnes_affichage.append("Valeur_fmt")
-        elif col in ["Acquisition", "Valeur"]:
-            continue
-        else:
-            colonnes_affichage.append(col)
+    if "Valeur" not in df.columns and "Quantité" in df.columns and "Acquisition" in df.columns:
+        df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    df_affichage = df[colonnes_affichage].rename(columns={
-        "Acquisition_fmt": "Acquisition",
-        "Valeur_fmt": "Valeur"
-    })
+    # Mise en forme avec espaces pour les milliers
+    df["Quantité_fmt"] = df["Quantité"].map(lambda x: formater_nombre_fr(x, decimales=0))
+    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: formater_nombre_fr(x, decimales=4))
+    df["Valeur_fmt"] = df["Valeur"].map(lambda x: formater_nombre_fr(x, decimales=2))
 
-    # Alignement à droite (via CSS personnalisé)
-    st.markdown("""
-        <style>
-            .stDataFrame td {
-                text-align: right !important;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    # Construction du tableau final
+    colonnes = []
+    if "Tickers" in df.columns: colonnes.append("Tickers")
+    if "Shortname" in df.columns: colonnes.append("Shortname")
+    colonnes += ["Devise", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
 
+    df_affichage = df[colonnes]
+    df_affichage.columns = ["Tickers", "Nom", "Devise", "Quantité", "Acquisition", "Valeur"]  # Renommage lisible
+
+    # Affichage
     st.dataframe(df_affichage, use_container_width=True)
-
