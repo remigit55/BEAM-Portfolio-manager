@@ -48,14 +48,14 @@ def afficher_portefeuille():
                 name = meta.get("shortName", "")
                 
                 if not name:
-                    name = f"https://finance.yahoo.com/quote/{t}"
+                    name = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 
                 st.session_state.ticker_names_cache[t] = name
                 time.sleep(0.5)  # Délai pour éviter le rate limiting
                 return name
             except Exception as e:
                 print(f"Erreur pour {t}: {e}")
-                return f"https://finance.yahoo.com/quote/{t}"
+                return f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
 
         df["shortName"] = df[ticker_col].apply(fetch_shortname)
 
