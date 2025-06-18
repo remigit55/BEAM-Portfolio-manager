@@ -25,7 +25,7 @@ def afficher_portefeuille():
 
     # Création du tableau HTML
     tableau = "<table><thead><tr>"
-    colonnes = ["Tickers", "Devise", "Quantité", "Acquisition", "Valeur"]
+    colonnes = ["Tickers", "Quantité", "Acquisition", "Valeur", "Devise"]
     for col in colonnes:
         tableau += f"<th>{col}</th>"
     tableau += "</tr></thead><tbody>"
