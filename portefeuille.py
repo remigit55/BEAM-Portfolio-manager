@@ -22,7 +22,30 @@ def afficher_portefeuille():
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-   
+
+
+    # Préparer les colonnes d’affichage
+    colonnes_affichage = []
+    for col in df.columns:
+        if col == "Acquisition_fmt":
+            colonnes_affichage.append("Acquisition_fmt")
+        elif col == "Valeur_fmt":
+            colonnes_affichage.append("Valeur_fmt")
+        elif col in ["Acquisition", "Valeur"]:
+            continue
+        elif col == "Quantité_fmt":
+            colonnes_affichage.append("Quantité_fmt")
+        elif col == "Quantité":
+            continue
+        else:
+            colonnes_affichage.append(col)
+
+    # Renommer colonnes formatées pour affichage
+    df_affichage = df[colonnes_affichage].rename(columns={
+        "Quantité_fmt": "Quantité",
+        "Acquisition_fmt": "Acquisition",
+        "Valeur_fmt": "Valeur"
+    })
 
     # Alignement CSS à droite
     st.markdown("""
