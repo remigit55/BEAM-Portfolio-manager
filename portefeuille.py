@@ -12,6 +12,11 @@ def afficher_portefeuille():
         return
 
     df = st.session_state.df.copy()
+
+    if "Tickers" not in df.columns:
+    st.error("Le fichier importé ne contient pas de colonne 'Tickers'.")
+    return
+    
     cr = CurrencyRates()
     fx_rates_utilisés = {}
     devise_cible = st.session_state.devise_cible if "devise_cible" in st.session_state else "EUR"
