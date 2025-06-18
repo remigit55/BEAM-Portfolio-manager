@@ -24,13 +24,33 @@ def afficher_portefeuille():
         df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce")
         df["Valeur"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
 
+        # Construction du tableau à afficher
+    colonnes_affichage = []
+    for col in df.columns:
+        if col == "Acquisition_fmt":
+            colonnes_affichage.append("Acquisition_fmt")
+        elif col == "Valeur_fmt":
+            colonnes_affichage.append("Valeur_fmt")
+        elif col in ["Acquisition", "Valeur"]:
+            continue
+        else:
+            colonnes_affichage.append(col)
+
+    df_affichage = df[colonnes_affichage].rename(columns={
+        "Acquisition_fmt": "Acquisition",
+        "Valeur_fmt": "Valeur"
+    })
+
     # Alignement à droite (via CSS personnalisé)
     st.markdown("""
         <style>
-            .stDataFrame td:nth-child(n+1):not(:first-child) {
+            .stDataFrame td {
                 text-align: right !important;
             }
         </style>
+    """, unsafe_allow_html=True)
+
+    st.dataframe(df_affichage, use_container_width=True)
     """, unsafe_allow_html=True)
 
     st.dataframe(df, use_container_width=True)
