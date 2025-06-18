@@ -45,17 +45,20 @@ def afficher_portefeuille():
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid white;
+            border-color: white;
         }
         .portfolio-table th {
             background-color: #f4f4f4;
             padding: 8px;
             text-align: center;
             border-bottom: px solid #ccc;
+            border-color: white;
         }
         .portfolio-table td {
             padding: 8px;
             text-align: right;
             border-bottom: 1px solid #eee;
+            border-color: white;
         }
         .portfolio-table td:first-child {
             text-align: left;
