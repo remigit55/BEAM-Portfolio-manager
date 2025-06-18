@@ -2,14 +2,14 @@ import streamlit as st
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Titre avant tout
-st.title("BEAM Portfolio")
+st.title("BEAM Portfolio Manager")
 
 # Thème
 PRIMARY_COLOR = "#363636"
 SECONDARY_COLOR = "#E8E8E8"
 ACCENT_COLOR = "#A49B6D"
 
-# CSS
+# Style CSS pour bandeau horizontal
 st.markdown(f"""
     <style>
         body {{
@@ -18,9 +18,6 @@ st.markdown(f"""
         }}
         .stApp {{
             font-family: 'Arial', sans-serif;
-        }}
-        .stDataFrame td, .stDataFrame th {{
-            text-align: right !important;
         }}
         .st-emotion-cache-18ni7ap {{
             background-color: {ACCENT_COLOR};
@@ -33,3 +30,17 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
+
+# Afficher le titre principal
+st.title("BEAM Portfolio Manager")
+
+# Onglets horizontaux
+onglets = st.tabs([
+    "Portefeuille", 
+    "Performance", 
+    "OD Comptables", 
+    "Transactions", 
+    "Taux de change", 
+    "Paramètres"
+])
+
