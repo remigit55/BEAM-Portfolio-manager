@@ -46,7 +46,7 @@ if "ticker_data_cache" not in st.session_state:
     st.session_state.ticker_data_cache = {}
 
 # Onglets
-tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
+tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions", "Taux de change", "Paramètres"])
 
 with tabs[0]:
     if st.session_state.df is not None:
