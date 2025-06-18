@@ -44,8 +44,10 @@ def afficher_portefeuille():
         .table-container {
             max-height: 600px;
             overflow-y: auto;
+            border-radius: 10px;
         }
         .portfolio-table {
+            border-collapse: collapse;
             width: 100%;
         }
         .portfolio-table th {
@@ -62,6 +64,7 @@ def afficher_portefeuille():
         .portfolio-table td {
             padding: 6px;
             text-align: right;
+            border-bottom: 1px solid #eee;
             color: black;
             font-family: "Aptos narrow", Helvetica;
             font-size: 11px;
@@ -72,6 +75,7 @@ def afficher_portefeuille():
         .total-row {
             background-color: #A49B6D;
             font-weight: bold;
+            color: white;
         }
     </style>
     <div class="table-container">
