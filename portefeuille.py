@@ -62,7 +62,7 @@ def afficher_portefeuille():
         font-family: "Aptos narrow", Helvetica;
         font-size: 12px;
         position: sticky;
-        top: 0; /* ← ceci fige l'en-tête */
+        top: 0;
         z-index: 10;
     }
     .portfolio-table td {
