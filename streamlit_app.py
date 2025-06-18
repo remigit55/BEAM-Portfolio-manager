@@ -3,7 +3,7 @@ import pandas as pd
 from forex_python.converter import CurrencyRates
 import datetime
 import requests
-yf_base_url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols="
+yf_base_url = ""https://query1.finance.yahoo.com/v8/finance/chart/"
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
