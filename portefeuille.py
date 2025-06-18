@@ -10,9 +10,6 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Debug: Display CSV columns
-    st.write(f"CSV columns: {df.columns.tolist()}")
-
     # Normalisation numérique
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
@@ -28,10 +25,10 @@ def afficher_portefeuille():
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV
-    if len(df.columns) > 5:
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
+    if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
+        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")  # Convertir en string, gérer NaN
     else:
-        df["Catégorie"] = ""
+        df["Catégorie"] = ""  # Colonne vide si F n'existe pas
 
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -98,8 +95,8 @@ def afficher_portefeuille():
         ("Quantité", 0),
         ("Acquisition", 4),
         ("Valeur", 2),
-        ("currentPrice", 4),
-        ("fiftyTwoWeekHigh", 4),
+        ("currentPrice", 4),  # 4 décimales pour Prix Actuel
+        ("fiftyTwoWeekHigh", 4),  # 4 décimales pour Haut 52 Semaines
         ("Valeur_H52", 2),
         ("Valeur_Actuelle", 2)
     ]:
@@ -141,64 +138,21 @@ def afficher_portefeuille():
     # Construction HTML
     html = f"""
     <style>
-      .table-container {{ 
-        max-height: 500px; /* Increased to ensure TOTAL row visibility */
-        overflow-y: auto; 
-        overflow-x: auto; 
-        width: 100%;
-        position: relative;
-      }}
-      .portfolio-table {{ 
-        min-width: 1500px; /* Large width to trigger horizontal scroll */
-        border-collapse: collapse; 
-        table-layout: fixed; 
-      }}
+      .table-container {{ max-height:400px; overflow-y:auto; }}
+      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; }}
       .portfolio-table th {{
-        background: #363636; 
-        color: white; 
-        padding: 6px; 
-        text-align: center; 
-        border: 1px solid #ddd; /* Debug border */
-        position: sticky; 
-        top: 0; 
-        z-index: 10; /* Headers above content */
-        font-family: "Aptos narrow", Helvetica; 
-        font-size: 12px;
+        background:#363636; color:white; padding:6px; text-align:center; border:none;
+        position:sticky; top:0; z-index:2;
+        font-family:"Aptos narrow",Helvetica; font-size:12px;
       }}
       .portfolio-table td {{
-        padding: 6px; 
-        text-align: right; 
-        border: 1px solid #ddd; /* Debug border */
-        font-family: "Aptos narrow", Helvetica; 
-        font-size: 11px;
-        background: #fff;
+        padding:6px; text-align:right; border:none;
+        font-family:"Aptos narrow",Helvetica; font-size:11px;
       }}
-      .portfolio-table tr:nth-child(even) td {{ background: #efefef; }}
-      /* Figer les colonnes Ticker et Nom */
-      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
-        position: sticky; 
-        left: 0; 
-        text-align: left; 
-        width: 50px; /* Narrow Ticker */
-        z-index: 5; /* Below headers */
-        background: #fff;
-      }}
-      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
-        position: sticky; 
-        left: 50px; /* Match Ticker width */
-        text-align: left; 
-        width: 200px; /* Wider for names */
-        z-index: 5;
-        background: #fff;
-      }}
-      /* Ensure headers stay above */
-      .portfolio-table th:nth-child(1) {{ z-index: 15; }}
-      .portfolio-table th:nth-child(2) {{ z-index: 15; }}
-      /* Match even row background */
-      .portfolio-table tr:nth-child(even) td:nth-child(1),
-      .portfolio-table tr:nth-child(even) td:nth-child(2) {{ background: #efefef; }}
-      .portfolio-table td:nth-child(3) {{ text-align: left; width: 100px; }} /* Catégorie */
-      /* Largeur fixe pour colonnes numériques */
+      .portfolio-table td:first-child {{ text-align:left; }}
+      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
+      .portfolio-table td:nth-child(3) {{ text-align:left; }} /* Alignement à gauche pour Catégorie */
+      /* Largeur fixe pour les colonnes numériques */
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
       .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
@@ -206,21 +160,16 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
       .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
       .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
-        width: 100px;
+        width: 9%;
       }}
+      .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
       .total-row td {{
-        background: #A49B6D; 
-        color: white; 
-        font-weight: bold;
-        position: sticky; /* Ensure TOTAL row is visible */
-        bottom: 0; /* Stick to bottom if scrolling */
-        z-index: 5;
+        background:#A49B6D; color:white; font-weight:bold;
       }}
     </style>
     <div class="table-container">
       <table class="portfolio-table">
-        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead>
-        <tbody>
+        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead><tbody>
     """
 
     for _, row in df_disp.iterrows():
@@ -230,15 +179,10 @@ def afficher_portefeuille():
         html += "</tr>"
 
     # Ligne TOTAL
-    html += "<tr class='total-row'>"
-    html += "<td>TOTAL</td><td></td><td></td><td></td>"  # Ticker, Nom, Catégorie, Quantité
-    html += f"<td>{total_str}</td>"  # Valeur
-    html += "<td></td><td></td><td></td><td></td><td></td><td></td>"  # Prix d'Acquisition, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
-    html += "</tr>"
+    html += "<tr class='total-row'><td>TOTAL</td>"
+    html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
+    html += f"<td>{total_str}</td>"  # Prix d'Acquisition
+    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Valeur, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
     html += "</tbody></table></div>"
-
-    # Debug: Display raw HTML
-    # st.text("Raw HTML:")
-    # st.code(html)
 
     st.markdown(html, unsafe_allow_html=True)
