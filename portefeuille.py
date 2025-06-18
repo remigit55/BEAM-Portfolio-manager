@@ -138,6 +138,59 @@ def afficher_portefeuille():
     # Construction HTML
     html_parts = []
 
+    # JavaScript (placé en premier pour être chargé avant le tableau)
+    html_parts.append("""
+<script>
+function sortTable(n) {
+  try {
+    console.log("sortTable called with column: " + n);
+    var table = document.getElementById("portfolioTable");
+    var tbody = document.getElementById("tableBody");
+    if (!table || !tbody) {
+      console.error("Table or tbody not found");
+      return;
+    }
+    var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
+    console.log("Rows found: " + rows.length);
+    var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+    dir = (dir === "asc") ? "desc" : "asc";
+    table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+    var headers = table.getElementsByTagName("TH");
+    for (var i = 0; i < headers.length; i++) {
+      headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
+    }
+    headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+    rows.sort((rowA, rowB) => {
+      var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+      var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+      console.log("Comparing: " + x + " vs " + y);
+      if (x === "" && y === "") return 0;
+      if (x === "") return dir === "asc" ? -1 : 1;
+      if (y === "") return dir === "asc" ? 1 : -1;
+      var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+      var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+      if (!isNaN(xValue) && !isNaN(yValue)) {
+        return dir === "asc" ? xValue - yValue : yValue - xValue;
+      }
+      xValue = x.toLowerCase();
+      yValue = y.toLowerCase();
+      return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
+    });
+    tbody.innerHTML = "";
+    rows.forEach(row => tbody.appendChild(row));
+    var totalRow = tbody.getElementsByTagName("tr")[rows.length] || table.querySelector("tr.total-row");
+    if (totalRow) {
+      tbody.appendChild(totalRow);
+    } else {
+      console.error("Total row not found");
+    }
+  } catch (e) {
+    console.error("Error in sortTable: " + e.message);
+  }
+}
+</script>
+""")
+
     # CSS
     html_parts.append("""
 <style>
@@ -213,44 +266,6 @@ def afficher_portefeuille():
     </tbody>
   </table>
 </div>
-""")
-
-    # JavaScript (dans une chaîne séparée pour éviter les conflits)
-    html_parts.append("""
-<script>
-function sortTable(n) {
-  var table = document.getElementById("portfolioTable");
-  var tbody = document.getElementById("tableBody");
-  var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
-  var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
-  dir = (dir === "asc") ? "desc" : "asc";
-  table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
-  var headers = table.getElementsByTagName("TH");
-  for (var i = 0; i < headers.length; i++) {
-    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
-  }
-  headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
-  rows.sort((rowA, rowB) => {
-    var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
-    var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
-    if (x === "" && y === "") return 0;
-    if (x === "") return dir === "asc" ? -1 : 1;
-    if (y === "") return dir === "asc" ? 1 : -1;
-    var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
-    var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
-    if (!isNaN(xValue) && !isNaN(yValue)) {
-      return dir === "asc" ? xValue - yValue : yValue - xValue;
-    }
-    xValue = x.toLowerCase();
-    yValue = y.toLowerCase();
-    return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
-  });
-  tbody.innerHTML = "";
-  rows.forEach(row => tbody.appendChild(row));
-  var totalRow = table.getElementsByTagName("tr")[rows.length];
-  tbody.appendChild(totalRow);
-}
-</script>
 """)
 
     # Combiner toutes les parties
