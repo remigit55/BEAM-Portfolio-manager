@@ -44,7 +44,6 @@ def afficher_portefeuille():
         .table-container {
             max-height: 600px;
             overflow-y: auto;
-            border-radius: 10px;
         }
         .portfolio-table {
             border-collapse: collapse;
@@ -95,7 +94,7 @@ def afficher_portefeuille():
 
     html += f"""
         <tr class="total-row">
-            <td colspan="4" style="text-align:right;">TOTAL</td>
+            <td colspan="1" style="text-align:right;">TOTAL</td>
             <td>{total_valeur_fmt}</td>
             <td></td>
         </tr>
