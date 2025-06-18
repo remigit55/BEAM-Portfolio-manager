@@ -5,3 +5,4 @@ forex-python
 gdown
 gspread
 oauth2client
+yfinance
