@@ -92,6 +92,7 @@ def afficher_portefeuille():
         font-family:"Aptos narrow",Helvetica; font-size:11px;
       }}
       .portfolio-table td:first-child {{ text-align:left; }}
+      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour la colonne Nom */
       .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
       .total-row td {{
         background:#A49B6D; color:white; font-weight:bold;
