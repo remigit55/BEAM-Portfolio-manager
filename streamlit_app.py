@@ -4,6 +4,8 @@ import pandas as pd
 import datetime
 import requests
 from PIL import Image
+import base64
+from io import BytesIO
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -38,18 +40,35 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Titre avec logo
-col1, col2 = st.columns([1, 6])
+# Titre avec logo centré verticalement
+col1, col2 = st.columns([1, 8])
 with col1:
     try:
-        logo = Image.open("Logo.png.png")
-        st.image(logo, width=100)
+        logo = Image.open("Logo.png.png")  # vérifie bien le nom exact du fichier
+        buffer = BytesIO()
+        logo.save(buffer, format="PNG")
+        logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        st.markdown(
+            f"""
+            <div style="display: flex; align-items: center; height: 100%;">
+                <img src="data:image/png;base64,{logo_base64}" style="margin-right: 0px; width:64px;" />
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     except Exception:
         st.markdown("⚠️ Logo non trouvé.")
 with col2:
-    st.markdown("<h1 style='font-size: 36px; margin-bottom: 5px;'>BEAM Portfolio Manager</h1>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; height: 100%; padding-left: 10px;">
+            <h1 style='font-size: 36px; margin-bottom: 0;'>BEAM Portfolio Manager</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Initialisation session_state
+# Initialisation des variables de session
 if "df" not in st.session_state:
     st.session_state.df = None
 if "fx_rates" not in st.session_state:
@@ -59,7 +78,7 @@ if "devise_cible" not in st.session_state:
 if "ticker_names_cache" not in st.session_state:
     st.session_state.ticker_names_cache = {}
 
-# Importation des modules
+# Importation des modules fonctionnels
 from portefeuille import afficher_portefeuille
 from performance import afficher_performance
 from transactions import afficher_transactions
@@ -67,7 +86,7 @@ from taux_change import afficher_taux_change
 from parametres import afficher_parametres
 from od_comptables import afficher_od_comptables
 
-# Onglets
+# Onglets horizontaux
 onglets = st.tabs([
     "Portefeuille", 
     "Performance", 
@@ -77,20 +96,26 @@ onglets = st.tabs([
     "Paramètres"
 ])
 
+# Onglet : Portefeuille
 with onglets[0]:
     afficher_portefeuille()
 
+# Onglet : Performance
 with onglets[1]:
     afficher_performance()
 
+# Onglet : OD Comptables
 with onglets[2]:
     afficher_od_comptables()
 
+# Onglet : Transactions
 with onglets[3]:
     afficher_transactions()
 
+# Onglet : Taux de change
 with onglets[4]:
     afficher_taux_change()
 
+# Onglet : Paramètres
 with onglets[5]:
     afficher_parametres()
