@@ -6,7 +6,7 @@ import requests
 from forex_python.converter import CurrencyRates
 
 
-st.set_page_config(page_title="BEAM Portfolio Manager test", layout="wide")
+st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Thème personnalisé
 PRIMARY_COLOR = "#363636"
