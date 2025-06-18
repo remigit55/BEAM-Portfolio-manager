@@ -1,13 +1,16 @@
 # streamlit_app.py
 import streamlit as st
+import streamlit.components.v1 as components
 
+# ➤ Cette commande DOIT être en première ligne Streamlit
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
+# Thème personnalisé
 PRIMARY_COLOR = "#363636"
 SECONDARY_COLOR = "#E8E8E8"
 ACCENT_COLOR = "#A49B6D"
 
-# CSS personnalisé
+# Style CSS pour bandeau horizontal
 st.markdown(f"""
     <style>
         body {{
@@ -29,7 +32,10 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Création des onglets
+# Afficher le titre principal
+st.title("BEAM Portfolio Manager")
+
+# Onglets horizontaux
 onglets = st.tabs([
     "Portefeuille", 
     "Performance", 
@@ -39,23 +45,16 @@ onglets = st.tabs([
     "Paramètres"
 ])
 
-# Import dynamique et exécution
+# Importer les scripts correspondant à chaque onglet
 with onglets[0]:
     import portefeuille
-
 with onglets[1]:
     import performance
-
 with onglets[2]:
     import od_comptables
-
 with onglets[3]:
     import transactions
-
 with onglets[4]:
     import taux_change
-
 with onglets[5]:
-    st.write("✅ L'onglet Paramètres fonctionne")
-
-
+    import parametres
