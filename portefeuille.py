@@ -12,53 +12,47 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Conversion des colonnes numériques
-    if "Quantité" in df.columns:
-        df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
-    if "Acquisition" in df.columns:
-        df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
+    # Conversion des colonnes numériques (virgules françaises → points anglais si besoin)
+    for col in ["Quantité", "Acquisition"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(" ", "").str.replace(",", ".")
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Calcul de la valeur
+    # Calcul Valeur
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formattage style français : 1 234,56
+    # Formatage à la française
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
         return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", " ")
 
-    if "Quantité" in df.columns:
-        df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
-    if "Acquisition" in df.columns:
-        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
-    if "Valeur" in df.columns:
-        df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0)) if "Quantité" in df.columns else ""
+    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4)) if "Acquisition" in df.columns else ""
+    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2)) if "Valeur" in df.columns else ""
 
-    # Préparer les colonnes d’affichage
+    # Colonnes à afficher (ordre souhaité)
     colonnes_affichage = []
     for col in df.columns:
-        if col == "Acquisition_fmt":
+        if col == "Tickers":
+            colonnes_affichage.append("Tickers")
+        elif col == "Quantité_fmt":
+            colonnes_affichage.append("Quantité_fmt")
+        elif col == "Acquisition_fmt":
             colonnes_affichage.append("Acquisition_fmt")
         elif col == "Valeur_fmt":
             colonnes_affichage.append("Valeur_fmt")
-        elif col in ["Acquisition", "Valeur"]:
-            continue
-        elif col == "Quantité_fmt":
-            colonnes_affichage.append("Quantité_fmt")
-        elif col == "Quantité":
-            continue
-        else:
+        elif col not in ["Quantité", "Acquisition", "Valeur"]:
             colonnes_affichage.append(col)
 
-    # Renommer colonnes formatées pour affichage
     df_affichage = df[colonnes_affichage].rename(columns={
         "Quantité_fmt": "Quantité",
         "Acquisition_fmt": "Acquisition",
         "Valeur_fmt": "Valeur"
     })
 
-    # Alignement CSS à droite
+    # Alignement à droite
     st.markdown("""
         <style>
             .stDataFrame td {
@@ -67,5 +61,9 @@ def afficher_portefeuille():
         </style>
     """, unsafe_allow_html=True)
 
-    # Affichage
+    # Sécuriser le cast string (évite erreurs PyArrow)
+    for col in ["Quantité", "Acquisition", "Valeur"]:
+        if col in df_affichage.columns:
+            df_affichage[col] = df_affichage[col].astype(str)
+
     st.dataframe(df_affichage, use_container_width=True)
