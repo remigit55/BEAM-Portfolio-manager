@@ -80,7 +80,7 @@ with onglets[2]:
 
 # Onglet : Transactions
 with onglets[3]:
-    st.subheader("🤝 Transactions M&A")
+    st.subheader("Transactions")
     if "ma" in st.session_state:
         st.dataframe(st.session_state.ma, use_container_width=True)
     else:
