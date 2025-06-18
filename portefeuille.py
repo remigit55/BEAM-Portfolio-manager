@@ -33,9 +33,9 @@ def afficher_portefeuille():
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2) if pd.notnull(x) else "")
 
     # Colonnes à afficher
-    colonnes = ["Tickers", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
+    colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
     df_affichage = df[colonnes].rename(columns={
-        "Tickers": "Ticker",
+        "Ticker": "Ticker",
         "Quantité_fmt": "Quantité",
         "Acquisition_fmt": "Acquisition",
         "Valeur_fmt": "Valeur"
