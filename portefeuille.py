@@ -43,13 +43,13 @@ def afficher_portefeuille():
             border-collapse: collapse;
             width: 100%;
             font-family: sans-serif;
-            font-size: 14px;
+            font-size: 12px;
         }
         .portfolio-table th {
             background-color: #f4f4f4;
             padding: 8px;
             text-align: center;
-            border-bottom: 2px solid #ccc;
+            border-bottom: 1px solid #ccc;
         }
         .portfolio-table td {
             padding: 6px 10px;
