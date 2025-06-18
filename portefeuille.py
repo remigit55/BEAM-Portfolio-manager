@@ -22,7 +22,18 @@ def afficher_portefeuille():
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
+    # Formattage style français : 1 234,56
+    def format_fr(x, dec=2):
+        if pd.isnull(x):
+            return ""
+        return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", " ")
 
+    if "Quantité" in df.columns:
+        df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    if "Acquisition" in df.columns:
+        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    if "Valeur" in df.columns:
+        df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
     # Préparer les colonnes d’affichage
     colonnes_affichage = []
