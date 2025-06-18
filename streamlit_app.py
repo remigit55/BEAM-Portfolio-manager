@@ -44,6 +44,8 @@ if "fx_rates" not in st.session_state:
     st.session_state.fx_rates = {}
 if "devise_cible" not in st.session_state:
     st.session_state.devise_cible = "EUR"
+if "ticker_names_cache" not in st.session_state:
+    st.session_state.ticker_names_cache = {}
 
 # Onglets de navigation
 tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
@@ -51,7 +53,8 @@ tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&
 # Onglet Portefeuille
 with tabs[0]:
     if st.session_state.df is not None:
-        
+        st.subheader("Portefeuille consolidé")
+
         df = st.session_state.df.copy()
         cr = CurrencyRates()
         fx_rates_utilisés = {}
@@ -84,9 +87,6 @@ with tabs[0]:
 
         # Ajouter colonne Nom via récupération Yahoo Finance avec cache en mémoire
         if "Tickers" in df.columns:
-            if "ticker_names_cache" not in st.session_state:
-                st.session_state.ticker_names_cache = {}
-        
             def get_name_cached(ticker):
                 if ticker in st.session_state.ticker_names_cache:
                     return st.session_state.ticker_names_cache[ticker]
@@ -100,11 +100,10 @@ with tabs[0]:
                     name = "Erreur nom"
                 st.session_state.ticker_names_cache[ticker] = name
                 return name
-        
+
             noms = df["Tickers"].apply(get_name_cached)
             index_ticker = df.columns.get_loc("Tickers")
             df.insert(index_ticker + 1, "Nom", noms)
-
 
         st.dataframe(df, use_container_width=True)
         st.session_state.fx_rates = fx_rates_utilisés
