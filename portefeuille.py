@@ -33,10 +33,10 @@ def afficher_portefeuille():
     for _, row in df.iterrows():
         tableau += "<tr>"
         tableau += f"<td style='text-align: left'>{row.get('Tickers', '')}</td>"
-        tableau += f"<td style='text-align: left'>{row.get('Devise', '')}</td>"
         tableau += f"<td style='text-align: right'>{row.get('Quantité_fmt', '')}</td>"
         tableau += f"<td style='text-align: right'>{row.get('Acquisition_fmt', '')}</td>"
         tableau += f"<td style='text-align: right'>{row.get('Valeur_fmt', '')}</td>"
+        tableau += f"<td style='text-align: left'>{row.get('Devise', '')}</td>"
         tableau += "</tr>"
 
     tableau += "</tbody></table>"
