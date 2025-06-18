@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import requests
@@ -30,7 +31,7 @@ def afficher_portefeuille():
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV
-    if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
+    if len(df.columns) > 5:
         df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
         df["Catégorie"] = ""
