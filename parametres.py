@@ -4,6 +4,7 @@ import pandas as pd
 
 def afficher_parametres():
 
+    st.markdown("#### Paramètres généraux")
     # Définir la devise cible par défaut si non définie
     if "devise_cible" not in st.session_state:
         st.session_state.devise_cible = "EUR"
