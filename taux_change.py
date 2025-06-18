@@ -81,5 +81,4 @@ def afficher_taux_change():
   </table>
 </div>
 """
-    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
     components.html(html_code, height=400, scrolling=True)
