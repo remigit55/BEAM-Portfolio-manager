@@ -78,7 +78,7 @@ def afficher_portefeuille():
         .total-row {
             background-color: #A49B6D !important;
             font-weight: bold;
-            color: white;
+            color: white !important;
         }
     </style>
     <div class="table-container">
