@@ -71,8 +71,9 @@ with tabs[0]:
             df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
         df["Taux FX"] = df["Devise"].apply(lambda d: get_fx_rate(d, devise_cible))
-        df["Taux FX Num"] = pd.to_numeric(df["Taux FX"], errors="coerce").fillna(0)
-        df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX Num"]
+        df["Taux FX Num"] = pd.to_numeric(df["Taux FX"], errors="coerce").fillna(0.0)
+        df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce").fillna(0.0)
+        df["Valeur (devise cible)"] = df["Valeur"].astype(float) * df["Taux FX Num"].astype(float)
 
         st.dataframe(df, use_container_width=True)
 
@@ -119,4 +120,3 @@ with tabs[5]:
             st.success("Données importées depuis le lien CSV")
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
-            
