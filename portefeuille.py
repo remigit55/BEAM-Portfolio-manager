@@ -18,30 +18,36 @@ def afficher_portefeuille():
             )
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Calcul Valeur
+    # Calcul de la colonne "Valeur"
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage FR
+    # Formatage français : 1 234,56
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
         return f"{x:,.{dec}f}".replace(",", " ").replace(".", ",")
 
-    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0) if pd.notnull(x) else "")
-    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4) if pd.notnull(x) else "")
-    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2) if pd.notnull(x) else "")
+    if "Quantité" in df.columns:
+        df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    if "Acquisition" in df.columns:
+        df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    if "Valeur" in df.columns:
+        df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Colonnes à afficher
-    colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
-    df_affichage = df[colonnes].rename(columns={
+    # Sélection des colonnes dans l'ordre souhaité
+    colonnes_base = {
         "Ticker": "Ticker",
         "Quantité_fmt": "Quantité",
         "Acquisition_fmt": "Acquisition",
-        "Valeur_fmt": "Valeur"
-    })
+        "Valeur_fmt": "Valeur",
+        "Devise": "Devise"
+    }
+    colonnes_existantes = [col for col in colonnes_base if col in df.columns]
 
-    # Génération du tableau HTML avec CSS
+    df_affichage = df[colonnes_existantes].rename(columns={k: colonnes_base[k] for k in colonnes_existantes})
+
+    # CSS personnalisé
     style = """
     <style>
         .styled-table {
@@ -52,12 +58,6 @@ def afficher_portefeuille():
         .styled-table th, .styled-table td {
             border: 1px solid #ccc;
             padding: 6px 10px;
-        }
-        .styled-table th {
-            background-color: #f2f2f2;
-            text-align: right;
-        }
-        .styled-table td {
             text-align: right;
         }
         .styled-table td:first-child, .styled-table th:first-child {
