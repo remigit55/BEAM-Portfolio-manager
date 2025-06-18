@@ -1,13 +1,17 @@
 import streamlit as st
 import pandas as pd
-import time
 import datetime
 import requests
 
 def obtenir_taux(devise_source, devise_cible):
     if devise_source == devise_cible:
         return 1.0
-    ticker = f"{devise_cible.upper()}={devise_source.upper()}" if devise_cible == "USD" else f"{devise_source.upper()}{devise_cible.upper()}=X"
+
+    ticker = (
+        f"{devise_cible.upper()}={devise_source.upper()}"
+        if devise_cible == "USD"
+        else f"{devise_source.upper()}{devise_cible.upper()}=X"
+    )
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
     headers = { "User-Agent": "Mozilla/5.0" }
 
@@ -29,26 +33,22 @@ def afficher_taux_change():
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
     devises_uniques = sorted(set(df["Devise"].dropna().unique()))
-    taux_dict = {}
 
-    with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
-        for d in devises_uniques:
-            taux = obtenir_taux(d, devise_cible)
-            if taux:
-                taux_dict[d] = taux
+    if st.button("Mettre à jour les taux de change"):
+        taux_dict = {}
+        with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
+            for d in devises_uniques:
+                taux = obtenir_taux(d, devise_cible)
+                if taux:
+                    taux_dict[d] = taux
 
-    st.session_state.fx_rates = taux_dict
+        if taux_dict:
+            st.session_state.fx_rates = taux_dict
+            st.success(f"Taux mis à jour à {datetime.datetime.now().strftime('%H:%M:%S')}")
+        else:
+            st.warning("Aucun taux de change valide récupéré.")
 
-    if not taux_dict:
-        st.warning("Aucun taux de change valide récupéré.")
-        return
-
-    st.markdown(f"Taux appliqués pour conversion en **{devise_cible}** – _{datetime.datetime.now().strftime('%H:%M:%S')}_")
-
-    df_fx = pd.DataFrame(list(taux_dict.items()), columns=["Devise Source", f"Taux vers {devise_cible}"])
-    st.dataframe(df_fx, use_container_width=True)
-
-    # Rafraîchit toutes les 30 secondes automatiquement
-    st.markdown("<meta http-equiv='refresh' content='30'>", unsafe_allow_html=True)
-    time.sleep(30)
-    st.experimental_rerun()
+    fx_rates = st.session_state.get("fx_rates", {})
+    if fx_rates:
+        df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise Source", f"Taux vers {devise_cible}"])
+        st.dataframe(df_fx, use_container_width=True)
