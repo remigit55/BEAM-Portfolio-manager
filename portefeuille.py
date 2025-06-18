@@ -34,7 +34,7 @@ def afficher_portefeuille():
 
     # Ordre des colonnes
     colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
-    noms = ["Ticker", "Quantité", "Acquisition", "Valeur", "Devise"]
+    noms = ["Ticker", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
     # Générer HTML manuellement
     html = """
