@@ -130,3 +130,6 @@ with tabs[5]:
             st.success("Données importées depuis Google Sheets")
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
+
+
+Update streamlit_app.py ;
