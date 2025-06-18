@@ -6,6 +6,8 @@ import datetime
 import requests
 
 st.header("Paramètres")
+st.header("Paramètres")
+st.write("Test d'affichage")  # <== test simple
 
 # Définir la devise cible par défaut si non définie
 if "devise_cible" not in st.session_state:
