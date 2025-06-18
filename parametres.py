@@ -26,3 +26,8 @@ def afficher_parametres():
             st.success("Données importées avec succès depuis le lien CSV.")
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
+
+    st.session_state.df = pd.read_csv(csv_url)
+    st.success("Données importées avec succès depuis le lien CSV.")
+    st.write(st.session_state.df.head())  # DEBUG
+
