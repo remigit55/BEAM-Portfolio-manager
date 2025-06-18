@@ -1,8 +1,6 @@
 # streamlit_app.py
 import streamlit as st
-import streamlit.components.v1 as components
 
-# ➤ Cette commande DOIT être en première ligne Streamlit
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Thème personnalisé
