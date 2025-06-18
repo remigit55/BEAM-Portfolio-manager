@@ -135,7 +135,7 @@ def afficher_portefeuille():
 
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
-       # Construction HTML
+        # Construction HTML
     html_parts = []
 
     # CSS
@@ -215,20 +215,9 @@ def afficher_portefeuille():
 </div>
 """)
 
-    # JavaScript
+    # JavaScript avec MutationObserver
     html_parts.append("""
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  console.log("DOM fully loaded, attaching event listeners");
-  var headers = document.querySelectorAll("#portfolioTable th");
-  headers.forEach((header, index) => {
-    header.addEventListener("click", () => {
-      console.log("Header clicked, column: " + index);
-      sortTable(index);
-    });
-  });
-});
-
 function sortTable(n) {
   try {
     console.log("sortTable called with column: " + n);
@@ -276,6 +265,24 @@ function sortTable(n) {
     console.error("Error in sortTable: " + e.message);
   }
 }
+
+// Attacher les écouteurs d'événements avec MutationObserver
+var observer = new MutationObserver(() => {
+  console.log("MutationObserver triggered, attaching event listeners");
+  var headers = document.querySelectorAll("#portfolioTable th");
+  console.log("Headers found: " + headers.length);
+  headers.forEach((header, index) => {
+    // Vérifier si l'écouteur n'est pas déjà attaché pour éviter les doublons
+    if (!header.dataset.sortListener) {
+      header.addEventListener("click", () => {
+        console.log("Header clicked, column: " + index);
+        sortTable(index);
+      });
+      header.dataset.sortListener = "true";
+    }
+  });
+});
+observer.observe(document.body, { childList: true, subtree: true });
 </script>
 """)
 
