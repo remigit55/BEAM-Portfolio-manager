@@ -136,7 +136,10 @@ def afficher_portefeuille():
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
     # Construction HTML
-    html = """
+    html_parts = []
+
+    # CSS
+    html_parts.append("""
 <style>
   .table-container { max-height:400px; overflow-y:auto; }
   .portfolio-table { width:100%; border-collapse:collapse; table-layout:auto; }
@@ -170,30 +173,37 @@ def afficher_portefeuille():
     background:#A49B6D; color:white; font-weight:bold;
   }
 </style>
+""")
+
+    # Début du tableau
+    html_parts.append("""
 <div class="table-container">
   <table class="portfolio-table" id="portfolioTable">
     <thead>
       <tr>
-"""
-    # Ajout des en-têtes
+""")
+
+    # En-têtes
     for i, label in enumerate(labels):
-        html += f'<th onclick="sortTable({i})">{label}</th>'
-    html += """
+        html_parts.append(f'<th onclick="sortTable({i})">{label}</th>')
+
+    # Fin des en-têtes et début du corps
+    html_parts.append("""
       </tr>
     </thead>
     <tbody id="tableBody">
-"""
+""")
 
-    # Ajout des lignes de données
+    # Lignes de données
     for _, row in df_disp.iterrows():
-        html += "<tr>"
+        html_parts.append("<tr>")
         for label in labels:
             cell_value = row[label] if pd.notnull(row[label]) else ''
-            html += f"<td>{cell_value}</td>"
-        html += "</tr>"
+            html_parts.append(f"<td>{cell_value}</td>")
+        html_parts.append("</tr>")
 
     # Ligne TOTAL
-    html += f"""
+    html_parts.append(f"""
       <tr class="total-row">
         <td>TOTAL</td>
         <td></td><td></td><td></td>
@@ -203,7 +213,47 @@ def afficher_portefeuille():
     </tbody>
   </table>
 </div>
+""")
 
-"""
+    # JavaScript (dans une chaîne séparée pour éviter les conflits)
+    html_parts.append("""
+<script>
+function sortTable(n) {
+  var table = document.getElementById("portfolioTable");
+  var tbody = document.getElementById("tableBody");
+  var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
+  var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+  dir = (dir === "asc") ? "desc" : "asc";
+  table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+  var headers = table.getElementsByTagName("TH");
+  for (var i = 0; i < headers.length; i++) {
+    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
+  }
+  headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+  rows.sort((rowA, rowB) => {
+    var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+    var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+    if (x === "" && y === "") return 0;
+    if (x === "") return dir === "asc" ? -1 : 1;
+    if (y === "") return dir === "asc" ? 1 : -1;
+    var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+    var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+    if (!isNaN(xValue) && !isNaN(yValue)) {
+      return dir === "asc" ? xValue - yValue : yValue - xValue;
+    }
+    xValue = x.toLowerCase();
+    yValue = y.toLowerCase();
+    return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
+  });
+  tbody.innerHTML = "";
+  rows.forEach(row => tbody.appendChild(row));
+  var totalRow = table.getElementsByTagName("tr")[rows.length];
+  tbody.appendChild(totalRow);
+}
+</script>
+""")
+
+    # Combiner toutes les parties
+    html = "".join(html_parts)
 
     st.markdown(html, unsafe_allow_html=True)
