@@ -48,11 +48,11 @@ def afficher_portefeuille():
             if ticker in st.session_state.ticker_names_cache:
                 return st.session_state.ticker_names_cache[ticker]
             try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+                url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}"
                 response = requests.get(url)
                 if response.ok:
                     data = response.json()
-                    name = data["chart"]["result"][0].get("meta", {}).get("symbol", ticker)
+                    name = data["quoteResponse"]["result"][0].get("shortName", ticker)
                 else:
                     name = "Erreur requête"
             except:
