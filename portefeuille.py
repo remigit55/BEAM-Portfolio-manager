@@ -194,7 +194,7 @@ def afficher_portefeuille():
     <tbody id="tableBody">
 """)
 
-    # Lignes de données
+        # Lignes de données
     for _, row in df_disp.iterrows():
         html_parts.append("<tr>")
         for label in labels:
@@ -202,37 +202,42 @@ def afficher_portefeuille():
             html_parts.append(f"<td>{cell_value}</td>")
         html_parts.append("</tr>")
 
-    # Ligne TOTAL
-    html_parts.append(f"""
+    html_parts.append("""
+    </tbody>
+    <tfoot>
       <tr class="total-row">
         <td>TOTAL</td>
         <td></td><td></td><td></td>
-        <td>{total_str}</td>
-        <td></td><td></td><td></td><td></td><td></td><td></td>
+        <td></td><td>{}</td>
+        <td></td><td></td><td></td><td></td><td></td>
       </tr>
-    </tbody>
+    </tfoot>
   </table>
 </div>
-""")
+""".format(total_str))  # total_str injecté ici
 
-    # JavaScript (dans une chaîne séparée pour éviter les conflits)
+    # JavaScript mis à jour
     html_parts.append("""
 <script>
 function sortTable(n) {
   var table = document.getElementById("portfolioTable");
   var tbody = document.getElementById("tableBody");
-  var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
-  var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+  var rows = Array.from(tbody.getElementsByTagName("tr"));
+  var th = table.getElementsByTagName("TH")[n];
+  var dir = th.getAttribute("data-sort-dir") || "asc";
   dir = (dir === "asc") ? "desc" : "asc";
-  table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+  th.setAttribute("data-sort-dir", dir);
+
+  // Supprimer les flèches précédentes
   var headers = table.getElementsByTagName("TH");
   for (var i = 0; i < headers.length; i++) {
-    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
+    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/g, "");
   }
-  headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+  th.innerHTML += (dir === "asc") ? " ▲" : " ▼";
+
   rows.sort((rowA, rowB) => {
-    var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
-    var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+    var x = rowA.getElementsByTagName("TD")[n].textContent.trim();
+    var y = rowB.getElementsByTagName("TD")[n].textContent.trim();
     if (x === "" && y === "") return 0;
     if (x === "") return dir === "asc" ? -1 : 1;
     if (y === "") return dir === "asc" ? 1 : -1;
@@ -245,15 +250,11 @@ function sortTable(n) {
     yValue = y.toLowerCase();
     return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
   });
+
   tbody.innerHTML = "";
   rows.forEach(row => tbody.appendChild(row));
-  var totalRow = table.getElementsByTagName("tr")[rows.length];
-  tbody.appendChild(totalRow);
 }
 </script>
 """)
 
-    # Combiner toutes les parties
-    html = "".join(html_parts)
-
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
