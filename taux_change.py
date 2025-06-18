@@ -4,36 +4,51 @@ import time
 import datetime
 import requests
 
-DEVISES = ["USD", "CAD", "CHF", "JPY", "GBP", "AUD"]
-DEVISE_CIBLE = st.session_state.get("devise_cible", "EUR")
+def obtenir_taux(devise_source, devise_cible):
+    if devise_source == devise_cible:
+        return 1.0
+    ticker = f"{devise_cible.upper()}={devise_source.upper()}" if devise_cible == "USD" else f"{devise_source.upper()}{devise_cible.upper()}=X"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+    headers = { "User-Agent": "Mozilla/5.0" }
 
-@st.cache_data(ttl=30)
-def get_fx_yahoo(base, quote):
     try:
-        symbol = f"{base}{quote}=X"
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range=1d"
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, headers=headers, timeout=5)
         r.raise_for_status()
-        json_data = r.json()
-        meta = json_data["chart"]["result"][0]["meta"]
-        return meta.get("regularMarketPrice", None)
-    except Exception:
+        data = r.json()
+        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+        return float(meta.get("regularMarketPrice", 0))
+    except Exception as e:
+        st.warning(f"Taux non disponible pour {devise_source}/{devise_cible} : {e}")
         return None
 
 def afficher_taux_change():
-    st.markdown(f"Taux de change pour conversion en **{DEVISE_CIBLE}** (auto-refresh toutes les 30s) — *{datetime.datetime.now().strftime('%H:%M:%S')}*")
+    df = st.session_state.get("df")
+    if df is None or "Devise" not in df.columns:
+        st.info("Aucun portefeuille chargé.")
+        return
 
-    fx_rates = []
-    for dev in DEVISES:
-        if dev == DEVISE_CIBLE:
-            continue
-        taux = get_fx_yahoo(dev, DEVISE_CIBLE)
-        if taux:
-            fx_rates.append((f"{dev}/{DEVISE_CIBLE}", taux))
+    devise_cible = st.session_state.get("devise_cible", "EUR")
+    devises_uniques = sorted(set(df["Devise"].dropna().unique()))
+    taux_dict = {}
 
-    if fx_rates:
-        st.session_state.fx_rates = {pair: rate for pair, rate in fx_rates}
-        df = pd.DataFrame(fx_rates, columns=["Conversion", "Taux"])
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.error("Impossible de récupérer les taux. Vérifiez votre connexion ou réessayez plus tard.")
+    with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
+        for d in devises_uniques:
+            taux = obtenir_taux(d, devise_cible)
+            if taux:
+                taux_dict[d] = taux
+
+    st.session_state.fx_rates = taux_dict
+
+    if not taux_dict:
+        st.warning("Aucun taux de change valide récupéré.")
+        return
+
+    st.markdown(f"Taux appliqués pour conversion en **{devise_cible}** – _{datetime.datetime.now().strftime('%H:%M:%S')}_")
+
+    df_fx = pd.DataFrame(list(taux_dict.items()), columns=["Devise Source", f"Taux vers {devise_cible}"])
+    st.dataframe(df_fx, use_container_width=True)
+
+    # Rafraîchit toutes les 30 secondes automatiquement
+    st.markdown("<meta http-equiv='refresh' content='30'>", unsafe_allow_html=True)
+    time.sleep(30)
+    st.experimental_rerun()
