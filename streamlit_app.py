@@ -31,9 +31,6 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Afficher le titre principal
-st.title("BEAM Portfolio Manager")
-
 # Onglets horizontaux
 onglets = st.tabs([
     "Portefeuille", 
