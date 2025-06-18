@@ -43,7 +43,6 @@ def afficher_portefeuille():
             border-collapse: collapse;
             width: 100%;
             overflow: hidden;
-            border: 1px solid white;
             color: white;
         }
         .portfolio-table th {
@@ -51,13 +50,13 @@ def afficher_portefeuille():
             padding: 8px;
             text-align: center;
             border-bottom: px solid #ccc;
-            border-color: white;
+            color: black;
         }
         .portfolio-table td {
             padding: 8px;
             text-align: right;
             border-bottom: 1px solid #eee;
-            border-color: white;
+            color: black;
         }
         .portfolio-table td:first-child {
             text-align: left;
