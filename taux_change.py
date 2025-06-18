@@ -31,7 +31,6 @@ def afficher_taux_change():
     devise_cible = st.session_state.get("devise_cible", "EUR")
     devises_uniques = sorted(set(df["Devise"].dropna().unique()))
 
-    st.markdown(f"#### Taux de change vers {devise_cible}")
     if st.button("Actualiser les taux"):
         taux_dict = {}
         with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
