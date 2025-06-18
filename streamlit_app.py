@@ -31,6 +31,9 @@ st.markdown(f"""
         .stDataFrame tbody tr:nth-child(even) {{
             background-color: #f2f2f2;
         }}
+        .stDataFrame td {{
+            text-align: right !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -74,6 +77,18 @@ with tabs[0]:
         df["Taux FX Num"] = pd.to_numeric(df["Taux FX"], errors="coerce").fillna(0.0)
         df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce").fillna(0.0)
         df["Valeur (devise cible)"] = df["Valeur"].astype(float) * df["Taux FX Num"].astype(float)
+
+        # Format des colonnes
+        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{float(x):.4f}")
+        df["Taux FX"] = df["Taux FX Num"].map(lambda x: f"{x:.4f}")
+        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}")
+        df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}")
+
+        # Ajoute le nom de la participation (duplique la colonne Actions si besoin)
+        df.insert(1, "Nom", df["Actions"])
+
+        # Supprimer la première colonne (index ou identifiant inutile)
+        df = df.iloc[:, 1:]
 
         st.dataframe(df, use_container_width=True)
 
