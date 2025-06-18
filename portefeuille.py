@@ -33,8 +33,8 @@ def afficher_portefeuille():
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
     # Ordre des colonnes
-    colonnes = ["Ticker", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
-    noms = ["Ticker", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
+    colonnes = ["Ticker", "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
+    noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
     # Générer HTML manuellement
     html = """
