@@ -14,7 +14,7 @@ def afficher_portefeuille():
     devise_cible = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.get("fx_rates", {})
 
-    for col in ["Quantité", "Acquisition", "LT"]:
+    for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
                 df[col].astype(str)
@@ -66,9 +66,10 @@ def afficher_portefeuille():
         df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"])
         df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"])
 
-    df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
-    df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
-    df["Valeur_LT"] = df["Quantité"] * df["LT"]
+    if all(c in df.columns for c in ["Quantité", "fiftyTwoWeekHigh"]):
+        df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
+    if all(c in df.columns for c in ["Quantité", "currentPrice"]):
+        df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
 
     def format_fr(x, dec):
         if pd.isnull(x): return ""
@@ -76,9 +77,13 @@ def afficher_portefeuille():
         return s.replace(",", " ").replace(".", ",")
 
     for col, dec in [
-        ("Quantité", 0), ("Acquisition", 4), ("LT", 4),
-        ("Valeur", 2), ("currentPrice", 4), ("fiftyTwoWeekHigh", 4),
-        ("Valeur_Actuelle", 2), ("Valeur_H52", 2), ("Valeur_LT", 2)
+        ("Quantité", 0),
+        ("Acquisition", 4),
+        ("Valeur", 2),
+        ("currentPrice", 4),
+        ("fiftyTwoWeekHigh", 4),
+        ("Valeur_H52", 2),
+        ("Valeur_Actuelle", 2)
     ]:
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
@@ -92,51 +97,66 @@ def afficher_portefeuille():
     df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
     df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
     df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
 
-    total_val = df["Valeur_conv"].sum()
+    total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
-    total_lt = df["Valeur_LT_conv"].sum()
 
     cols = [
-        ticker_col, "shortName", "Catégorie", "Quantité_fmt", "Acquisition_fmt",
-        "Valeur_fmt", "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
-        "Valeur_H52_fmt", "LT_fmt", "Valeur_LT_fmt", "Devise"
+        ticker_col,
+        "shortName",
+        "Catégorie",
+        "Quantité_fmt",
+        "Acquisition_fmt",
+        "Valeur_fmt",
+        "currentPrice_fmt",
+        "Valeur_Actuelle_fmt",
+        "fiftyTwoWeekHigh_fmt",
+        "Valeur_H52_fmt",
+        "Devise"
     ]
     labels = [
-        "Ticker", "Nom", "Catégorie", "Quantité", "Prix d'Acquisition",
-        "Valeur", "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
-        "Valeur H52", "Objectif LT", "Valeur LT", "Devise"
+        "Ticker",
+        "Nom",
+        "Catégorie",
+        "Quantité",
+        "Prix d'Acquisition",
+        "Valeur",
+        "Prix Actuel",
+        "Valeur Actuelle",
+        "Haut 52 Semaines",
+        "Valeur H52",
+        "Devise"
     ]
 
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
-    # Génération HTML stylisé
-    html_code = """
-    <style>
-      .table-container { max-height: 500px; overflow-y: auto; }
-      .portfolio-table { width: 100%; border-collapse: collapse; font-family: 'Segoe UI'; }
-      .portfolio-table th {
-        background: #363636; color: white; padding: 6px; text-align: center; position: sticky; top: 0;
-        font-size: 12px;
-      }
-      .portfolio-table td {
-        padding: 6px; text-align: right; font-size: 11px;
-      }
-      .portfolio-table td:first-child,
-      .portfolio-table td:nth-child(2),
-      .portfolio-table td:nth-child(3) {
-        text-align: left;
-      }
-      .portfolio-table tr:nth-child(even) { background: #efefef; }
-      .total-row td { background: #A49B6D; color: white; font-weight: bold; }
-    </style>
-    <div class="table-container">
-      <table class="portfolio-table">
-        <thead><tr>"""
-
+    html_code = f"""
+<style>
+  .table-container {{ max-height: 500px; overflow-y: auto; }}
+  .portfolio-table {{ width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+  .portfolio-table th {{
+    background: #363636; color: white; padding: 6px; text-align: center; border: none;
+    position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
+  }}
+  .portfolio-table td {{
+    padding: 6px; text-align: right; border: none; font-size: 11px;
+  }}
+  .portfolio-table td:first-child,
+  .portfolio-table td:nth-child(2),
+  .portfolio-table td:nth-child(3) {{
+    text-align: left;
+  }}
+  .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+  .total-row td {{
+    background: #A49B6D; color: white; font-weight: bold;
+  }}
+</style>
+<div class="table-container">
+  <table class="portfolio-table">
+    <thead><tr>
+"""
     for i, label in enumerate(labels):
         html_code += f'<th onclick="sortTable({i})">{html.escape(label)}</th>'
     html_code += "</tr></thead><tbody>"
@@ -150,17 +170,47 @@ def afficher_portefeuille():
         html_code += "</tr>"
 
     html_code += f"""
-        </tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td>TOTAL ({devise_cible})</td><td></td><td></td><td></td><td></td>
-            <td>{format_fr(total_val, 2)}</td>
-            <td></td><td>{format_fr(total_actuelle, 2)}</td><td></td>
-            <td>{format_fr(total_h52, 2)}</td><td></td><td>{format_fr(total_lt, 2)}</td><td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    """
+    </tbody>
+    <tfoot>
+      <tr class="total-row">
+        <td>TOTAL ({devise_cible})</td><td></td><td></td><td></td><td></td>
+        <td>{format_fr(total_valeur, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_actuelle, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_h52, 2)}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+<script>
+function sortTable(n) {{
+  var table = document.querySelector(".portfolio-table");
+  var tbody = table.querySelector("tbody");
+  var rows = Array.from(tbody.rows);
+  var dir = table.querySelectorAll("th")[n].getAttribute("data-dir") || "asc";
+  dir = (dir === "asc") ? "desc" : "asc";
+  table.querySelectorAll("th").forEach(th => {{
+    th.removeAttribute("data-dir");
+    th.innerHTML = th.innerHTML.replace(/ ▲| ▼/g, "");
+  }});
+  table.querySelectorAll("th")[n].setAttribute("data-dir", dir);
+  table.querySelectorAll("th")[n].innerHTML += dir === "asc" ? " ▲" : " ▼";
 
+  rows.sort((a, b) => {{
+    var x = a.cells[n].textContent.trim();
+    var y = b.cells[n].textContent.trim();
+    var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
+    var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
+    if (!isNaN(xNum) && !isNaN(yNum)) {{
+      return dir === "asc" ? xNum - yNum : yNum - xNum;
+    }}
+    return dir === "asc" ? x.localeCompare(y) : y.localeCompare(x);
+  }});
+  tbody.innerHTML = "";
+  rows.forEach(row => tbody.appendChild(row));
+}}
+</script>
+"""
     components.html(html_code, height=600, scrolling=True)
