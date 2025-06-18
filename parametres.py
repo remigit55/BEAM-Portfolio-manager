@@ -21,7 +21,7 @@ def afficher_parametres():
     st.markdown(f"#### Source des données : [Google Sheets CSV]({csv_url})")
 
     # Rafraîchissement manuel
-    if st.button("🔄 Rafraîchir les données"):
+    if st.button("Rafraîchir les données"):
         try:
             df = pd.read_csv(csv_url)
 
@@ -29,9 +29,9 @@ def afficher_parametres():
                 st.warning("⚠️ Le fichier est vide ou incorrectement structuré.")
             else:
                 st.session_state.df = df
-                st.success("✅ Données importées avec succès.")
-                with st.expander("🔍 Aperçu des données importées (10 premières lignes)"):
+                st.success("Données importées avec succès.")
+                with st.expander("Aperçu des données importées (10 premières lignes)"):
                     st.dataframe(df.head(10), use_container_width=True)
 
         except Exception as e:
-            st.error(f"❌ Erreur lors de l'import : {e}")
+            st.error(f"Erreur lors de l'import : {e}")
