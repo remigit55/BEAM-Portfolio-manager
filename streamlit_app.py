@@ -79,16 +79,8 @@ with onglets[2]:
         st.info("Aucune OD comptable enregistrée.")
 
 # Onglet : Transactions
-with onglets[3]:
-    st.subheader("Transactions")
-    if "ma" in st.session_state:
-        st.dataframe(st.session_state.ma, use_container_width=True)
-    else:
-        st.info("Aucune transaction enregistrée.")
-
-# Onglet : Transactions
 from transactions import afficher_transactions
-with onglets[4]:
+with onglets[3]:
     afficher_transations()
 
 # Onglet : Taux de change
