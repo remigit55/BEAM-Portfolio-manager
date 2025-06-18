@@ -142,10 +142,11 @@ def afficher_portefeuille():
         max-height: 400px; 
         overflow-y: auto; 
         overflow-x: auto; 
-        position: relative; 
+        position: relative;
+        width: 100%;
       }}
       .portfolio-table {{ 
-        width: 100%; 
+        width: 1200px; /* Force large width to trigger horizontal scroll */
         border-collapse: collapse; 
         table-layout: fixed; 
       }}
@@ -157,7 +158,7 @@ def afficher_portefeuille():
         border: none;
         position: sticky; 
         top: 0; 
-        z-index: 2;
+        z-index: 10; /* Headers above all */
         font-family: "Aptos narrow", Helvetica; 
         font-size: 12px;
       }}
@@ -167,28 +168,33 @@ def afficher_portefeuille():
         border: none;
         font-family: "Aptos narrow", Helvetica; 
         font-size: 11px;
+        background: #fff;
       }}
+      .portfolio-table tr:nth-child(even) td {{ background: #efefef; }}
       /* Figer les colonnes Ticker et Nom */
       .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
         position: sticky; 
         left: 0; 
         text-align: left; 
-        width: 5%; 
-        background: #fff; 
-        z-index: 1;
+        width: 50px; /* Fixed pixel width for narrow Ticker */
+        z-index: 5; /* Below headers but above content */
+        background: #fff;
       }}
       .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
         position: sticky; 
-        left: 5%; 
+        left: 50px; /* Match Ticker width */
         text-align: left; 
-        width: 20%; 
-        background: #fff; 
-        z-index: 1;
+        width: 200px; /* Wider for company names */
+        z-index: 5;
+        background: #fff;
       }}
-      /* Assurer que les en-têtes restent au-dessus */
-      .portfolio-table th:nth-child(1) {{ z-index: 3; }}
-      .portfolio-table th:nth-child(2) {{ z-index: 3; }}
-      .portfolio-table td:nth-child(3) {{ text-align: left; }} /* Alignement à gauche pour Catégorie */
+      /* Ensure headers stay above content */
+      .portfolio-table th:nth-child(1) {{ z-index: 15; }}
+      .portfolio-table th:nth-child(2) {{ z-index: 15; }}
+      /* Match even row background for frozen columns */
+      .portfolio-table tr:nth-child(even) td:nth-child(1),
+      .portfolio-table tr:nth-child(even) td:nth-child(2) {{ background: #efefef; }}
+      .portfolio-table td:nth-child(3) {{ text-align: left; }} /* Catégorie left-aligned */
       /* Largeur fixe pour les colonnes numériques */
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
@@ -197,21 +203,18 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
       .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
       .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
-        width: 8%;
+        width: 100px; /* Fixed pixel width for numeric columns */
       }}
-      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
         background: #A49B6D; 
         color: white; 
         font-weight: bold;
       }}
-      /* Assurer le fond des colonnes figées */
-      .portfolio-table tr:nth-child(even) td:nth-child(1),
-      .portfolio-table tr:nth-child(even) td:nth-child(2) {{ background: #efefef; }}
     </style>
     <div class="table-container">
       <table class="portfolio-table">
-        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead><tbody>
+        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead>
+        <tbody>
     """
 
     for _, row in df_disp.iterrows():
@@ -223,8 +226,8 @@ def afficher_portefeuille():
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
     html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
-    html += f"<td>{total_str}</td>"  # Prix d'Acquisition
-    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Valeur, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
+    html += f"<td>{total_str}</td>"  # Valeur
+    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix d'Acquisition, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
     html += "</tbody></table></div>"
 
     st.markdown(html, unsafe_allow_html=True)
