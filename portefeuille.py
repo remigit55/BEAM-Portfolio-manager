@@ -177,119 +177,119 @@ def afficher_portefeuille():
 
     # Début du tableau
     html_parts.append("""
-    <div class="table-container">
-      <table class="portfolio-table" id="portfolioTable">
-        <thead>
-          <tr>
-    """)
-    
-        # En-têtes (sans onclick)
-        for i, label in enumerate(labels):
-            html_parts.append(f'<th>{label}</th>')
-    
-        # Fin des en-têtes et début du corps
-        html_parts.append("""
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-    """)
-    
-        # Lignes de données
-        for _, row in df_disp.iterrows():
-            html_parts.append("<tr>")
-            for label in labels:
-                cell_value = row[label] if pd.notnull(row[label]) else ''
-                html_parts.append(f"<td>{cell_value}</td>")
-            html_parts.append("</tr>")
-    
-        # Ligne TOTAL
-        html_parts.append(f"""
-          <tr class="total-row">
-            <td>TOTAL</td>
-            <td></td><td></td><td></td>
-            <td>{total_str}</td>
-            <td></td><td></td><td></td><td></td><td></td><td></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    """)
+<div class="table-container">
+  <table class="portfolio-table" id="portfolioTable">
+    <thead>
+      <tr>
+""")
+
+    # En-têtes
+    for i, label in enumerate(labels):
+        html_parts.append(f'<th>{label}</th>')
+
+    # Fin des en-têtes et début du corps
+    html_parts.append("""
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+""")
+
+    # Lignes de données
+    for _, row in df_disp.iterrows():
+        html_parts.append("<tr>")
+        for label in labels:
+            cell_value = row[label] if pd.notnull(row[label]) else ''
+            html_parts.append(f"<td>{cell_value}</td>")
+        html_parts.append("</tr>")
+
+    # Ligne TOTAL
+    html_parts.append(f"""
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td></td><td></td><td></td>
+        <td>{total_str}</td>
+        <td></td><td></td><td></td><td></td><td></td><td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+""")
 
     # JavaScript
     html_parts.append("""
-    <script>
-    function sortTable(n) {
-      try {
-        console.log("sortTable called with column: " + n);
-        var table = document.getElementById("portfolioTable");
-        var tbody = document.getElementById("tableBody");
-        if (!table || !tbody) {
-          console.error("Table or tbody not found");
-          return;
-        }
-        var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
-        console.log("Rows found: " + rows.length);
-        var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
-        dir = (dir === "asc") ? "desc" : "asc";
-        table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
-        var headers = table.getElementsByTagName("TH");
-        for (var i = 0; i < headers.length; i++) {
-          headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
-        }
-        headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
-        rows.sort((rowA, rowB) => {
-          var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
-          var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
-          console.log("Comparing: " + x + " vs " + y);
-          if (x === "" && y === "") return 0;
-          if (x === "") return dir === "asc" ? -1 : 1;
-          if (y === "") return dir === "asc" ? 1 : -1;
-          var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
-          var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
-          if (!isNaN(xValue) && !isNaN(yValue)) {
-            return dir === "asc" ? xValue - yValue : yValue - xValue;
-          }
-          xValue = x.toLowerCase();
-          yValue = y.toLowerCase();
-          return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
-        });
-        tbody.innerHTML = "";
-        rows.forEach(row => tbody.appendChild(row));
-        var totalRow = tbody.querySelector("tr.total-row");
-        if (totalRow) {
-          tbody.appendChild(totalRow);
-        } else {
-          console.error("Total row not found");
-        }
-      } catch (e) {
-        console.error("Error in sortTable: " + e.message);
+<script>
+function sortTable(n) {
+  try {
+    console.log("sortTable called with column: " + n);
+    var table = document.getElementById("portfolioTable");
+    var tbody = document.getElementById("tableBody");
+    if (!table || !tbody) {
+      console.error("Table or tbody not found");
+      return;
+    }
+    var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
+    console.log("Rows found: " + rows.length);
+    var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+    dir = (dir === "asc") ? "desc" : "asc";
+    table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+    var headers = table.getElementsByTagName("TH");
+    for (var i = 0; i < headers.length; i++) {
+      headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
+    }
+    headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+    rows.sort((rowA, rowB) => {
+      var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+      var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+      console.log("Comparing: " + x + " vs " + y);
+      if (x === "" && y === "") return 0;
+      if (x === "") return dir === "asc" ? -1 : 1;
+      if (y === "") return dir === "asc" ? 1 : -1;
+      var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+      var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+      if (!isNaN(xValue) && !isNaN(yValue)) {
+        return dir === "asc" ? xValue - yValue : yValue - xValue;
       }
-    }
-    
-    // Fonction pour attacher les écouteurs
-    function attachListeners() {
-      console.log("Attaching event listeners");
-      var headers = document.querySelectorAll("#portfolioTable th");
-      console.log("Headers found: " + headers.length);
-      headers.forEach((header, index) => {
-        header.addEventListener("click", () => {
-          console.log("Header clicked, column: " + index);
-          sortTable(index);
-        });
-      });
-    }
-    
-    // Attachement initial
-    attachListeners();
-    
-    // MutationObserver pour les re-rendus
-    var observer = new MutationObserver(() => {
-      console.log("MutationObserver triggered");
-      attachListeners();
+      xValue = x.toLowerCase();
+      yValue = y.toLowerCase();
+      return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
     });
-    observer.observe(document.getElementById("portfolioTable") || document.body, { childList: true, subtree: true });
-    </script>
-    """)
+    tbody.innerHTML = "";
+    rows.forEach(row => tbody.appendChild(row));
+    var totalRow = tbody.querySelector("tr.total-row");
+    if (totalRow) {
+      tbody.appendChild(totalRow);
+    } else {
+      console.error("Total row not found");
+    }
+  } catch (e) {
+    console.error("Error in sortTable: " + e.message);
+  }
+}
+
+// Fonction pour attacher les écouteurs
+function attachListeners() {
+  console.log("Attaching event listeners");
+  var headers = document.querySelectorAll("#portfolioTable th");
+  console.log("Headers found: " + headers.length);
+  headers.forEach((header, index) => {
+    header.addEventListener("click", () => {
+      console.log("Header clicked, column: " + index);
+      sortTable(index);
+    });
+  });
+}
+
+// Attachement initial
+attachListeners();
+
+// MutationObserver pour les re-rendus
+var observer = new MutationObserver(() => {
+  console.log("MutationObserver triggered");
+  attachListeners();
+});
+observer.observe(document.getElementById("portfolioTable") || document.body, { childList: true, subtree: true });
+</script>
+""")
 
     # Combiner toutes les parties
     html = "".join(html_parts)
