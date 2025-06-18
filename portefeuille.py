@@ -6,8 +6,6 @@ import html
 import streamlit.components.v1 as components
 
 def afficher_portefeuille():
-    st.write("Contenu actuel de df :", st.session_state.get("df"))
-
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
         return
