@@ -83,9 +83,7 @@ with onglets[2]:
     else:
         st.info("Aucune OD comptable enregistrée.")
 
-# Onglet : Transactions
-with onglets[3]:
-    afficher_transactions()
+
 
 # Onglet : Taux de change
 with onglets[4]:
