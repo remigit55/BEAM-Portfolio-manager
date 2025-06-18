@@ -49,9 +49,8 @@ if "devise_cible" not in st.session_state:
 if "ticker_names_cache" not in st.session_state:
     st.session_state.ticker_names_cache = {}
 
-# Sélecteur de devise cible dans la sidebar
-st.sidebar.title("Paramètres")
-st.session_state.devise_cible = st.sidebar.selectbox("Devise de référence :", ["EUR", "USD", "CAD", "JPY"], index=["EUR", "USD", "CAD", "JPY"].index(st.session_state.devise_cible))
+# La devise de référence sera désormais gérée uniquement dans l’onglet "Paramètres"
+pass
 
 # Importation des modules fonctionnels
 from portefeuille import afficher_portefeuille
