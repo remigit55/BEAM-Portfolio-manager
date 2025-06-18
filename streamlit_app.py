@@ -1,7 +1,11 @@
 import streamlit as st
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
+
 import streamlit.components.v1 as components
 import importlib
+
+# Afficher le titre principal
+st.title("BEAM Portfolio Manager")
 
 # Thème personnalisé
 PRIMARY_COLOR = "#363636"
