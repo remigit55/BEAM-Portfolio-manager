@@ -18,6 +18,30 @@ if uploaded_file:
     if menu == "Portefeuille":
         if "Portefeuille" in onglets_disponibles:
             df = pd.read_excel(xls, sheet_name="Portefeuille")
+            
+            # Sélection de la devise cible (dans la sidebar)
+            devise_cible = st.sidebar.selectbox("💶 Devise de référence", options=["USD", "EUR", "CAD", "CHF"], index=1)
+            st.sidebar.markdown(f"💡 Affichage consolidé en **{devise_cible}**")
+            
+            # Vérifie que la feuille FX est disponible
+            if "Taux_FX" in onglets_disponibles:
+                fx = pd.read_excel(xls, sheet_name="Taux_FX")
+                
+                # Crée un dictionnaire des taux FX par devise de cotation
+                try:
+                    fx_dict = dict(zip(fx["Devise"], fx[devise_cible]))
+                    df["Taux FX"] = df["Devise"].map(fx_dict)
+                    df["Valeur (devise cible)"] = df["Valeur"] * df["Taux FX"]
+                    
+                    # Optionnel : affichage clair des taux appliqués
+                    st.markdown(f"📌 Taux de change appliqués vers **{devise_cible}** :")
+                    st.dataframe(fx.set_index("Devise")[[devise_cible]], use_container_width=True)
+                    
+                except Exception as e:
+                    st.error(f"Erreur lors de l'application des taux de change : {e}")
+            else:
+                st.warning("❗ La feuille 'Taux_FX' est manquante : conversion en devise cible non appliquée.")
+
             st.subheader("Positions actuelles")
             st.dataframe(df, use_container_width=True)
 
