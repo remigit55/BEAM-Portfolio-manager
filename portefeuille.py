@@ -50,7 +50,7 @@ def afficher_portefeuille():
             background-color: #f4f4f4;
             padding: 8px;
             text-align: center;
-            border-bottom: 2px solid #ccc;
+            border-bottom: px solid #ccc;
         }
         .portfolio-table td {
             padding: 8px;
