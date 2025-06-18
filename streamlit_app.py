@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
 import datetime
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
@@ -50,7 +52,6 @@ with tabs[0]:
     if st.session_state.df is not None:
         st.subheader("Portefeuille consolidé")
 
-        # Application du taux de change
         df = st.session_state.df.copy()
         cr = CurrencyRates()
         fx_rates_utilisés = {}
@@ -111,17 +112,21 @@ with tabs[5]:
     st.subheader("Paramètres globaux")
     st.session_state.devise_cible = st.selectbox("Devise de référence pour consolidation", options=["USD", "EUR", "CAD", "CHF"], index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible))
 
-    uploaded_file = st.file_uploader("Importer le fichier Excel du portefeuille", type=["xlsx"])
-    if uploaded_file:
-        xls = pd.ExcelFile(uploaded_file)
-        st.session_state.onglets_disponibles = xls.sheet_names
-        if "Portefeuille" in xls.sheet_names:
-            st.session_state.df = pd.read_excel(xls, sheet_name="Portefeuille")
-        if "Performance" in xls.sheet_names:
-            st.session_state.performance = pd.read_excel(xls, sheet_name="Performance")
-        if "OD_Comptables" in xls.sheet_names:
-            st.session_state.od = pd.read_excel(xls, sheet_name="OD_Comptables")
-        if "Transactions_M&A" in xls.sheet_names:
-            st.session_state.ma = pd.read_excel(xls, sheet_name="Transactions_M&A")
-        if "Taux_FX" in xls.sheet_names:
-            st.session_state.fx = pd.read_excel(xls, sheet_name="Taux_FX")
+    google_sheet_url = st.text_input("Lien vers le Google Sheets du portefeuille")
+    if google_sheet_url:
+        try:
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds = ServiceAccountCredentials.from_json_keyfile_name("google_credentials.json", scope)
+            client = gspread.authorize(creds)
+            spreadsheet_id = google_sheet_url.split("/d/")[1].split("/")[0]
+            spreadsheet = client.open_by_key(spreadsheet_id)
+
+            st.session_state.df = pd.DataFrame(spreadsheet.worksheet("Portefeuille").get_all_records())
+            st.session_state.performance = pd.DataFrame(spreadsheet.worksheet("Performance").get_all_records())
+            st.session_state.od = pd.DataFrame(spreadsheet.worksheet("OD_Comptables").get_all_records())
+            st.session_state.ma = pd.DataFrame(spreadsheet.worksheet("Transactions_M&A").get_all_records())
+            st.session_state.fx = pd.DataFrame(spreadsheet.worksheet("Taux_FX").get_all_records())
+
+            st.success("Données importées depuis Google Sheets")
+        except Exception as e:
+            st.error(f"Erreur lors de l'import : {e}")
