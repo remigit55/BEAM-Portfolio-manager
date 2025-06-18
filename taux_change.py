@@ -50,38 +50,37 @@ def afficher_taux_change():
         st.info("Aucun taux encore chargé.")
         return
 
-    # Affichage stylisé du tableau
+    # Construction du DataFrame
     df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
     df_fx = df_fx.sort_values(by="Devise source")
 
     # HTML stylisé
     html_code = f"""
-<style>
-  .table-container {{ max-height: 300px; overflow-y: auto; }}
-  .fx-table {{ width: 100%; border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
-  .fx-table th {{
-    background: #363636; color: white; padding: 6px; text-align: center; border: none;
-    position: sticky; top: 0; z-index: 2; font-size: 12px;
-  }}
-  .fx-table td {{
-    padding: 6px; text-align: right; border: none; font-size: 11px;
-  }}
-  .fx-table td:first-child {{ text-align: left; }}
-  .fx-table tr:nth-child(even) {{ background: #efefef; }}
-</style>
-<div class="table-container">
-  <table class="fx-table">
-    <thead><tr><th>Devise source</th><th>Taux vers {devise_cible}</th></tr></thead>
-    <tbody>
-"""
+    <style>
+      .table-container {{ max-height: 300px; overflow-y: auto; }}
+      .fx-table {{ width: 100%; border-collapse: collapse; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+      .fx-table th {{
+        background: #363636; color: white; padding: 6px; text-align: center; border: none;
+        position: sticky; top: 0; z-index: 2; font-size: 12px;
+      }}
+      .fx-table td {{
+        padding: 6px; text-align: right; border: none; font-size: 11px;
+      }}
+      .fx-table td:first-child {{ text-align: left; }}
+      .fx-table tr:nth-child(even) {{ background: #efefef; }}
+    </style>
+    <div class="table-container">
+      <table class="fx-table">
+        <thead><tr><th>Devise source</th><th>Taux vers {devise_cible}</th></tr></thead>
+        <tbody>
+    """
     for _, row in df_fx.iterrows():
         html_code += f"<tr><td>{html.escape(str(row[0]))}</td><td>{row[1]:,.6f}</td></tr>"
     html_code += """
-    </tbody>
-  </table>
-  st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
-</div>
-"""
-components.html(html_code, height=400, scrolling=True)    
+        </tbody>
+      </table>
+    </div>
+    """
 
-
+    components.html(html_code, height=400, scrolling=True)
+    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
