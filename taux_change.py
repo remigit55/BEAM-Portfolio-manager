@@ -50,8 +50,6 @@ def afficher_taux_change():
         st.info("Aucun taux encore chargé.")
         return
 
-    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
-
     # Affichage stylisé du tableau
     df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
     df_fx = df_fx.sort_values(by="Devise source")
@@ -83,4 +81,5 @@ def afficher_taux_change():
   </table>
 </div>
 """
+    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
     components.html(html_code, height=400, scrolling=True)
