@@ -278,10 +278,11 @@ function attachListeners() {
     });
   });
 }
-setTimeout(attachListeners, 1000);
+
 
 // Attachement initial
 attachListeners();
+setTimeout(attachListeners, 1000);
 
 // MutationObserver pour les re-rendus
 var observer = new MutationObserver(() => {
