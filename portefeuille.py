@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+import html
 import streamlit.components.v1 as components
 
 def afficher_portefeuille():
@@ -159,13 +160,15 @@ def afficher_portefeuille():
     <thead><tr>
 """
     for i, label in enumerate(labels):
-        html += f'<th onclick="sortTable({i})">{label}</th>'
+        html += f'<th onclick="sortTable({i})">{html.escape(label)}</th>'
     html += "</tr></thead><tbody>"
 
     for _, row in df_disp.iterrows():
         html += "<tr>"
         for lbl in labels:
-            html += f"<td>{row[lbl] or ''}</td>"
+            val = row[lbl]
+            val_str = str(val) if pd.notnull(val) else ""
+            html += f"<td>{html.escape(val_str)}</td>"
         html += "</tr>"
 
     html += f"""
@@ -173,7 +176,7 @@ def afficher_portefeuille():
     <tfoot>
       <tr class="total-row">
         <td>TOTAL</td><td></td><td></td><td></td><td></td>
-        <td>{total_str}</td><td></td><td></td><td></td><td></td><td></td>
+        <td>{html.escape(total_str)}</td><td></td><td></td><td></td><td></td><td></td>
       </tr>
     </tfoot>
   </table>
