@@ -48,6 +48,8 @@ def afficher_portefeuille():
         .portfolio-table {
             border-collapse: collapse;
             width: 100%;
+            border-left: 1px solid transparent;
+            border-right: 1px solid transparent;
         }
         .portfolio-table th {
             background-color: #363636;
