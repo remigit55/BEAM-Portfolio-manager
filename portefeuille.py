@@ -27,13 +27,11 @@ def afficher_portefeuille():
             fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = "Erreur"
             return None
 
-    # Nettoyage et conversions
-    df["Tickers"] = df["Tickers"].astype(str).str.strip()
-    df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce").fillna(0)
-    df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce").fillna(0)
+    df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
+    df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
     df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Récupération du nom via Yahoo Finance (endpoint v8/chart → field: shortName)
+    # Ajouter colonne Shortname via Yahoo Finance (endpoint v8/chart)
     if "Tickers" in df.columns:
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
@@ -58,9 +56,11 @@ def afficher_portefeuille():
         index_ticker = df.columns.get_loc("Tickers")
         df.insert(index_ticker + 1, "Shortname", shortnames)
 
-    # Colonnes finales affichées
+    # Sélection des colonnes à afficher
     colonnes_finales = ["Tickers", "Shortname", "Devise", "Quantité", "Acquisition", "Valeur"]
     df = df[[col for col in colonnes_finales if col in df.columns]]
 
+    st.dataframe(df, use_container_width=True)
+    st.session_state.fx_rates = fx_rates_utilisés
     st.dataframe(df, use_container_width=True)
     st.session_state.fx_rates = fx_rates_utilisés
