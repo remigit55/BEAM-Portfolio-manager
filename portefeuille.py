@@ -46,4 +46,9 @@ def afficher_portefeuille():
         "Valeur_fmt": "Valeur"
     })
 
-   
+    # Générer le HTML pour Streamlit
+    html_table = df_affichage.to_html(index=False, escape=False, classes="styled-table")
+
+ 
+
+    st.markdown(style + html_table, unsafe_allow_html=True)
