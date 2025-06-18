@@ -72,7 +72,7 @@ import streamlit as st
 from portefeuille import afficher_portefeuille
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
-st.title("BEAM Portfolio Manager")  # ✅ Ne l’ajoute qu’ici
+# st.title("BEAM Portfolio Manager")  # ✅ Ne l’ajoute qu’ici
 
 afficher_portefeuille()
 
