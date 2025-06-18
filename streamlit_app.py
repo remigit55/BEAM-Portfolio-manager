@@ -55,7 +55,7 @@ except Exception:
 st.markdown(
     f"""
     <div style="display: flex; align-items: left; margin-top: -10px; margin-bottom: 20px;">
-        <img src="data:image/png;base64,{logo_base64}" style="height: 50px; margin-right: 12px;" />
+        <img src="data:image/png;base64,{logo_base64}" style="height: 70px; margin-right: 5px;" />
         <h1 style='font-size: 32px; margin: 0;'>BEAM Portfolio Manager</h1>
     </div>
     """,
