@@ -9,7 +9,7 @@ def afficher_parametres():
 
     # Choix de la devise de référence dans le corps principal (plus de sidebar)
     st.session_state.devise_cible = st.selectbox(
-        "Devise de référence",
+        st.markdown(f"#### Devise de référence")
         ["USD", "EUR", "CAD", "CHF"],
         index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
     )
