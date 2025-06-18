@@ -1,8 +1,9 @@
-import streamlit as st
+""import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
 import datetime
 import requests
+yf_base_url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols="
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
@@ -27,9 +28,7 @@ st.markdown(f"""
         .stDataFrame thead tr th {{
             background-color: {ACCENT_COLOR};
             color: white;
-        }}
-        .stDataFrame tbody tr:nth-child(even) {{
-            background-color: #f2f2f2;
+            text-align: right !important;
         }}
         .stDataFrame td {{
             text-align: right !important;
@@ -45,21 +44,6 @@ if "fx_rates" not in st.session_state:
     st.session_state.fx_rates = {}
 if "devise_cible" not in st.session_state:
     st.session_state.devise_cible = "EUR"
-
-# Dictionnaire des noms des entreprises
-ticker_to_name = {
-    "GLDG": "GoldMining Inc.",
-    "LJP3": "3X Long JPY Short USD ETF",
-    "COP": "ConocoPhillips",
-    "TTE": "TotalEnergies SE",
-    "CVX": "Chevron Corporation",
-    "APGO": "Apollo Silver Corp.",
-    "SSV": "Southern Silver Exploration Corp.",
-    "MUX": "McEwen Mining Inc.",
-    "UEC": "Uranium Energy Corp.",
-    "CCJ": "Cameco Corporation",
-    # À compléter
-}
 
 # Onglets de navigation
 tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
@@ -99,12 +83,21 @@ with tabs[0]:
         df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
         df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
-        # Ajouter colonne Nom via mapping Ticker
+        # Ajouter colonne Nom via récupération Yahoo Finance
         if "Tickers" in df.columns:
-            df.insert(1, "Nom", df["Tickers"].map(ticker_to_name).fillna("À renseigner"))
+            def get_name(ticker):
+                try:
+                    response = requests.get(f"{yf_base_url}{ticker}")
+                    if response.ok:
+                        return response.json()['quoteResponse']['result'][0].get('shortName', 'Non trouvé')
+                except:
+                    return "Erreur nom"
+                return "Non trouvé"
+
+            noms = df["Tickers"].apply(get_name)
+            df.insert(1, "Nom", noms)
 
         st.dataframe(df, use_container_width=True)
-
         st.session_state.fx_rates = fx_rates_utilisés
 
 # Onglet Performance
