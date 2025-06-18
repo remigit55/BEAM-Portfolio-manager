@@ -1,6 +1,5 @@
 # streamlit_app.py
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 st.title("BEAM Portfolio Manager")
@@ -32,29 +31,25 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# Onglets de navigationMore actions
-tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions", "Taux de change", "Paramètres"])
-
-# Bandeau horizontal de navigation
-menu = st.selectbox("Navigation", [
+# Onglets de navigation horizontaux
+onglets = st.tabs([
     "Portefeuille", 
     "Performance", 
     "OD Comptables", 
-    "Transactions M&A", 
+    "Transactions", 
     "Taux de change", 
     "Paramètres"
-], key="navigation_select")
+])
 
-# Gestion des onglets via import de fichiers séparés
-if menu == "Portefeuille":
+with onglets[0]:
     import portefeuille
-elif menu == "Performance":
+with onglets[1]:
     import performance
-elif menu == "OD Comptables":
+with onglets[2]:
     import od_comptables
-elif menu == "Transactions M&A":
+with onglets[3]:
     import transactions_ma
-elif menu == "Taux de change":
+with onglets[4]:
     import taux_change
-elif menu == "Paramètres":
+with onglets[5]:
     import parametres
