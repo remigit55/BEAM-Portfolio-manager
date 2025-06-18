@@ -8,7 +8,7 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Nettoyage des données numériques
+    # Nettoyage des colonnes numériques
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
@@ -19,11 +19,11 @@ def afficher_portefeuille():
                 .astype(float)
             )
 
-    # Calcul de la colonne Valeur
+    # Calcul de la valeur
     if "Quantité" in df.columns and "Acquisition" in df.columns:
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Format français avec séparateurs
+    # Format français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
@@ -33,45 +33,32 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Ajout colonne Ticker propre
+    # Ordre des colonnes à afficher
+    colonnes_affichage = []
     if "Tickers" in df.columns:
-        df["Ticker"] = df["Tickers"]
-
-    # Sélection et renommage
-    colonnes = []
-    if "Ticker" in df.columns:
-        colonnes.append("Ticker")
-    colonnes += ["Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
+        df["Ticker"] = df["Tickers"]  # pour afficher avec un nom plus propre
+        colonnes_affichage.append("Ticker")
+    colonnes_affichage += ["Quantité_fmt", "Acquisition_fmt", "Valeur_fmt"]
     if "Devise" in df.columns:
-        colonnes.append("Devise")
+        colonnes_affichage.append("Devise")
 
-    df_affichage = df[colonnes].rename(columns={
+    # Construction du DataFrame final
+    df_affichage = df[colonnes_affichage].rename(columns={
         "Quantité_fmt": "Quantité",
         "Acquisition_fmt": "Acquisition",
         "Valeur_fmt": "Valeur"
     })
 
-    # Construction du tableau HTML avec alignement à droite
-    def df_to_html(df):
-        return df.to_html(index=False, escape=False, classes="styled-table", justify="right")
+    # CSS alignement à droite
+    st.markdown("""
+        <style>
+            .st-emotion-cache-1xarl3l td {
+                text-align: right !important;
+            }
+            .st-emotion-cache-1xarl3l th {
+                text-align: right !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Style HTML intégré
-    style = """
-    <style>
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 14px;
-    }
-    .styled-table th, .styled-table td {
-        padding: 8px;
-        border: 1px solid #ddd;
-        text-align: right;
-    }
-    .styled-table th:first-child, .styled-table td:first-child {
-        text-align: left;
-    }
-    </style>
-    """
-
-    st.markdown(style + df_to_html(df_affichage), unsafe_allow_html=True)
+    st.dataframe(df_affichage, use_container_width=True)
