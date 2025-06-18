@@ -167,8 +167,8 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td></td><td>"  # Pour Nom, Quantité, Prix d'Acquisition
-    html += f"<td>{total_str}</td>"  # Valeur
+    html += "<td></td><td></td><td>"  # Pour Nom, Quantité, Prix d'Acquisition
+    html += f"<td>{total_str}</td></td><td>"  # Valeur
     html += "<td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix Actuel, Haut 52 Semaines, Valeur H52, Valeur Actuelle, Devise
     html += "</tbody></table></div>"
 
