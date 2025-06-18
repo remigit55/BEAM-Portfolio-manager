@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 
-st.subheader("Paramètres")
+st.header("Paramètres")
 
 # Définir la devise cible par défaut si non définie
 if "devise_cible" not in st.session_state:
