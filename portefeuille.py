@@ -45,9 +45,7 @@ def afficher_portefeuille():
 
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
-                headers = {
-                    "User-Agent": "Mozilla/5.0"
-                }
+                headers = { "User-Agent": "Mozilla/5.0" }
                 r = requests.get(url, headers=headers, timeout=5)
                 r.raise_for_status()
                 data = r.json()
@@ -194,5 +192,5 @@ function sortTable(n) {{
 }}
 </script>
 """
-components.html(html, height=600, scrolling=True)
 
+    components.html(html, height=600, scrolling=True)
