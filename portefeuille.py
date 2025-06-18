@@ -43,7 +43,6 @@ def afficher_portefeuille():
                     return cached
                 else:
                     del st.session_state.ticker_names_cache[t]
-
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 headers = { "User-Agent": "Mozilla/5.0" }
@@ -119,29 +118,16 @@ def afficher_portefeuille():
     df_disp.columns = labels
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
-    html = """
+    html_code = """
 <style>
   .table-container { max-height: 500px; overflow-y: auto; }
-  .portfolio-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+  .portfolio-table { width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
   .portfolio-table th {
-    background: #363636;
-    color: white;
-    padding: 6px;
-    text-align: center;
-    border: none;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    font-size: 12px;
-    cursor: pointer;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #363636; color: white; padding: 6px; text-align: center; border: none;
+    position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
   }
   .portfolio-table td {
-    padding: 6px;
-    text-align: right;
-    border: none;
-    font-size: 11px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 6px; text-align: right; border: none; font-size: 11px;
   }
   .portfolio-table td:first-child,
   .portfolio-table td:nth-child(2),
@@ -150,9 +136,7 @@ def afficher_portefeuille():
   }
   .portfolio-table tr:nth-child(even) { background: #efefef; }
   .total-row td {
-    background: #A49B6D;
-    color: white;
-    font-weight: bold;
+    background: #A49B6D; color: white; font-weight: bold;
   }
 </style>
 <div class="table-container">
@@ -160,23 +144,23 @@ def afficher_portefeuille():
     <thead><tr>
 """
     for i, label in enumerate(labels):
-        html += f'<th onclick="sortTable({i})">{html.escape(label)}</th>'
-    html += "</tr></thead><tbody>"
+        html_code += f'<th onclick="sortTable({i})">{html.escape(label)}</th>'
+    html_code += "</tr></thead><tbody>"
 
     for _, row in df_disp.iterrows():
-        html += "<tr>"
+        html_code += "<tr>"
         for lbl in labels:
             val = row[lbl]
             val_str = str(val) if pd.notnull(val) else ""
-            html += f"<td>{html.escape(val_str)}</td>"
-        html += "</tr>"
+            html_code += f"<td>{html.escape(val_str)}</td>"
+        html_code += "</tr>"
 
-    html += f"""
+    html_code += f"""
     </tbody>
     <tfoot>
       <tr class="total-row">
         <td>TOTAL</td><td></td><td></td><td></td><td></td>
-        <td>{html.escape(total_str)}</td><td></td><td></td><td></td><td></td><td></td>
+        <td>{total_str}</td><td></td><td></td><td></td><td></td><td></td>
       </tr>
     </tfoot>
   </table>
@@ -210,5 +194,4 @@ function sortTable(n) {{
 }}
 </script>
 """
-
-    components.html(html, height=600, scrolling=True)
+    components.html(html_code, height=600, scrolling=True)
