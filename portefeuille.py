@@ -45,6 +45,7 @@ def afficher_portefeuille():
             font-family: sans-serif;
             font-size: 12px;
             border-radius: 30px;
+            overflow: hiden;
         }
         .portfolio-table th {
             background-color: #f4f4f4;
