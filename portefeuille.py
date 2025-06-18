@@ -23,18 +23,13 @@ def afficher_portefeuille():
     df["Acquisition"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Colonnes à afficher dans l'ordre souhaité
-    colonnes = []
-    for col in ["Tickers", "Quantité", "Acquisition", "Valeur"]:
-        if col in df.columns:
-            colonnes.append(col)
-    if "Devise" in df.columns:
-        colonnes.append("Devise")
+    # Sélection des colonnes à afficher
+    colonnes = [col for col in ["Tickers", "Devise", "Quantité", "Acquisition", "Valeur"] if col in df.columns]
 
     # Affichage
     st.dataframe(df[colonnes], use_container_width=True)
 
-    # Alignement à droite
+    # Hack CSS pour forcer alignement à droite
     st.markdown("""
         <style>
         .st-emotion-cache-1xarl3l td {
