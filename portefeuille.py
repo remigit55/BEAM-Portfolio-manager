@@ -32,11 +32,11 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Ordre des colonnes
+    # Ordre et noms d’affichage
     colonnes = ["Ticker", "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
     noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
-    # Calcul total
+    # Calcul du total
     total_valeur = df["Valeur"].sum()
     total_valeur_fmt = format_fr(total_valeur, 2)
 
@@ -71,7 +71,7 @@ def afficher_portefeuille():
         .portfolio-table tr:last-child td {
             border-bottom: none;
         }
-        .total-row {
+        .total-cell {
             background-color: #A49B6D;
             font-weight: bold;
         }
@@ -90,11 +90,11 @@ def afficher_portefeuille():
             html += f"<td>{val}</td>"
         html += "</tr>"
 
-    # Ligne total
+    # Ligne total uniquement sur la colonne "Valeur"
     html += f"""
-        <tr class="total-row">
-            <td colspan="4" style="text-align:right;">Total</td>
-            <td>{total_valeur_fmt}</td>
+        <tr>
+            <td colspan="4"></td>
+            <td class="total-cell">{total_valeur_fmt}</td>
             <td></td>
         </tr>
     """
