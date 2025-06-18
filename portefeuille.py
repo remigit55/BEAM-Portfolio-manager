@@ -71,7 +71,7 @@ def afficher_portefeuille():
       .table-container {{ max-height:400px; overflow-y:auto; }}
       .portfolio-table {{ width:100%; border-collapse:collapse; }}
       .portfolio-table th {{
-        background:#363636; color:white; padding:6px; text-align:center;
+        background:#363636; color:white; padding:6px; text-align:center; border:none;
         position:sticky; top:0; z-index:2;
         font-family:"Aptos narrow",Helvetica; font-size:12px;
       }}
