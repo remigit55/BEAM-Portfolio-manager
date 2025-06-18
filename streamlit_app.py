@@ -66,7 +66,7 @@ with onglets[0]:
     afficher_portefeuille()
 
 # Onglet : Performance
-from performanxe import afficher_performance
+from performance import afficher_performance
 with onglets[1]:
     afficher_performance()
 
