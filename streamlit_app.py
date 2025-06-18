@@ -40,20 +40,13 @@ st.markdown(f"""
 
         /* Personnalisation des onglets */
         div[data-testid="stTabs"] button[role="tab"] {{
-            background-color: #f5f5f5 !important;
+            background-color: ACCENT_COLOR !important;
             color: #888 !important;
             border: none;
             padding: 10px 15px;
             font-size: 14px;
             font-weight: normal;
             border-radius: 5px 5px 0 0 !important;
-        }}
-
-        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {{
-            background-color: {SECONDARY_COLOR} !important;
-            color: {PRIMARY_COLOR} !important;
-            font-weight: bold !important;
-            border-bottom: 3px solid {ACCENT_COLOR} !important;
         }}
     </style>
 """, unsafe_allow_html=True)
