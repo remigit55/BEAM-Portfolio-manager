@@ -86,6 +86,11 @@ with onglets[3]:
     else:
         st.info("Aucune transaction enregistrée.")
 
+# Onglet : Transactions
+from transactions import afficher_transactions
+with onglets[4]:
+    afficher_transations()
+
 # Onglet : Taux de change
 from taux_change import afficher_taux_change
 with onglets[4]:
