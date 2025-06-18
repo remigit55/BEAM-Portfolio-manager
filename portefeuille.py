@@ -14,7 +14,6 @@ def afficher_portefeuille():
     devise_cible = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.get("fx_rates", {})
 
-    # Normalisation
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
