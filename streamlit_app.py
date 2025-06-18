@@ -4,6 +4,35 @@ from forex_python.converter import CurrencyRates
 import datetime
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
+
+# Définir les couleurs de thème
+PRIMARY_COLOR = "#363636"
+SECONDARY_COLOR = "#E8E8E8"
+ACCENT_COLOR = "#A49B6D"
+
+st.markdown(f"""
+    <style>
+        body {{
+            background-color: {SECONDARY_COLOR};
+            color: {PRIMARY_COLOR};
+        }}
+        .stApp {{
+            font-family: 'Arial', sans-serif;
+        }}
+        .css-1d391kg, .css-ffhzg2 {{
+            background-color: {SECONDARY_COLOR} !important;
+            color: {PRIMARY_COLOR} !important;
+        }}
+        .stDataFrame thead tr th {{
+            background-color: {ACCENT_COLOR};
+            color: white;
+        }}
+        .stDataFrame tbody tr:nth-child(even) {{
+            background-color: #f2f2f2;
+        }}
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("BEAM Portfolio Manager")
 
 if "df" not in st.session_state:
