@@ -39,7 +39,7 @@ st.markdown(f"""
         }}
 
         /* Personnalisation des onglets */
-        div[data-baseweb="tabs"] button[role="tab"] {{
+        div[data-testid="stTabs"] button[role="tab"] {{
             background-color: #f5f5f5 !important;
             color: #888 !important;
             border: none;
@@ -49,7 +49,7 @@ st.markdown(f"""
             border-radius: 5px 5px 0 0 !important;
         }}
 
-        div[data-baseweb="tabs"] button[aria-selected="true"] {{
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {{
             background-color: {SECONDARY_COLOR} !important;
             color: {PRIMARY_COLOR} !important;
             font-weight: bold !important;
@@ -57,6 +57,7 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
+
 
 
 from PIL import Image
