@@ -12,14 +12,19 @@ def afficher_portefeuille():
     df = st.session_state.df.copy()
 
     # Normalisation numérique
-    for col in ["Quantité", "Acquisition"]:
-        if col in df.columns:
-            df[col] = (
-                df[col].astype(str)
-                      .str.replace(" ", "", regex=False)
-                      .str.replace(",", ".", regex=False)
-            )
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    try:
+        for col in ["Quantité", "Acquisition"]:
+            if col in df.columns:
+                df[col] = (
+                    df[col].astype(str)
+                    .str.replace(" ", "", regex=False)
+                    .str.replace(",", ".", regex=False)
+                )
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+    except Exception as e:
+        print(f"Erreur lors de la normalisation numérique : {e}")
+        st.error(f"Erreur lors de la normalisation des données : {e}")
+        return
 
     # Calcul de la valeur
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
@@ -48,14 +53,14 @@ def afficher_portefeuille():
 
             if not t or not t.replace(".", "").isalnum():
                 print(f"Ticker invalide ignoré : {t}")
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+                return {"ticker": None, "shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 headers = {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
                 }
-                r = requests.get(url, headers=headers, timeout=5)
+                r = requests.get(url, headers=headers, timeout=10)
                 r.raise_for_status()
 
                 data = r.json()
@@ -67,16 +72,16 @@ def afficher_portefeuille():
                 if not name:
                     name = f"https://finance.yahoo.com/quote/{t}"
 
-                result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
+                result = {"ticker": t, "shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
                 st.session_state.ticker_names_cache[t] = result
                 time.sleep(0.5)
                 return result
             except Exception as e:
                 print(f"Erreur pour {t}: {e}")
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+                return {"ticker": t, "shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
         yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
-        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"] if isinstance(x, dict) else f"https://finance.yahoo.com/quote/{t}")
+        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"] if isinstance(x, dict) else f"https://finance.yahoo.com/quote/{x}")
         df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"] if isinstance(x, dict) else None)
         df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"] if isinstance(x, dict) else None)
 
@@ -88,7 +93,8 @@ def afficher_portefeuille():
 
     # Formatage : français + création des colonnes *_fmt
     def format_fr(x, dec):
-        if pd.isnull(x): return ""
+        if pd.isnull(x):
+            return ""
         s = f"{x:,.{dec}f}"
         return s.replace(",", " ").replace(".", ",")
 
@@ -131,13 +137,22 @@ def afficher_portefeuille():
         "Valeur H52",
         "Devise"
     ]
-    df_disp = df[cols].copy()
-    df_disp.columns = labels
+    try:
+        df_disp = df[cols].copy()
+        df_disp.columns = labels
+    except Exception as e:
+        print(f"Erreur lors de la préparation du DataFrame d'affichage : {e}")
+        st.error(f"Erreur lors de la préparation des données : {e}")
+        return
 
     total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
     # Construction HTML
     html_parts = []
+
+    # Vérification des données
+    print("DataFrame shape:", st.session_state.df.shape if st.session_state.df is not None else "None")
+    print("DataFrame columns:", st.session_state.df.columns.tolist() if st.session_state.df is not None else "None")
 
     # CSS
     html_parts.append("""
@@ -169,4 +184,122 @@ def afficher_portefeuille():
   .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {
     width: 9%;
   }
-  .portfolio
+  .portfolio-table tr:nth-child(even) { background:#efefef; }
+  .total-row td {
+    background:#A49B6D; color:white; font-weight:bold;
+  }
+</style>
+""")
+
+    # Début du tableau
+    html_parts.append("""
+<div class="table-container">
+  <table class="portfolio-table" id="portfolioTable">
+    <thead>
+      <tr>
+""")
+
+    # En-têtes avec onclick
+    for i, label in enumerate(labels):
+        html_parts.append(f'<th onclick="sortTable({i})">{label}</th>')
+
+    # Fin des en-têtes et début du corps
+    html_parts.append("""
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+""")
+
+    # Lignes de données
+    try:
+        if df_disp.empty:
+            print("DataFrame vide")
+            st.warning("Le DataFrame est vide, aucune donnée à afficher.")
+            return
+        for _, row in df_disp.iterrows():
+            html_parts.append("<tr>")
+            for label in labels:
+                cell_value = str(row[label]) if pd.notnull(row[label]) else ''
+                html_parts.append(f"<td>{cell_value}</td>")
+            html_parts.append("</tr>")
+    except Exception as e:
+        print(f"Erreur lors de la génération des lignes : {e}")
+        st.error(f"Erreur lors de la génération du tableau : {e}")
+        return
+
+    # Ligne TOTAL
+    html_parts.append(f"""
+      <tr class="total-row">
+        <td>TOTAL</td>
+        <td></td><td></td><td></td>
+        <td>{total_str}</td>
+        <td></td><td></td><td></td><td></td><td></td><td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+""")
+
+    # JavaScript
+    html_parts.append("""
+<script>
+function sortTable(n) {
+  try {
+    console.log("sortTable called with column: " + n);
+    var table = document.getElementById("portfolioTable");
+    var tbody = document.getElementById("tableBody");
+    if (!table || !tbody) {
+      console.error("Table or tbody not found");
+      return;
+    }
+    var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1);
+    console.log("Rows found: " + rows.length);
+    var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+    dir = (dir === "asc") ? "desc" : "asc";
+    table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
+    var headers = table.getElementsByTagName("TH");
+    for (var i = 0; i < headers.length; i++) {
+      headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
+    }
+    headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+    rows.sort((rowA, rowB) => {
+      var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+      var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+      console.log("Comparing: " + x + " vs " + y);
+      if (x === "" && y === "") return 0;
+      if (x === "") return dir === "asc" ? -1 : 1;
+      if (y === "") return dir === "asc" ? 1 : -1;
+      var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+      var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+      if (!isNaN(xValue) && !isNaN(yValue)) {
+        return dir === "asc" ? xValue - yValue : yValue - xValue;
+      }
+      xValue = x.toLowerCase();
+      yValue = y.toLowerCase();
+      return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
+    });
+    tbody.innerHTML = "";
+    rows.forEach(row => tbody.appendChild(row));
+    var totalRow = tbody.querySelector("tr.total-row");
+    if (totalRow) {
+      tbody.appendChild(totalRow);
+    } else {
+      console.error("Total row not found");
+    }
+  } catch (e) {
+    console.error("Error in sortTable: " + e.message);
+  }
+}
+</script>
+""")
+
+    # Combiner toutes les parties
+    try:
+        html = "".join(html_parts)
+        print("HTML length:", len(html))
+        st.markdown(html, unsafe_allow_html=True)
+    except Exception as e:
+        print(f"Erreur lors du rendu HTML : {e}")
+        st.error(f"Erreur lors du rendu du tableau : {e}")
+        return
+```
