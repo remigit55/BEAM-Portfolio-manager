@@ -74,7 +74,7 @@ from portefeuille import afficher_portefeuille
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 st.title("BEAM Portfolio Manager")
 
-    afficher_portefeuille()
+   afficher_portefeuille()
 
 
 # Onglet : Performance
