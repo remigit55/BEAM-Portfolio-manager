@@ -1,19 +1,15 @@
-# streamlit_app.py
 import streamlit as st
-import pandas as pd
-import datetime
-import requests
-from forex_python.converter import CurrencyRates
-
-
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
-# Thème personnalisé
+# Titre avant tout
+st.title("BEAM Portfolio Manager")
+
+# Thème
 PRIMARY_COLOR = "#363636"
 SECONDARY_COLOR = "#E8E8E8"
 ACCENT_COLOR = "#A49B6D"
 
-# Style CSS pour bandeau horizontal
+# CSS
 st.markdown(f"""
     <style>
         body {{
@@ -22,6 +18,9 @@ st.markdown(f"""
         }}
         .stApp {{
             font-family: 'Arial', sans-serif;
+        }}
+        .stDataFrame td, .stDataFrame th {{
+            text-align: right !important;
         }}
         .st-emotion-cache-18ni7ap {{
             background-color: {ACCENT_COLOR};
@@ -34,30 +33,3 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
-
-# Afficher le titre principal
-st.title("BEAM Portfolio Manager")
-
-# Onglets horizontaux
-onglets = st.tabs([
-    "Portefeuille", 
-    "Performance", 
-    "OD Comptables", 
-    "Transactions", 
-    "Taux de change", 
-    "Paramètres"
-])
-
-# Importer les scripts correspondant à chaque onglet
-with onglets[0]:
-    import portefeuille
-with onglets[1]:
-    import performance
-with onglets[2]:
-    import od_comptables
-with onglets[3]:
-    import transactions
-with onglets[4]:
-    import taux_change
-with onglets[5]:
-    import parametres
