@@ -1,4 +1,3 @@
-# parametres.py
 import streamlit as st
 import pandas as pd
 
@@ -16,20 +15,30 @@ def afficher_parametres():
     )
 
     st.markdown("#### Lien Google Sheets exporté en CSV (public)")
-    csv_url = st.text_input("Lien CSV")
+    csv_url = st.text_input("Lien CSV", key="csv_url_input")
 
     if csv_url:
-        try:
-            # Ajout vérification si lien Google Sheets, transformer en lien CSV si besoin
-            if "docs.google.com" in csv_url and "output=csv" not in csv_url:
-                if "/edit" in csv_url:
-                    csv_url = csv_url.split("/edit")[0] + "/export?format=csv"
-                elif "?usp=sharing" in csv_url:
-                    csv_url = csv_url.split("?usp=sharing")[0] + "export?format=csv"
+        # Vérifier si le lien a déjà été traité
+        if "last_csv_url" not in st.session_state:
+            st.session_state.last_csv_url = None
 
-            df = pd.read_csv(csv_url)
-            st.session_state.df = df
-            st.success("Données importées avec succès")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erreur lors de l'import : {e}")
+        # Traiter uniquement si le lien est nouveau
+        if csv_url != st.session_state.last_csv_url:
+            try:
+                # Transformer lien Google Sheets en lien CSV si besoin
+                if "docs.google.com" in csv_url and "output=csv" not in csv_url:
+                    if "/edit" in csv_url:
+                        csv_url = csv_url.split("/edit")[0] + "/export?format=csv"
+                    elif "?usp=sharing" in csv_url:
+                        csv_url = csv_url.split("?usp=sharing")[0] + "/export?format=csv"
+
+                df = pd.read_csv(csv_url)
+                st.session_state.df = df
+                st.session_state.last_csv_url = csv_url  # Mettre à jour le dernier lien traité
+                st.success("Données importées avec succès")
+                # Réinitialiser le champ de saisie
+                st.session_state.csv_url_input = ""
+                st.rerun()  # Relancer pour mettre à jour l'affichage
+            except Exception as e:
+                st.error(f"Erreur lors de l'import : {e}")
+                st.session_state.last_csv_url = None  # Permettre une nouvelle tentative
