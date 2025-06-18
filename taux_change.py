@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 
-st.subheader("Taux de change")
+def afficher_taux_change():
 
 if "fx_rates" in st.session_state and st.session_state.fx_rates:
     devise_cible = st.session_state.get("devise_cible", "EUR")
