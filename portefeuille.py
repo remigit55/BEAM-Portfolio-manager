@@ -139,23 +139,6 @@ def afficher_portefeuille():
     if "sort_direction" not in st.session_state:
         st.session_state.sort_direction = "asc"
 
-    # Créer une ligne pour les en-têtes avec boutons de tri
-    header_cols = st.columns(len(labels))
-    for idx, (col, header_col) in enumerate(zip(labels, header_cols)):
-        with header_col:
-            button_key = f"sort_{col}_{idx}"
-            if st.button(
-                f"{col} {'▲' if st.session_state.sort_column == col and st.session_state.sort_direction == 'asc' else '▼' if st.session_state.sort_column == col else ''}",
-                key=button_key
-            ):
-                if st.session_state.sort_column == col:
-                    # Inverser la direction si la même colonne est cliquée
-                    st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-                else:
-                    # Nouvelle colonne, trier par ordre croissant
-                    st.session_state.sort_column = col
-                    st.session_state.sort_direction = "asc"
-
     # Appliquer le tri
     if st.session_state.sort_column:
         sort_key = {
@@ -167,12 +150,11 @@ def afficher_portefeuille():
             "Haut 52 Semaines": "fiftyTwoWeekHigh",
             "Valeur H52": "Valeur_H52"
         }.get(st.session_state.sort_column, st.session_state.sort_column)
-        # Utiliser la colonne non formatée pour les colonnes numériques
         if sort_key in df.columns:
             df_disp = df_disp.sort_values(
                 by=st.session_state.sort_column,
                 ascending=(st.session_state.sort_direction == "asc"),
-                key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce") if x.name in [
+                key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf')) if x.name in [
                     "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines", "Valeur H52"
                 ] else x.str.lower()
             )
@@ -191,7 +173,7 @@ def afficher_portefeuille():
       .table-container {{ max-height:400px; overflow-y:auto; }}
       .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; }}
       .portfolio-table th {{
-        background:#363636; color:white; padding:6px; text-align:center; border:none;
+        background:#363636; color:white; padding:0; text-align:center; border:none;
         position:sticky; top:0; z-index:2;
         font-family:"Aptos narrow",Helvetica; font-size:12px;
       }}
@@ -200,28 +182,72 @@ def afficher_portefeuille():
         font-family:"Aptos narrow",Helvetica; font-size:11px;
       }}
       .portfolio-table td:first-child {{ text-align:left; }}
-      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
-      .portfolio-table td:nth-child(3) {{ text-align:left; }} /* Alignement à gauche pour Catégorie */
-      /* Largeur fixe pour les colonnes numériques */
-      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
-      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
-      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
-      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Prix Actuel */
-      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
-      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
-      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
+      .portfolio-table td:nth-child(2) {{ text-align:left; }}
+      .portfolio-table td:nth-child(3) {{ text-align:left; }}
+      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4),
+      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5),
+      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6),
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7),
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8),
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9),
+      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{
         width: 9%;
       }}
       .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
       .total-row td {{
         background:#A49B6D; color:white; font-weight:bold;
       }}
+      /* Style pour les boutons dans les en-têtes */
+      .header-button {{
+        background:#363636; color:white; border:none; width:100%; height:100%;
+        padding:6px; font-family:"Aptos narrow",Helvetica; font-size:12px;
+        cursor:pointer; text-align:center;
+      }}
+      .header-button:hover {{
+        background:#4a4a4a;
+      }}
     </style>
     <div class="table-container">
       <table class="portfolio-table">
-        <thead><tr>{''.join(f'<th>{lbl}</th>' for lbl in labels)}</tr></thead>
-        <tbody>
+        <thead><tr>
     """
+
+    # Ajouter les en-têtes avec des boutons
+    for idx, lbl in enumerate(labels):
+        sort_indicator = ""
+        if st.session_state.sort_column == lbl:
+            sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
+        button_key = f"sort_{lbl}_{idx}"
+        # Générer un placeholder pour le bouton
+        html += f'<th><div id="button_{button_key}"></div></th>'
+        # Rendre le bouton séparément avec st.button
+        if st.button(
+            f"{lbl}{sort_indicator}",
+            key=button_key,
+            help=f"Trier par {lbl}",
+            use_container_width=True
+        ):
+            if st.session_state.sort_column == lbl:
+                st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
+            else:
+                st.session_state.sort_column = lbl
+                st.session_state.sort_direction = "asc"
+        # Injecter le bouton dans le placeholder via JavaScript
+        st.markdown(
+            f"""
+            <script>
+            var btn = document.querySelector('button[data-testid="stButton"][data-key="{button_key}"]');
+            var placeholder = document.getElementById("button_{button_key}");
+            if (btn && placeholder) {{
+                btn.className = "header-button";
+                placeholder.appendChild(btn);
+            }}
+            </script>
+            """,
+            unsafe_allow_html=True
+        )
+
+    html += "</tr></thead><tbody>"
 
     for _, row in df_disp.iterrows():
         html += "<tr>"
@@ -231,9 +257,9 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html += "<tr class='total-row'><td>TOTAL</td>"
-    html += "<td></td><td></td><td></td>"  # Pour Nom, Catégorie, Quantité
+    html += "<td></td><td></td><td></td>"  # Nom, Catégorie, Quantité
     html += f"<td>{total_str}</td>"  # Valeur
-    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Pour Prix d'Acquisition, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
+    html += "<td></td><td></td><td></td><td></td><td></td><td></td></tr>"  # Prix d'Acquisition, Prix Actuel, Valeur Actuelle, Haut 52 Semaines, Valeur H52, Devise
     html += "</tbody></table></div>"
 
     st.markdown(html, unsafe_allow_html=True)
