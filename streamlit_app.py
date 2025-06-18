@@ -85,8 +85,9 @@ with tabs[0]:
         df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
         df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
-        # Ajoute le nom de la participation (duplique la colonne Actions si besoin)
-        df.insert(1, "Nom", df["Actions"])
+        # Ajoute le nom de la participation (duplique la colonne Actions si elle existe)
+        if "Actions" in df.columns:
+            df.insert(1, "Nom", df["Actions"])
 
         # Supprimer la première colonne (index ou identifiant inutile)
         df = df.iloc[:, 1:]
