@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
-from forex_python.converter import CurrencyRates
 
 # Configuration de la page (à mettre en tout début)
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -50,6 +49,10 @@ if "devise_cible" not in st.session_state:
 if "ticker_names_cache" not in st.session_state:
     st.session_state.ticker_names_cache = {}
 
+# Sélecteur de devise cible dans la sidebar
+st.sidebar.title("Paramètres")
+st.session_state.devise_cible = st.sidebar.selectbox("Devise de référence :", ["EUR", "USD", "CAD", "JPY"], index=["EUR", "USD", "CAD", "JPY"].index(st.session_state.devise_cible))
+
 # Importation des modules fonctionnels
 from portefeuille import afficher_portefeuille
 from performance import afficher_performance
@@ -68,17 +71,10 @@ onglets = st.tabs([
 ])
 
 # Onglet : Portefeuille
-import streamlit as st
-from portefeuille import afficher_portefeuille
-
-st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
-# st.title("BEAM Portfolio Manager")  # ✅ Ne l’ajoute qu’ici
-
-afficher_portefeuille()
-
+with onglets[0]:
+    afficher_portefeuille()
 
 # Onglet : Performance
-from performance import afficher_performance
 with onglets[1]:
     afficher_performance()
 
@@ -88,16 +84,13 @@ with onglets[2]:
     afficher_od_comptables()
 
 # Onglet : Transactions
-from transactions import afficher_transactions
 with onglets[3]:
     afficher_transactions()
 
 # Onglet : Taux de change
-from taux_change import afficher_taux_change
 with onglets[4]:
     afficher_taux_change()
 
 # Onglet : Paramètres
-from parametres import afficher_parametres
 with onglets[5]:
     afficher_parametres()
