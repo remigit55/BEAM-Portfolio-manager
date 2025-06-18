@@ -37,27 +37,27 @@ st.markdown(f"""
         section.main > div:nth-child(1) {{
             margin-top: -55px;
         }}
-        /* Onglet actif */
-        .stTabs [data-baseweb="tab"] {
-            background-color: #E8E8E8 !important;
-            color: #363636 !important;
-            border-radius: 5px 5px 0 0 !important;
-        }
-        
-        /* Onglet inactif */
-        .stTabs [data-baseweb="tab"]:not(:hover):not([aria-selected="true"]) {
+
+        /* Personnalisation des onglets */
+        div[data-baseweb="tabs"] button[role="tab"] {{
             background-color: #f5f5f5 !important;
             color: #888 !important;
-        }
-        
-        /* Contour autour de l’onglet actif */
-        .stTabs [data-baseweb="tab"][aria-selected="true"] {
-            border-bottom: 3px solid #A49B6D !important;
-            font-weight: bold !important;
-        }
+            border: none;
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: normal;
+            border-radius: 5px 5px 0 0 !important;
+        }}
 
+        div[data-baseweb="tabs"] button[aria-selected="true"] {{
+            background-color: {SECONDARY_COLOR} !important;
+            color: {PRIMARY_COLOR} !important;
+            font-weight: bold !important;
+            border-bottom: 3px solid {ACCENT_COLOR} !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
+
 
 from PIL import Image
 import base64
