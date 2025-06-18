@@ -11,6 +11,8 @@ def afficher_portefeuille():
         return
 
     df = st.session_state.df.copy()
+    devise_cible = st.session_state.get("devise_cible", "EUR")
+    fx_rates = st.session_state.get("fx_rates", {})
 
     # Normalisation
     for col in ["Quantité", "Acquisition"]:
@@ -87,6 +89,20 @@ def afficher_portefeuille():
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
 
+    def convertir(val, devise):
+        if pd.isnull(val) or pd.isnull(devise): return 0
+        if devise == devise_cible: return val
+        taux = fx_rates.get(devise.upper())
+        return val * taux if taux else 0
+
+    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
+    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
+    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
+
+    total_valeur = df["Valeur_conv"].sum()
+    total_actuelle = df["Valeur_Actuelle_conv"].sum()
+    total_h52 = df["Valeur_H52_conv"].sum()
+
     cols = [
         ticker_col,
         "shortName",
@@ -116,28 +132,27 @@ def afficher_portefeuille():
 
     df_disp = df[cols].copy()
     df_disp.columns = labels
-    total_str = format_fr(df["Valeur"].sum() if "Valeur" in df.columns else 0, 2)
 
-    html_code = """
+    html_code = f"""
 <style>
-  .table-container { max-height: 500px; overflow-y: auto; }
-  .portfolio-table { width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  .portfolio-table th {
+  .table-container {{ max-height: 500px; overflow-y: auto; }}
+  .portfolio-table {{ width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+  .portfolio-table th {{
     background: #363636; color: white; padding: 6px; text-align: center; border: none;
     position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
-  }
-  .portfolio-table td {
+  }}
+  .portfolio-table td {{
     padding: 6px; text-align: right; border: none; font-size: 11px;
-  }
+  }}
   .portfolio-table td:first-child,
   .portfolio-table td:nth-child(2),
-  .portfolio-table td:nth-child(3) {
+  .portfolio-table td:nth-child(3) {{
     text-align: left;
-  }
-  .portfolio-table tr:nth-child(even) { background: #efefef; }
-  .total-row td {
+  }}
+  .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+  .total-row td {{
     background: #A49B6D; color: white; font-weight: bold;
-  }
+  }}
 </style>
 <div class="table-container">
   <table class="portfolio-table">
@@ -159,8 +174,13 @@ def afficher_portefeuille():
     </tbody>
     <tfoot>
       <tr class="total-row">
-        <td>TOTAL</td><td></td><td></td><td></td><td></td>
-        <td>{total_str}</td><td></td><td></td><td></td><td></td><td></td>
+        <td>TOTAL ({devise_cible})</td><td></td><td></td><td></td><td></td>
+        <td>{format_fr(total_valeur, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_actuelle, 2)}</td>
+        <td></td>
+        <td>{format_fr(total_h52, 2)}</td>
+        <td></td>
       </tr>
     </tfoot>
   </table>
