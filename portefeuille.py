@@ -8,35 +8,56 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Conversion brute
+    # Nettoyage et conversion
     df["Quantité"] = pd.to_numeric(df.get("Quantité", 0), errors="coerce")
     df["Acquisition"] = pd.to_numeric(df.get("Acquisition", 0), errors="coerce")
     df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Formatage en style français
+    # Formatage français
     def format_fr(x, dec=2):
         if pd.isnull(x):
             return ""
-        return f"{x:,.{dec}f}".replace(",", " ").replace(".", ",")
+        return f"{x:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", " ")
 
-    df["Quantité"] = df["Quantité"].map(lambda x: format_fr(x, 0))
-    df["Acquisition"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
-    df["Valeur"] = df["Valeur"].map(lambda x: format_fr(x, 2))
+    df["Quantité_fmt"] = df["Quantité"].map(lambda x: format_fr(x, 0))
+    df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
+    df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Sélection des colonnes à afficher
-    colonnes = [col for col in ["Tickers", "Devise", "Quantité", "Acquisition", "Valeur"] if col in df.columns]
+    # Création du tableau HTML
+    tableau = "<table><thead><tr>"
+    colonnes = ["Tickers", "Devise", "Quantité", "Acquisition", "Valeur"]
+    for col in colonnes:
+        tableau += f"<th>{col}</th>"
+    tableau += "</tr></thead><tbody>"
 
-    # Affichage
-    st.dataframe(df[colonnes], use_container_width=True)
+    for _, row in df.iterrows():
+        tableau += "<tr>"
+        tableau += f"<td style='text-align: left'>{row.get('Tickers', '')}</td>"
+        tableau += f"<td style='text-align: left'>{row.get('Devise', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Quantité_fmt', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Acquisition_fmt', '')}</td>"
+        tableau += f"<td style='text-align: right'>{row.get('Valeur_fmt', '')}</td>"
+        tableau += "</tr>"
 
-    # Hack CSS pour forcer alignement à droite
+    tableau += "</tbody></table>"
+
+    # CSS pour bordures et alignement
     st.markdown("""
         <style>
-        .st-emotion-cache-1xarl3l td {
-            text-align: right !important;
-        }
-        .st-emotion-cache-1xarl3l th {
-            text-align: right !important;
-        }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                padding: 8px;
+                border-bottom: 1px solid #ddd;
+                font-family: monospace;
+            }
+            thead {
+                background-color: #f0f0f0;
+            }
         </style>
     """, unsafe_allow_html=True)
+
+    # Affichage
+    st.markdown(tableau, unsafe_allow_html=True)
