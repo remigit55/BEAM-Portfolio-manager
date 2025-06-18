@@ -41,7 +41,7 @@ onglets = st.tabs([
     "Paramètres"
 ])
 
-with onglets[Portefeuille]:
+with onglets[0]:
     import portefeuille
 with onglets[1]:
     import performance
