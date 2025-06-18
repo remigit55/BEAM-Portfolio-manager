@@ -1,5 +1,10 @@
 # streamlit_app.py
 import streamlit as st
+import pandas as pd
+import datetime
+import requests
+from forex_python.converter import CurrencyRates
+
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
