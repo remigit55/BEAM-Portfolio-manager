@@ -46,13 +46,14 @@ def afficher_portefeuille():
     .portfolio-table-container {
         overflow-y: auto;
         max-height: 600px;
+        border-style : none;
     }
     .portfolio-table {
         border-collapse: collapse;
         width: 100%;
         min-width: 700px;
         overflow: hidden;
-        border-radius: 8px;
+        border-style : none;
     }
     .portfolio-table th {
         background-color: #363636;
@@ -64,14 +65,15 @@ def afficher_portefeuille():
         position: sticky;
         top: 0;
         z-index: 10;
+        border-style : none;
     }
     .portfolio-table td {
         padding: 6px;
         text-align: right;
-        border-bottom: 1px solid #eee;
         color: black;
         font-family: "Aptos narrow", Helvetica;
         font-size: 11px;
+        border-style : none;
     }
     .portfolio-table td:first-child {
         text-align: left;
