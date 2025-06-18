@@ -47,7 +47,7 @@ def afficher_portefeuille():
         }
         .portfolio-table {
             width: 100%;
-            border-style: none;
+            border: 1px solid transparent;
         }
         .portfolio-table th {
             background-color: #363636;
