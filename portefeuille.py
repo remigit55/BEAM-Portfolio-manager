@@ -1,16 +1,17 @@
+# portefeuille.py
+
 import streamlit as st
 import pandas as pd
 from forex_python.converter import CurrencyRates
-import datetime
 import requests
 
-yf_base_url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols="
+def afficher_portefeuille():
+    st.subheader("📂 Portefeuille")
 
-st.subheader("Portefeuille")
+    if "df" not in st.session_state or st.session_state.df is None:
+        st.warning("Aucune donnée de portefeuille n’a encore été importée.")
+        return
 
-if "df" not in st.session_state or st.session_state.df is None:
-    st.warning("Aucune donnée de portefeuille n’a encore été importée.")
-else:
     df = st.session_state.df.copy()
     cr = CurrencyRates()
     fx_rates_utilisés = {}
@@ -48,7 +49,7 @@ else:
             if ticker in st.session_state.ticker_names_cache:
                 return st.session_state.ticker_names_cache[ticker]
             try:
-                response = requests.get(f"{yf_base_url}{ticker}")
+                response = requests.get(f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}")
                 if response.ok:
                     name = response.json()['quoteResponse']['result'][0].get('shortName', 'Non trouvé')
                 else:
