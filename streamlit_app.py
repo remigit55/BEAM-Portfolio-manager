@@ -131,5 +131,3 @@ with tabs[5]:
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
 
-
-Update streamlit_app.py ;
