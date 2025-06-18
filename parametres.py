@@ -1,0 +1,24 @@
+# parametres.py
+import streamlit as st
+import pandas as pd
+
+st.subheader("Paramètres")
+
+# Devise cible
+if "devise_cible" not in st.session_state:
+    st.session_state.devise_cible = "EUR"
+
+st.session_state.devise_cible = st.selectbox(
+    "Devise de référence pour consolidation",
+    options=["USD", "EUR", "CAD", "CHF"],
+    index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
+)
+
+# Import depuis Google Sheets CSV
+csv_url = st.text_input("Lien vers le CSV Google Sheets (onglet Portefeuille)")
+if csv_url:
+    try:
+        st.session_state.df = pd.read_csv(csv_url)
+        st.success("Données importées depuis le lien CSV")
+    except Exception as e:
+        st.error(f"Erreur lors de l'import : {e}")
