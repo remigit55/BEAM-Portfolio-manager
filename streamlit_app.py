@@ -61,7 +61,7 @@ with col1:
 with col2:
     st.markdown(
         """
-        <div style="display: flex; align-items: center; height: 100%; padding-left: 10px;">
+        <div style="display: flex; align-items: left; height: 100%; padding-left: 10px;">
             <h1 style='font-size: 36px; margin-bottom: 0;'>BEAM Portfolio Manager</h1>
         </div>
         """,
