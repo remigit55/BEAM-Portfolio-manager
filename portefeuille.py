@@ -27,7 +27,9 @@ def afficher_portefeuille():
             fx_rates_utilisés[f"{devise_origine} → {devise_cible}"] = "Erreur"
             return None
 
-    df["Valeur"] = pd.to_numeric(df["Quantité"], errors="coerce") * pd.to_numeric(df["Acquisition"], errors="coerce")
+    df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
+    df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
+    df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajouter colonne Shortname via Yahoo Finance (endpoint v8/chart)
     if "Tickers" in df.columns:
@@ -42,7 +44,7 @@ def afficher_portefeuille():
                 response = requests.get(url)
                 if response.ok:
                     data = response.json()
-                    name = data["chart"]["result"][0]["meta"].get("symbol", ticker)
+                    name = data["chart"]["result"][0]["meta"].get("shortName", ticker)
                 else:
                     name = "Erreur requête"
             except:
