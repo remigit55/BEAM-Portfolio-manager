@@ -33,6 +33,7 @@ def afficher_portefeuille():
             t = str(t).strip().upper()
             if t in st.session_state.ticker_names_cache:
                 return st.session_state.ticker_names_cache[t]
+        
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
                 r = requests.get(url, timeout=5)
@@ -40,10 +41,14 @@ def afficher_portefeuille():
                 if r.ok:
                     meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
                     name = meta.get("shortName", "")
-                st.session_state.ticker_names_cache[t] = name or ""
-                return st.session_state.ticker_names_cache[t]
+                if not name:
+                    # Si aucun nom trouvé, on met l’URL publique de Yahoo Finance
+                    name = f"https://finance.yahoo.com/quote/{t}"
+                st.session_state.ticker_names_cache[t] = name
+                return name
             except:
-                return ""
+                return f"https://finance.yahoo.com/quote/{t}"
+
 
         df["shortName"] = df[ticker_col].apply(fetch_shortname)
 
