@@ -16,8 +16,7 @@ def afficher_parametres():
 
     # Source de données
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
-    st.markdown("#### Source des données")
-    st.markdown(f"[Lien Google Sheets CSV]({csv_url})")
+    st.markdown(f"#### Source des données : [Google Sheets CSV]({csv_url})")
 
     if st.button("Rafraîchir les données"):
         try:
