@@ -25,10 +25,10 @@ def afficher_portefeuille():
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV
-    if len(df.columns) > 5:  # Vérifier si la colonne F (index 5) existe
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")  # Convertir en string, gérer NaN
+    if len(df.columns) > 5:
+        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
-        df["Catégorie"] = ""  # Colonne vide si F n'existe pas
+        df["Catégorie"] = ""
 
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -95,8 +95,8 @@ def afficher_portefeuille():
         ("Quantité", 0),
         ("Acquisition", 4),
         ("Valeur", 2),
-        ("currentPrice", 4),  # 4 décimales pour Prix Actuel
-        ("fiftyTwoWeekHigh", 4),  # 4 décimales pour Haut 52 Semaines
+        ("currentPrice", 4),
+        ("fiftyTwoWeekHigh", 4),
         ("Valeur_H52", 2),
         ("Valeur_Actuelle", 2)
     ]:
@@ -138,20 +138,57 @@ def afficher_portefeuille():
     # Construction HTML
     html = f"""
     <style>
-      .table-container {{ max-height:400px; overflow-y:auto; }}
-      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; }}
+      .table-container {{ 
+        max-height: 400px; 
+        overflow-y: auto; 
+        overflow-x: auto; 
+        position: relative; 
+      }}
+      .portfolio-table {{ 
+        width: 100%; 
+        border-collapse: collapse; 
+        table-layout: fixed; 
+      }}
       .portfolio-table th {{
-        background:#363636; color:white; padding:6px; text-align:center; border:none;
-        position:sticky; top:0; z-index:2;
-        font-family:"Aptos narrow",Helvetica; font-size:12px;
+        background: #363636; 
+        color: white; 
+        padding: 6px; 
+        text-align: center; 
+        border: none;
+        position: sticky; 
+        top: 0; 
+        z-index: 2;
+        font-family: "Aptos narrow", Helvetica; 
+        font-size: 12px;
       }}
       .portfolio-table td {{
-        padding:6px; text-align:right; border:none;
-        font-family:"Aptos narrow",Helvetica; font-size:11px;
+        padding: 6px; 
+        text-align: right; 
+        border: none;
+        font-family: "Aptos narrow", Helvetica; 
+        font-size: 11px;
       }}
-      .portfolio-table td:first-child {{ text-align:left; }}
-      .portfolio-table td:nth-child(2) {{ text-align:left; }} /* Alignement à gauche pour Nom */
-      .portfolio-table td:nth-child(3) {{ text-align:left; }} /* Alignement à gauche pour Catégorie */
+      /* Figer les colonnes Ticker et Nom */
+      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
+        position: sticky; 
+        left: 0; 
+        text-align: left; 
+        width: 5%; 
+        background: #fff; 
+        z-index: 1;
+      }}
+      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
+        position: sticky; 
+        left: 5%; 
+        text-align: left; 
+        width: 20%; 
+        background: #fff; 
+        z-index: 1;
+      }}
+      /* Assurer que les en-têtes restent au-dessus */
+      .portfolio-table th:nth-child(1) {{ z-index: 3; }}
+      .portfolio-table th:nth-child(2) {{ z-index: 3; }}
+      .portfolio-table td:nth-child(3) {{ text-align: left; }} /* Alignement à gauche pour Catégorie */
       /* Largeur fixe pour les colonnes numériques */
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
@@ -160,12 +197,17 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
       .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
       .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ /* Valeur H52 */
-        width: 9%;
+        width: 8%;
       }}
-      .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
+      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
-        background:#A49B6D; color:white; font-weight:bold;
+        background: #A49B6D; 
+        color: white; 
+        font-weight: bold;
       }}
+      /* Assurer le fond des colonnes figées */
+      .portfolio-table tr:nth-child(even) td:nth-child(1),
+      .portfolio-table tr:nth-child(even) td:nth-child(2) {{ background: #efefef; }}
     </style>
     <div class="table-container">
       <table class="portfolio-table">
