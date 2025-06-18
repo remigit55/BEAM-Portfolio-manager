@@ -1,5 +1,7 @@
 # streamlit_app.py
 import streamlit as st
+st.write("DEBUG : le module paramètres est bien exécuté.")
+
 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 st.title("BEAM Portfolio Manager")
