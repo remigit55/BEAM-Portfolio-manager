@@ -42,9 +42,8 @@ def afficher_portefeuille():
     html = """
     <style>
         .table-container {
-            max-height: 600px;
+            max-height: 300px;
             overflow-y: auto;
-            border-radius: 10px;
         }
         .portfolio-table {
             border-collapse: collapse;
@@ -79,6 +78,8 @@ def afficher_portefeuille():
             color: white;
             border-top: 1px solid transparent;
             border-bottom: 1px solid transparent;
+            border-left: 1px solid transparent;
+            border-right: 1px solid transparent;
         }
     </style>
     <div class="table-container">
