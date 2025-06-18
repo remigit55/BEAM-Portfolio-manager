@@ -36,6 +36,10 @@ def afficher_portefeuille():
     colonnes = ["Ticker", "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
     noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
+    # Calcul total
+    total_valeur = df["Valeur"].sum()
+    total_valeur_fmt = format_fr(total_valeur, 2)
+
     # Générer HTML manuellement
     html = """
     <style>
@@ -43,18 +47,18 @@ def afficher_portefeuille():
             border-collapse: collapse;
             width: 100%;
             overflow: hidden;
+            border-radius: 8px;
         }
         .portfolio-table th {
             background-color: #363636;
-            padding: 4px;
+            padding: 6px;
             text-align: center;
-            border-bottom: px solid #ccc;
             color: white;
             font-family: "Aptos narrow", Helvetica;
             font-size: 12px;
         }
         .portfolio-table td {
-            padding: 4px;
+            padding: 6px;
             text-align: right;
             border-bottom: 1px solid #eee;
             color: black;
@@ -66,6 +70,10 @@ def afficher_portefeuille():
         }
         .portfolio-table tr:last-child td {
             border-bottom: none;
+        }
+        .total-row {
+            background-color: #A49B6D;
+            font-weight: bold;
         }
     </style>
     <table class="portfolio-table">
@@ -81,6 +89,15 @@ def afficher_portefeuille():
             val = row.get(col, "")
             html += f"<td>{val}</td>"
         html += "</tr>"
+
+    # Ligne total
+    html += f"""
+        <tr class="total-row">
+            <td colspan="4" style="text-align:right;">Total</td>
+            <td>{total_valeur_fmt}</td>
+            <td></td>
+        </tr>
+    """
 
     html += "</tbody></table>"
 
