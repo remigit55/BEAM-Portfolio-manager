@@ -37,49 +37,49 @@ def afficher_portefeuille():
     noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
     # Calcul du total
-    total_valeur = df["Valeur"].sum()
-    total_valeur_fmt = format_fr(total_valeur, 2)
+        total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
 
-    # Générer HTML manuellement
     html = """
     <style>
-    .portfolio-table-container {
-        overflow-y: auto;
-        max-height: 600px;
-        border-style : none;
-    }
-    .portfolio-table {
-        border-collapse: collapse;
-        width: 100%;
-        min-width: 700px;
-        overflow: hidden;
-        border-style : none;
-    }
-    .portfolio-table th {
-        background-color: #363636;
-        padding: 6px;
-        text-align: center;
-        color: white;
-        font-family: "Aptos narrow", Helvetica;
-        font-size: 12px;
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        border-style : none;
-    }
-    .portfolio-table td {
-        padding: 6px;
-        text-align: right;
-        color: black;
-        font-family: "Aptos narrow", Helvetica;
-        font-size: 11px;
-        border-style : none;
-    }
-    .portfolio-table td:first-child {
-        text-align: left;
-    }
-</style>
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+        }
+        .portfolio-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .portfolio-table th {
+            background-color: #363636;
+            padding: 6px;
+            text-align: center;
+            color: white;
+            font-family: "Aptos narrow", Helvetica;
+            font-size: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .portfolio-table td {
+            padding: 6px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+            color: black;
+            font-family: "Aptos narrow", Helvetica;
+            font-size: 11px;
+        }
+        .portfolio-table td:first-child {
+            text-align: left;
+        }
+        .total-row {
+            background-color: #A49B6D;
+            font-weight: bold;
+        }
+    </style>
 
+    <div class="table-container">
     <table class="portfolio-table">
         <thead>
             <tr>""" + "".join(f"<th>{name}</th>" for name in noms) + """</tr>
@@ -94,21 +94,15 @@ def afficher_portefeuille():
             html += f"<td>{val}</td>"
         html += "</tr>"
 
-    # Ligne total uniquement sur la colonne "Valeur"
-        html += f"""
-        <tr style="background-color:#A49B6D; font-weight: bold;">
+    html += f"""
+        <tr class="total-row">
             <td colspan="4" style="text-align:right;">TOTAL</td>
-            <td style="text-align:right;">{total_valeur_fmt}</td>
+            <td>{total_valeur_fmt}</td>
             <td></td>
         </tr>
         </tbody>
     </table>
     </div>
     """
-
-    st.markdown(html, unsafe_allow_html=True)
-
-
-    html += "</tbody></table>"
 
     st.markdown(html, unsafe_allow_html=True)
