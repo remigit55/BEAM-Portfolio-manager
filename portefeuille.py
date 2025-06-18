@@ -7,7 +7,7 @@ import requests
 
 yf_base_url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols="
 
-st.header("Portefeuille")
+st.subheader("Portefeuille")
 
 if "df" not in st.session_state:
     st.warning("Aucune donnée de portefeuille disponible. Veuillez en importer dans l'onglet Paramètres.")
