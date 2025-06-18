@@ -42,7 +42,7 @@ def afficher_portefeuille():
     html = """
     <style>
         .table-container {
-            max-height: 600px;
+            max-height: 50%;
             overflow-y: auto;
         }
         .portfolio-table {
