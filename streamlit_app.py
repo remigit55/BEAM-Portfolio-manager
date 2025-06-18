@@ -50,7 +50,7 @@ with col1:
         logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         st.markdown(
             f"""
-            <div style="display: flex; align-items: center; height: 100%;">
+            <div style="display: flex; align-items: center; height: 100%; width: 50px;">
                 <img src="data:image/png;base64,{logo_base64}" style="margin-right: 0px; width:64px;" />
             </div>
             """,
