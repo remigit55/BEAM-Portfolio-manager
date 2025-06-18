@@ -53,6 +53,18 @@ with onglets[3]:
 with onglets[4]:
     import taux_change
 with onglets[5]:
-    import parametres
+    st.subheader("⚙️ Paramètres")
 
+    st.session_state.devise_cible = st.selectbox(
+        "Devise de référence pour consolidation",
+        options=["USD", "EUR", "CAD", "CHF"],
+        index=["USD", "EUR", "CAD", "CHF"].index(st.session_state.devise_cible)
+    )
 
+    csv_url = st.text_input("Lien vers le fichier CSV (Google Sheets)")
+    if csv_url:
+        try:
+            st.session_state.df = pd.read_csv(csv_url)
+            st.success("Données importées depuis le lien CSV.")
+        except Exception as e:
+            st.error(f"Erreur d'import : {e}")
