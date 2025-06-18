@@ -46,8 +46,6 @@ def afficher_portefeuille():
             overflow-y: auto;
         }
         .portfolio-table {
-            border-collapse: collapse;
-            border-style: none;
             width: 100%;
         }
         .portfolio-table th {
