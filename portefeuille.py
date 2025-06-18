@@ -198,53 +198,49 @@ function sortTable(n) {
   var table = document.getElementById("portfolioTable");
   var tbody = document.getElementById("tableBody");
   var rows = Array.from(tbody.getElementsByTagName("tr")).slice(0, -1); // Exclure la ligne TOTAL
-  var switching = true;
-  var dir = "asc";
-  var switchcount = 0;
-
-  var prevDir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
-  if (prevDir === "asc") {
-    dir = "desc";
-  } else {
-    dir = "asc";
-  }
+  var dir = table.getElementsByTagName("TH")[n].getAttribute("data-sort-dir") || "asc";
+  dir = (dir === "asc") ? "desc" : "asc"; // Toggle direction
   table.getElementsByTagName("TH")[n].setAttribute("data-sort-dir", dir);
 
-  while (switching) {
-    switching = false;
-    for (var i = 0; i < rows.length - 1; i++) {
-      var shouldSwitch = false;
-      var x = rows[i].getElementsByTagName("TD")[n];
-      var y = rows[i + 1].getElementsByTagName("TD")[n];
-      var xContent = x.innerHTML.trim();
-      var yContent = y.innerHTML.trim();
-
-      var xValue = isNaN(parseFloat(xContent.replace(/ /g, "").replace(",", "."))) ? xContent.toLowerCase() : parseFloat(xContent.replace(/ /g, "").replace(",", "."));
-      var yValue = isNaN(parseFloat(yContent.replace(/ /g, "").replace(",", "."))) ? yContent.toLowerCase() : parseFloat(yContent.replace(/ /g, "").replace(",", "."));
-
-      if (dir == "asc") {
-        if (xValue > yValue) {
-          shouldSwitch = true;
-          break;
-        }
-      } else if (dir == "desc") {
-        if (xValue < yValue) {
-          shouldSwitch = true;
-          break;
-        }
-      }
-    }
-    if (shouldSwitch) {
-      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-      switching = true;
-      switchcount++;
-    } else {
-      if (switchcount == 0 && dir == "asc") {
-        dir = "desc";
-        switching = true;
-      }
-    }
+  // Reset sort indicators
+  var headers = table.getElementsByTagName("TH");
+  for (var i = 0; i < headers.length; i++) {
+    headers[i].innerHTML = headers[i].innerHTML.replace(/ ▼| ▲/, "");
   }
+  // Add sort indicator
+  headers[n].innerHTML += (dir === "asc") ? " ▲" : " ▼";
+
+  // Sort rows
+  rows.sort((rowA, rowB) => {
+    var x = rowA.getElementsByTagName("TD")[n].innerHTML.trim();
+    var y = rowB.getElementsByTagName("TD")[n].innerHTML.trim();
+
+    // Handle empty cells
+    if (x === "" && y === "") return 0;
+    if (x === "") return dir === "asc" ? -1 : 1;
+    if (y === "") return dir === "asc" ? 1 : -1;
+
+    // Try parsing as numbers
+    var xValue = parseFloat(x.replace(/ /g, "").replace(",", "."));
+    var yValue = parseFloat(y.replace(/ /g, "").replace(",", "."));
+    
+    // If both are valid numbers, compare numerically
+    if (!isNaN(xValue) && !isNaN(yValue)) {
+      return dir === "asc" ? xValue - yValue : yValue - xValue;
+    }
+    
+    // Otherwise, compare as strings
+    xValue = x.toLowerCase();
+    yValue = y.toLowerCase();
+    return dir === "asc" ? xValue.localeCompare(yValue) : yValue.localeCompare(xValue);
+  });
+
+  // Re-attach sorted rows
+  tbody.innerHTML = "";
+  rows.forEach(row => tbody.appendChild(row));
+  // Re-attach TOTAL row
+  var totalRow = table.getElementsByTagName("tr")[rows.length];
+  tbody.appendChild(totalRow);
 }
 </script>
 """
