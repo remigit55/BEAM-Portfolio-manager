@@ -13,5 +13,23 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Affichage brut des colonnes du CSV importé, sans transformation
+    # Mise en forme des colonnes numériques si présentes
+    if "Quantité" in df.columns:
+        df["Quantité"] = pd.to_numeric(df["Quantité"], errors="coerce")
+    if "Acquisition" in df.columns:
+        df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
+        df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:,.4f}" if pd.notnull(x) else "")
+    if "Valeur" in df.columns:
+        df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce")
+        df["Valeur"] = df["Valeur"].map(lambda x: f"{x:,.2f}" if pd.notnull(x) else "")
+
+    # Alignement à droite (via CSS personnalisé)
+    st.markdown("""
+        <style>
+            .stDataFrame td:nth-child(n+1):not(:first-child) {
+                text-align: right !important;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.dataframe(df, use_container_width=True)
