@@ -32,23 +32,20 @@ def afficher_portefeuille():
     df["Acquisition_fmt"] = df["Acquisition"].map(lambda x: format_fr(x, 4))
     df["Valeur_fmt"] = df["Valeur"].map(lambda x: format_fr(x, 2))
 
-    # Ordre et noms d’affichage
+    # Ordre des colonnes
     colonnes = ["Ticker", "shortName", "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt", "Devise"]
     noms = ["Ticker", "Nom", "Quantité", "Prix d'Acquisition", "Valeur", "Devise"]
 
-    # Calcul du total
-        total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
+    total_valeur_fmt = format_fr(df["Valeur"].sum(), 2)
 
+    # HTML avec style et tableau scrollable
     html = """
     <style>
         .table-container {
             max-height: 600px;
             overflow-y: auto;
-            border-radius: 10px;
-            border-style: none;
         }
         .portfolio-table {
-            border-collapse: collapse;
             width: 100%;
         }
         .portfolio-table th {
@@ -77,7 +74,6 @@ def afficher_portefeuille():
             font-weight: bold;
         }
     </style>
-
     <div class="table-container">
     <table class="portfolio-table">
         <thead>
