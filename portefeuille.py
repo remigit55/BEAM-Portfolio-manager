@@ -47,7 +47,7 @@ def afficher_portefeuille():
                 st.session_state.ticker_names_cache[t] = name
                 return name
             except:
-                return f"https://finance.yahoo.com/quote/{t}"
+                return f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
 
 
         df["shortName"] = df[ticker_col].apply(fetch_shortname)
