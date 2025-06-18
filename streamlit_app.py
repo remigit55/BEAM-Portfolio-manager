@@ -61,8 +61,9 @@ onglets = st.tabs([
 ])
 
 # Onglet : Portefeuille
+from portefeuille import afficher_portefeuille
 with onglets[0]:
-    import portefeuille
+    afficher_portefeuille()
 
 # Onglet : Performance
 with onglets[1]:
