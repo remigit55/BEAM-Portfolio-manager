@@ -43,7 +43,7 @@ col1, col2 = st.columns([1, 6])
 with col1:
     try:
         logo = Image.open("Logo.png.png")
-        st.image(logo, width=48)
+        st.image(logo, width=100)
     except Exception:
         st.markdown("⚠️ Logo non trouvé.")
 with col2:
