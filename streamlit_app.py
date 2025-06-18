@@ -46,6 +46,21 @@ if "fx_rates" not in st.session_state:
 if "devise_cible" not in st.session_state:
     st.session_state.devise_cible = "EUR"
 
+# Dictionnaire des noms des entreprises
+ticker_to_name = {
+    "GLDG": "GoldMining Inc.",
+    "LJP3": "3X Long JPY Short USD ETF",
+    "COP": "ConocoPhillips",
+    "TTE": "TotalEnergies SE",
+    "CVX": "Chevron Corporation",
+    "APGO": "Apollo Silver Corp.",
+    "SSV": "Southern Silver Exploration Corp.",
+    "MUX": "McEwen Mining Inc.",
+    "UEC": "Uranium Energy Corp.",
+    "CCJ": "Cameco Corporation",
+    # À compléter
+}
+
 # Onglets de navigation
 tabs = st.tabs(["Portefeuille", "Performance", "OD Comptables", "Transactions M&A", "Taux de change", "Paramètres"])
 
@@ -78,19 +93,15 @@ with tabs[0]:
         df["Valeur"] = pd.to_numeric(df["Valeur"], errors="coerce").fillna(0.0)
         df["Valeur (devise cible)"] = df["Valeur"].astype(float) * df["Taux FX Num"].astype(float)
 
-        # Format des colonnes
         df["Acquisition"] = pd.to_numeric(df["Acquisition"], errors="coerce")
         df["Acquisition"] = df["Acquisition"].map(lambda x: f"{x:.4f}" if pd.notnull(x) else "")
         df["Taux FX"] = df["Taux FX Num"].map(lambda x: f"{x:.4f}" if pd.notnull(x) else "")
         df["Valeur"] = df["Valeur"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
         df["Valeur (devise cible)"] = df["Valeur (devise cible)"].map(lambda x: f"{x:.2f}" if pd.notnull(x) else "")
 
-        # Ajoute le nom de la participation (duplique la colonne Actions si elle existe)
-        if "Actions" in df.columns:
-            df.insert(1, "Nom", df["Actions"])
-
-        # Supprimer la première colonne (index ou identifiant inutile)
-        df = df.iloc[:, 1:]
+        # Ajouter colonne Nom via mapping Ticker
+        if "Tickers" in df.columns:
+            df.insert(1, "Nom", df["Tickers"].map(ticker_to_name).fillna("À renseigner"))
 
         st.dataframe(df, use_container_width=True)
 
