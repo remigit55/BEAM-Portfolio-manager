@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 
 def afficher_parametres():
-    st.subheader("Paramètres")
-
     if "devise_cible" not in st.session_state:
         st.session_state.devise_cible = "EUR"
 
