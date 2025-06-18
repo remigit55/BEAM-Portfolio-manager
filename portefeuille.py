@@ -6,7 +6,7 @@ from forex_python.converter import CurrencyRates
 import requests
 
 def afficher_portefeuille():
-    st.subheader("📂 Portefeuille")
+    st.subheader("Portefeuille")
 
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
