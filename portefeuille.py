@@ -3,11 +3,14 @@ import pandas as pd
 import requests
 import time
 import html
-import streamlit.components.v1 as components
+# components.html ne sera plus utilisé pour le tableau principal, donc nous pouvons le commenter si nous voulons
+# import streamlit.components.v1 as components 
 import yfinance as yf
 
 def safe_escape(text):
     """Escape HTML characters safely."""
+    # Cette fonction pourrait ne plus être strictement nécessaire si nous n'utilisons plus components.html
+    # mais elle ne fait pas de mal de la garder si d'autres parties du code l'utilisent.
     if hasattr(html, 'escape'):
         return html.escape(str(text))
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
@@ -97,10 +100,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             signal = "➖ Neutre"
             action = "Ne rien faire"
             reason = "Pas de signal exploitable"
-        elif z > -1.5:
-            signal = "↘ Faible"
-            action = "Surveiller / Réduire si confirmé"
-            reason = "Dynamique en affaiblissement"
         else:
             signal = "🧊 Survendu"
             action = "Acheter / Renforcer (si signal technique)"
@@ -196,180 +195,96 @@ def afficher_portefeuille():
         s = f"{x:,.{dec}f}"
         return s.replace(",", " ").replace(".", ",")
 
-    for col, dec in [
-        ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4), ("fiftyTwoWeekHigh", 4),
-        ("Valeur_H52", 2), ("Valeur_Actuelle", 2), ("Objectif_LT", 4), ("Valeur_LT", 2),
-        ("Momentum (%)", 2), ("Z-Score", 2)
-    ]:
-        if col in df.columns:
-            df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
-        else:
-            df[f"{col}_fmt"] = ""
+    # Maintenant, nous allons créer un dictionnaire de formatage pour st.dataframe / st.data_editor
+    # plutôt que de créer des colonnes _fmt.
+    column_config = {}
+    
+    # Définition des colonnes et de leurs labels d'affichage pour st.data_editor
+    # L'ordre ici sera l'ordre d'affichage.
+    display_columns = []
 
-    def convertir(val, devise):
-        if pd.isnull(val) or pd.isnull(devise): return 0
-        if devise == devise_cible: return val
-        taux = fx_rates.get(devise.upper())
-        return val * taux if taux else 0
+    # Mapping entre les colonnes internes (df.columns) et les labels d'affichage souhaités
+    column_mapping = {
+        ticker_col: "Ticker",
+        "shortName": "Nom",
+        "Catégorie": "Catégorie",
+        "Devise": "Devise",
+        "Quantité": "Quantité",
+        "Acquisition": "Prix d'Acquisition",
+        "Valeur": "Valeur",
+        "currentPrice": "Prix Actuel",
+        "Valeur_Actuelle": "Valeur Actuelle",
+        "fiftyTwoWeekHigh": "Haut 52 Semaines",
+        "Valeur_H52": "Valeur H52",
+        "Objectif_LT": "Objectif LT",
+        "Valeur_LT": "Valeur LT",
+        "Momentum (%)": "Momentum (%)",
+        "Z-Score": "Z-Score",
+        "Signal": "Signal",
+        "Action": "Action",
+        "Justification": "Justification"
+    }
 
-    if "Devise" in df.columns:
-        df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
-        df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
-        df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
-        df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
-    else:
-        df["Valeur_conv"] = df["Valeur"].fillna(0)
-        df["Valeur_Actuelle_conv"] = df["Valeur_Actuelle"].fillna(0)
-        df["Valeur_H52_conv"] = df["Valeur_H52"].fillna(0)
-        df["Valeur_LT_conv"] = df["Valeur_LT"].fillna(0)
+    # Ajoutez les colonnes qui existent réellement dans df et configurez leur affichage
+    for col_internal, col_display_label in column_mapping.items():
+        if col_internal and col_internal in df.columns: # Vérifier que la colonne existe
+            display_columns.append(col_internal) # Ajouter la colonne interne pour la sélection finale
+            
+            # Configuration de l'affichage dans st.data_editor
+            if col_internal in ["Quantité"]:
+                column_config[col_internal] = st.column_config.NumberColumn(
+                    label=col_display_label, format="%d"
+                )
+            elif col_internal in ["Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT"]:
+                 column_config[col_internal] = st.column_config.NumberColumn(
+                    label=col_display_label, format="%.4f"
+                )
+            elif col_internal in ["Valeur", "Valeur_Actuelle", "Valeur_H52", "Valeur_LT"]:
+                 column_config[col_internal] = st.column_config.NumberColumn(
+                    label=col_display_label, format="%.2f"
+                )
+            elif col_internal in ["Momentum (%)", "Z-Score"]:
+                column_config[col_internal] = st.column_config.NumberColumn(
+                    label=col_display_label, format="%.2f"
+                )
+            else: # Pour les colonnes de texte
+                column_config[col_internal] = st.column_config.TextColumn(label=col_display_label)
+        elif col_internal in ["shortName", "Signal", "Action", "Justification", "Devise"] and col_internal in df.columns:
+            # Cas spécifiques pour les colonnes ajoutées par l'API qui sont de type texte
+            display_columns.append(col_internal)
+            column_config[col_internal] = st.column_config.TextColumn(label=col_display_label)
 
 
+    # Filtrer le DataFrame pour ne garder que les colonnes à afficher
+    df_display = df[display_columns].copy()
+
+    # Calcul des totaux après toutes les conversions
     total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
     total_lt = df["Valeur_LT_conv"].sum()
 
-    cols_internal = [
-        ticker_col, "shortName", "Catégorie", "Devise",
-        "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
-        "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt",
-        "Objectif_LT_fmt", "Valeur_LT_fmt",
-        "Momentum (%)_fmt", "Z-Score_fmt", "Signal", "Action", "Justification"
-    ]
-    labels_display = [
-        "Ticker", "Nom", "Catégorie", "Devise",
-        "Quantité", "Prix d'Acquisition", "Valeur",
-        "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines", "Valeur H52",
-        "Objectif LT", "Valeur LT",
-        "Momentum (%)", "Z-Score", "Signal", "Action", "Justification"
-    ]
+    st.subheader("Vue d'ensemble du Portefeuille")
 
-    final_cols_internal = []
-    final_labels = []
-    for i, col_name in enumerate(cols_internal):
-        if col_name in df.columns or (col_name and col_name.endswith("_fmt") and col_name.replace("_fmt", "") in df.columns):
-            final_cols_internal.append(col_name)
-            final_labels.append(labels_display[i])
-        elif col_name in ["shortName", "Signal", "Action", "Justification", "Devise"] and col_name in df.columns:
-            final_cols_internal.append(col_name)
-            final_labels.append(labels_display[i])
-            
-    df_disp = df[final_cols_internal].copy()
-    df_disp.columns = final_labels
+    # Afficher le DataFrame avec st.data_editor pour profiter des fonctionnalités natives
+    # La largeur automatique devrait gérer le défilement horizontal si nécessaire.
+    st.data_editor(
+        df_display,
+        column_config=column_config,
+        hide_index=True,
+        use_container_width=True, # Utilise toute la largeur disponible, ce qui aide au scroll horizontal
+        num_rows="dynamic", # Permet d'ajouter/supprimer des lignes si vous le souhaitez (peut être "fixed" si non)
+        key="editable_portfolio_data" # Clé unique pour le data_editor
+    )
 
-    # Génération du contenu HTML du tableau
-    table_headers_html = "".join([f'<th data-column-index="{i}">{safe_escape(label)}</th>' for i, label in enumerate(final_labels)])
-
-    table_rows_html = ""
-    for _, row in df_disp.iterrows():
-        table_rows_html += "<tr>"
-        for lbl in final_labels:
-            val = row[lbl]
-            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-            table_rows_html += f"<td>{val_str}</td>"
-        table_rows_html += "</tr>"
-
-    num_cols_displayed = len(df_disp.columns)
-    total_row_cells = [""] * num_cols_displayed
-    
-    try:
-        idx_valeur = final_labels.index("Valeur")
-        total_row_cells[idx_valeur] = format_fr(total_valeur, 2)
-    except ValueError: pass
-    
-    try:
-        idx_actuelle = final_labels.index("Valeur Actuelle")
-        total_row_cells[idx_actuelle] = format_fr(total_actuelle, 2)
-    except ValueError: pass
-        
-    try:
-        idx_h52 = final_labels.index("Valeur H52")
-        total_row_cells[idx_h52] = format_fr(total_h52, 2)
-    except ValueError: pass
-        
-    try:
-        idx_lt = final_labels.index("Valeur LT")
-        total_row_cells[idx_lt] = format_fr(total_lt, 2)
-    except ValueError: pass
-
-    total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
-
-    total_row_html = "<tr class='total-row'>"
-    for cell_content in total_row_cells:
-        total_row_html += f"<td>{cell_content}</td>"
-    total_row_html += "</tr>"
-
-    # Le HTML principal, avec la feuille de style et le script externe
-    html_code = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-    .scroll-wrapper {{
-      overflow-x: auto !important;
-      overflow-y: auto;
-      max-height: 500px;
-      width: 100%;
-      display: block;
-      border: 1px solid #ddd;
-    }}
-    .portfolio-table {{
-      width: 100%;
-      min-width: 1800px; /* Ajustez cette valeur si votre tableau est plus large ou moins large */
-      border-collapse: collapse;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }}
-    .portfolio-table th, .portfolio-table td {{
-      padding: 6px;
-      border: none;
-      font-size: 11px;
-      white-space: nowrap;
-    }}
-    .portfolio-table th {{
-      background: #363636; color: white; text-align: center;
-      position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
-    }}
-    .portfolio-table th:hover {{
-      background: #4a4a4a;
-    }}
-    .portfolio-table td:nth-child({final_labels.index("Ticker") + 1}),
-    .portfolio-table td:nth-child({final_labels.index("Nom") + 1}),
-    .portfolio-table td:nth-child({final_labels.index("Catégorie") + 1}),
-    .portfolio-table td:nth-child({final_labels.index("Signal") + 1}),
-    .portfolio-table td:nth-child({final_labels.index("Action") + 1}),
-    .portfolio-table td:nth-child({final_labels.index("Justification") + 1}) {{
-      text-align: left;
-      white-space: normal;
-    }}
-    .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
-    .total-row td {{
-      background: #A49B6D; color: white; font-weight: bold;
-    }}
-    .sort-asc::after {{ content: ' ▲'; }}
-    .sort-desc::after {{ content: ' ▼'; }}
-    </style>
-    </head>
-    <body>
-    <div class="scroll-wrapper">
-      <table class="portfolio-table">
-        <thead>
-          <tr>
-            {table_headers_html}
-          </tr>
-        </thead>
-        <tbody>
-          {table_rows_html}
-          {total_row_html}
-        </tbody>
-      </table>
-    </div>
-    <script src="sort_table.js"></script> 
-    </body>
-    </html>
-    '''
-    # Utilisez un key unique pour forcer Streamlit à re-renderer si le contenu change (par exemple, si le DataFrame est mis à jour)
-    # Le timestamp est une bonne méthode pour garantir l'unicité à chaque chargement de la page.
-    components.html(html_code, height=600, scrolling=True, key=f"portfolio_table_component_{time.time()}")
+    st.markdown(f"""
+    ---
+    **Totaux du Portefeuille ({devise_cible}) :**
+    * **Valeur d'Acquisition :** {format_fr(total_valeur, 2)} {devise_cible}
+    * **Valeur Actuelle :** {format_fr(total_actuelle, 2)} {devise_cible}
+    * **Valeur au Haut de 52 Semaines :** {format_fr(total_h52, 2)} {devise_cible}
+    * **Valeur Objectif Long Terme :** {format_fr(total_lt, 2)} {devise_cible}
+    """)
 
 def main():
     st.set_page_config(layout="wide", page_title="Mon Portefeuille")
