@@ -6,13 +6,17 @@ import html
 import streamlit.components.v1 as components
 import yfinance as yf
 
+def safe_escape(text):
+    """Escape HTML characters safely, with fallback if html.escape is unavailable."""
+    return html.escape(text) if hasattr(html, 'escape') else str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
+
 def fetch_fx_rates(base="EUR"):
     try:
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates", {})  # Fixed: removed trailing space, added comma
+        return data.get("rates", {})
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
@@ -336,7 +340,7 @@ def afficher_portefeuille():
     total_lt_str = format_fr(total_lt, 2)
 
     # Construction HTML
-    html = f"""
+    html_code = f"""
     <style>
       .table-container {{ max-height:500px; overflow-y:auto; }}
       .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
@@ -389,7 +393,7 @@ def afficher_portefeuille():
         if st.session_state.sort_column == lbl:
             sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
         button_key = f"sort_{lbl}_{idx}"
-        html += f'<th><div id="button_{button_key}"></div></th>'
+        html_code += f'<th><div id="button_{button_key}"></div></th>'
         if st.button(
             f"{lbl}{sort_indicator}",
             key=button_key,
@@ -415,31 +419,31 @@ def afficher_portefeuille():
             unsafe_allow_html=True
         )
 
-    html += "</tr></thead><tbody>"
+    html_code += "</tr></thead><tbody>"
 
     for _, row in df_disp.iterrows():
-        html += "<tr>"
+        html_code += "<tr>"
         for lbl in labels:
             val = row[lbl]
-            val_str = html.escape(str(val)) if pd.notnull(val) else ""
-            html += f"<td>{val_str}</td>"
-        html += "</tr>"
+            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+            html_code += f"<td>{val_str}</td>"
+        html_code += "</tr>"
 
     # Ligne TOTAL
-    html += f"""
+    html_code += f"""
     <tr class='total-row'>
       <td>TOTAL ({devise_cible})</td>
       <td></td><td></td><td></td><td></td>
-      <td>{total_valeur_str}</td>
+      <td>{safe_escape(total_valeur_str)}</td>
       <td></td>
-      <td>{total_actuelle_str}</td>
+      <td>{safe_escape(total_actuelle_str)}</td>
       <td></td>
-      <td>{total_h52_str}</td>
+      <td>{safe_escape(total_h52_str)}</td>
       <td></td>
-      <td>{total_lt_str}</td>
+      <td>{safe_escape(total_lt_str)}</td>
       <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
     </tr>
     </tbody></table></div>
     """
 
-    components.html(html, height=600, scrolling=True)
+    components.html(html_code, height=600, scrolling=True)
