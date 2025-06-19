@@ -88,6 +88,7 @@ def afficher_portefeuille():
         df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
 
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
+    total_valeur_lt = df["Valeur_LT"].sum()
 
     def format_fr(x, dec):
         if pd.isnull(x): return ""
