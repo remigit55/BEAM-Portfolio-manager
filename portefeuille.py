@@ -21,11 +21,10 @@ def fetch_fx_rates(base="EUR"):
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        data = response.json()
-        return data.get("rates", {})
+        data = response.get("rates", {})
+        return data
     except Exception as e:
-        # st.error(f"Erreur lors de la récupération des taux de change : {e}") # Use st.error for user feedback
-        print(f"Erreur lors de la récupération des taux : {e}") # Keep print for debugging in console
+        print(f"Erreur lors de la récupération des taux : {e}")
         return {}
 
 @st.cache_data(ttl=900) # Cache Yahoo data for 15 minutes
@@ -39,17 +38,13 @@ def fetch_yahoo_data(ticker):
     # Check if data is already cached
     if ticker in st.session_state.ticker_names_cache:
         cached = st.session_state.ticker_names_cache[ticker]
-        # Ensure cached data is a valid dictionary with shortName
         if isinstance(cached, dict) and "shortName" in cached:
             return cached
         else: # Invalidate incomplete cache entries to re-fetch
             del st.session_state.ticker_names_cache[ticker]
     
     try:
-        # Use yfinance.Ticker to fetch information reliably
-        # This is generally more robust than direct API calls for Yahoo
         stock = yf.Ticker(ticker)
-        # Fetching info can be slow, caching is essential here
         info = stock.info 
         
         name = info.get("shortName", f"https://finance.yahoo.com/quote/{ticker}")
@@ -58,7 +53,7 @@ def fetch_yahoo_data(ticker):
         
         result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
         st.session_state.ticker_names_cache[ticker] = result
-        time.sleep(0.05) # Small delay to be polite to APIs and avoid rate limiting
+        time.sleep(0.05) 
         return result
     except Exception as e:
         print(f"Erreur lors de la récupération des données Yahoo pour {ticker}: {e}")
@@ -96,7 +91,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
                 "Justification": ""
             }
 
-        # Determine Signal, Action, Justification based on Z-Score
         if z > 2:
             signal = "🔥 Surchauffe"
             action = "Alléger / Prendre profits"
@@ -146,20 +140,17 @@ def afficher_portefeuille():
 
     df = st.session_state.df.copy()
 
-    # Harmoniser le nom de la colonne pour l’objectif long terme
     if "LT" in df.columns and "Objectif_LT" not in df.columns:
         df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
-    # Fetch FX rates only if the target currency changes or if not already fetched
     if "fx_rates" not in st.session_state or st.session_state.get("last_devise_cible") != devise_cible:
         st.session_state.fx_rates = fetch_fx_rates(devise_cible)
         st.session_state.last_devise_cible = devise_cible
 
     fx_rates = st.session_state.get("fx_rates", {})
 
-    # Normalisation numérique
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
             df[col] = (
@@ -169,45 +160,34 @@ def afficher_portefeuille():
             )
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Calcul de la valeur
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
     else:
-        df["Valeur"] = None # Ensure column exists
+        df["Valeur"] = None
 
-    # Ajout de la colonne Catégorie depuis la colonne F du CSV (index 5)
     if df.shape[1] > 5:
         df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
         df["Catégorie"] = ""
 
-    # Get ticker column name
     ticker_col = next((col for col in TICKER_COL_NAMES if col in df.columns), None)
 
     if ticker_col:
-        # Ensure ticker column values are strings and not NaN for Yahoo/Momentum lookup
         df[ticker_col] = df[ticker_col].astype(str).fillna('')
-        
-        # Collect all unique tickers to fetch data only once
         unique_tickers = df[ticker_col].loc[df[ticker_col] != ''].unique()
 
-        # Fetch Yahoo data for unique tickers
         yahoo_data_dict = {t: fetch_yahoo_data(t) for t in unique_tickers}
-        # Map fetched data back to the DataFrame
         df["shortName"] = df[ticker_col].map(lambda x: yahoo_data_dict.get(x, {}).get("shortName"))
         df["currentPrice"] = df[ticker_col].map(lambda x: yahoo_data_dict.get(x, {}).get("currentPrice"))
         df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda x: yahoo_data_dict.get(x, {}).get("fiftyTwoWeekHigh"))
 
-        # Fetch Momentum data for unique tickers
         momentum_data_dict = {t: fetch_momentum_data(t) for t in unique_tickers}
-        # Map fetched momentum data back to the DataFrame
         df["Momentum (%)"] = df[ticker_col].map(lambda x: momentum_data_dict.get(x, {}).get("Momentum (%)"))
         df["Z-Score"] = df[ticker_col].map(lambda x: momentum_data_dict.get(x, {}).get("Z-Score"))
         df["Signal"] = df[ticker_col].map(lambda x: momentum_data_dict.get(x, {}).get("Signal"))
         df["Action"] = df[ticker_col].map(lambda x: momentum_data_dict.get(x, {}).get("Action"))
         df["Justification"] = df[ticker_col].map(lambda x: momentum_data_dict.get(x, {}).get("Justification"))
     else:
-        # Initialize columns if no ticker column is found
         df["shortName"] = None
         df["currentPrice"] = None
         df["fiftyTwoWeekHigh"] = None
@@ -217,7 +197,6 @@ def afficher_portefeuille():
         df["Action"] = None
         df["Justification"] = None
 
-    # Calcul des colonnes Valeur H52 et Valeur Actuelle
     if all(c in df.columns for c in ["Quantité", "fiftyTwoWeekHigh"]):
         df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
     else:
@@ -227,7 +206,6 @@ def afficher_portefeuille():
     else:
         df["Valeur_Actuelle"] = None 
 
-    # Conversion Objectif_LT et calcul de Valeur_LT
     if "Objectif_LT" not in df.columns:
         df["Objectif_LT"] = pd.NA
     else:
@@ -240,7 +218,6 @@ def afficher_portefeuille():
         df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
     
-    # Conversion en devise cible
     def convertir(val, devise):
         if pd.isnull(val) or pd.isnull(devise) or val is None: return 0
         if devise.upper() == devise_cible.upper(): return val
@@ -253,8 +230,7 @@ def afficher_portefeuille():
         df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
         df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
     else:
-        # If 'Devise' column is missing, assume all values are in the target currency
-        df["Valeur_conv"] = df["Valeur"].fillna(0) # Ensure no NaN for sum
+        df["Valeur_conv"] = df["Valeur"].fillna(0)
         df["Valeur_Actuelle_conv"] = df["Valeur_Actuelle"].fillna(0)
         df["Valeur_H52_conv"] = df["Valeur_H52"].fillna(0)
         df["Valeur_LT_conv"] = df["Valeur_LT"].fillna(0)
@@ -264,7 +240,6 @@ def afficher_portefeuille():
     total_h52 = df["Valeur_H52_conv"].sum()
     total_lt = df["Valeur_LT_conv"].sum()
 
-    # Formatage des colonnes numériques pour l'affichage
     def format_fr(x, dec):
         if pd.isnull(x) or x is None: return ""
         s = f"{x:,.{dec}f}"
@@ -283,106 +258,86 @@ def afficher_portefeuille():
         ("Momentum (%)", 2),
         ("Z-Score", 2)
     ]:
-        if col in df.columns: # Only format if the column exists
-            # Ensure the column is numeric before mapping for formatting
+        if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce') 
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
-        else: # Create an empty formatted column if the original doesn't exist
+        else:
             df[f"{col}_fmt"] = ""
 
-    # Préparer colonnes pour affichage et leurs labels
-    # Important: s'assurer que ces colonnes sont celles qui existeront dans df_disp
-    cols_to_display_raw = [
-        ticker_col,
-        "shortName",
-        "Catégorie",
-        "Devise",
-        "Quantité_fmt",
-        "Acquisition_fmt",
-        "Valeur_fmt",
-        "currentPrice_fmt",
-        "Valeur_Actuelle_fmt",
-        "fiftyTwoWeekHigh_fmt",
-        "Valeur_H52_fmt",
-        "Objectif_LT_fmt",
-        "Valeur_LT_fmt",
-        "Momentum (%)_fmt", # Formatted column
-        "Z-Score_fmt",      # Formatted column
-        "Signal",           # Raw column, likely string
-        "Action",           # Raw column, likely string
-        "Justification"     # Raw column, likely string
-    ]
-    labels_raw = [
-        "Ticker",
-        "Nom",
-        "Catégorie",
-        "Devise",
-        "Quantité",
-        "Prix d'Acquisition",
-        "Valeur",
-        "Prix Actuel",
-        "Valeur Actuelle",
-        "Haut 52 Semaines",
-        "Valeur H52",
-        "Objectif LT",
-        "Valeur LT",
-        "Momentum (%)",
-        "Z-Score",
-        "Signal",
-        "Action",
-        "Justification"
-    ]
-    
-    # Filter out columns that might not exist in df before selecting
-    # And create a mapping from internal column name to display label
-    df_columns_available = df.columns.tolist() # Get actual columns in df
+    # Define all possible columns and their display labels
+    # Use a dictionary to map internal column names to display labels for easier lookup
+    full_columns_mapping = {
+        ticker_col: "Ticker",
+        "shortName": "Nom",
+        "Catégorie": "Catégorie",
+        "Devise": "Devise",
+        "Quantité_fmt": "Quantité",
+        "Acquisition_fmt": "Prix d'Acquisition",
+        "Valeur_fmt": "Valeur",
+        "currentPrice_fmt": "Prix Actuel",
+        "Valeur_Actuelle_fmt": "Valeur Actuelle",
+        "fiftyTwoWeekHigh_fmt": "Haut 52 Semaines",
+        "Valeur_H52_fmt": "Valeur H52",
+        "Objectif_LT_fmt": "Objectif LT",
+        "Valeur_LT_fmt": "Valeur LT",
+        "Momentum (%)_fmt": "Momentum (%)", 
+        "Z-Score_fmt": "Z-Score",      
+        "Signal": "Signal",           
+        "Action": "Action",           
+        "Justification": "Justification"     
+    }
 
-    actual_display_cols = []
-    actual_labels = []
+    # Create two lists: one for internal column names to select, one for display labels
+    actual_display_cols_internal = [] # These are the keys from full_columns_mapping
+    actual_labels = [] # These are the values (display names) from full_columns_mapping
     
-    for i, col_name in enumerate(cols_to_display_raw):
-        if col_name in df_columns_available:
-            actual_display_cols.append(col_name)
-            actual_labels.append(labels_raw[i])
-        elif col_name.replace('_fmt','') in df_columns_available and col_name.endswith('_fmt'):
-             # If original non-formatted column exists, then the formatted one should too
-            actual_display_cols.append(col_name)
-            actual_labels.append(labels_raw[i])
+    # Iterate through the desired display order and check if the underlying data exists
+    for internal_col_key, display_label in full_columns_mapping.items():
+        # Check if the raw column exists OR if it's a formatted column and its raw counterpart exists
+        raw_col_name_for_fmt = internal_col_key.replace('_fmt', '')
+        if internal_col_key in df.columns or raw_col_name_for_fmt in df.columns:
+            actual_display_cols_internal.append(internal_col_key)
+            actual_labels.append(display_label)
 
-    df_disp = df[actual_display_cols].copy()
-    df_disp.columns = actual_labels
+    # Now create df_disp using the filtered list of internal column names
+    # This ensures df_disp only contains columns that actually exist in df
+    df_disp = df[actual_display_cols_internal].copy()
+    df_disp.columns = actual_labels # Set display labels as column names for df_disp
 
     # --- Tri du DataFrame pour l'affichage ---
-    # Récupération des paramètres de tri (depuis l'URL)
     query_params = st.query_params
     sort_column_from_url = query_params.get("sort_column", None)
     sort_direction_from_url = query_params.get("sort_direction", "asc")
     
-    # Appliquer le tri au DataFrame df_disp
     if sort_column_from_url in df_disp.columns:
-        sort_col_label = sort_column_from_url
+        sort_col_label = sort_column_from_url # The label of the column to sort by in df_disp
         
-        # Try to find the original numeric column name for sorting if it's a formatted column
-        original_numeric_col = None
-        for raw_col, label in zip(cols_to_display_raw, labels_raw):
+        # Find the original numeric column name in df that corresponds to sort_col_label
+        # We need this to sort by numeric values for formatted columns
+        original_numeric_col_name = None
+        for internal_col_key, label in full_columns_mapping.items():
             if label == sort_col_label:
-                original_numeric_col = raw_col.replace('_fmt', '')
+                original_numeric_col_name = internal_col_key.replace('_fmt', '')
                 break
 
-        if original_numeric_col and original_numeric_col in df.columns:
-            # If it's a numeric column (like Quantité, Valeur, Momentum (%)), sort by its numeric value
-            # Create a Series for sorting from the original DataFrame `df`
-            sort_series = pd.to_numeric(df[original_numeric_col], errors="coerce")
-            df_disp = df_disp.iloc[sort_series.argsort(
+        # Check if the original column exists in 'df' and if it's numeric
+        if original_numeric_col_name and original_numeric_col_name in df.columns:
+            # Sort df_disp using the numeric values from the original df column
+            # This is the key fix for the TypeError
+            df_disp = df_disp.sort_values(
+                by=sort_col_label, # Sort by the displayed column label
                 ascending=(sort_direction_from_url == "asc"),
-                na_position='last' # Puts NaN/None values at the end
-            )]
+                # Use a lambda key to convert to numeric for sorting, handling errors
+                key=lambda x: pd.to_numeric(
+                    df[original_numeric_col_name], errors='coerce'
+                ).reindex(x.index).fillna(-float('inf')) # Reindex to match df_disp's index
+            )
         else:
-            # For string or other columns, sort directly on the displayed string value
+            # For non-numeric or string columns, sort directly on the displayed column
             df_disp = df_disp.sort_values(
                 by=sort_col_label,
                 ascending=(sort_direction_from_url == "asc"),
-                key=lambda x: x.astype(str).str.lower() if x.dtype == 'object' else x # Case-insensitive sort for strings
+                key=lambda x: x.astype(str).str.lower() if x.dtype == 'object' else x 
             )
             
     total_valeur_str = format_fr(total_valeur, 2)
@@ -390,9 +345,6 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
     
-    # Injection JS sécurisée
-    # IMPORTANT: The JavaScript here will trigger a full page reload by setting window.location.href.
-    # This is the trade-off for having Python-driven sorting with custom HTML.
     safe_sort_column = safe_escape(str(sort_column_from_url if sort_column_from_url else ""))
     safe_sort_direction = safe_escape(str(sort_direction_from_url))
     
@@ -408,7 +360,7 @@ def afficher_portefeuille():
         position: relative;
       }}
       .portfolio-table {{
-        min-width: 2200px; /* Adjusted min-width if needed */
+        min-width: 2200px; 
         border-collapse: collapse;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }}
@@ -436,6 +388,7 @@ def afficher_portefeuille():
         white-space: nowrap;
       }}
       /* Adjust nth-child for left-aligned columns based on your current labels list */
+      /* Make sure these match the actual order of columns in actual_labels */
       /* Ticker (1), Nom (2), Catégorie (3), Signal (16), Action (17), Justification (18) */
       .portfolio-table td:nth-child(1),
       .portfolio-table td:nth-child(2),
@@ -465,8 +418,6 @@ def afficher_portefeuille():
         if (currentSort === column) {{
           direction = currentDirection === 'asc' ? 'desc' : 'asc';
         }}
-        // This will cause a full page reload (and thus a Streamlit re-run).
-        // This is necessary if Python handles the sorting logic on the server-side.
         const newPath = window.location.pathname + "?sort_column=" + encodeURIComponent(column) + "&sort_direction=" + direction;
         window.location.href = newPath;
       }}
@@ -486,7 +437,6 @@ def afficher_portefeuille():
         <thead><tr>
     """
     
-    # Ajouter les en-têtes avec tri cliquable
     for lbl in actual_labels:
         html_code += f'<th onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
     
@@ -495,7 +445,6 @@ def afficher_portefeuille():
         <tbody>
     """
     
-    # Corps du tableau
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
         for lbl in actual_labels:
@@ -504,7 +453,6 @@ def afficher_portefeuille():
             html_code += f"<td>{val_str}</td>"
         html_code += "</tr>"
     
-    # Ligne total
     html_code += f"""
         <tr class='total-row'>
           <td>TOTAL ({safe_escape(devise_cible)})</td>
@@ -525,12 +473,10 @@ def afficher_portefeuille():
     
     components.html(html_code, height=600, scrolling=True)
 
-# --- Structure de l'application principale (exemple) ---
 def main():
     st.set_page_config(layout="wide", page_title="Mon Portefeuille")
     st.title("Gestion de Portefeuille d'Investissement")
 
-    # Sidebar pour l'importation de fichiers et les paramètres
     with st.sidebar:
         st.header("Importation de Données")
         uploaded_file = st.file_uploader("Choisissez un fichier CSV", type=["csv"])
@@ -541,13 +487,13 @@ def main():
                 st.success("Fichier importé avec succès !")
             except Exception as e:
                 st.error(f"Erreur lors de la lecture du fichier : {e}")
-                st.session_state.df = None # Clear df on error to prevent displaying old data
+                st.session_state.df = None
 
         st.header("Paramètres de Devise")
         st.session_state.devise_cible = st.selectbox(
             "Devise cible pour l'affichage",
             ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
-            index=0 # Par défaut EUR
+            index=0
         )
 
     afficher_portefeuille()
