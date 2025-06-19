@@ -41,30 +41,32 @@ def afficher_portefeuille():
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
 
-        def fetch_yahoo_data(t):
-            t = str(t).strip().upper()
-            if t in st.session_state.ticker_names_cache:
-                cached = st.session_state.ticker_names_cache[t]
-                if isinstance(cached, dict) and "shortName" in cached:
-                    return cached
-                else:
-                    del st.session_state.ticker_names_cache[t]
-            try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
-                headers = { "User-Agent": "Mozilla/5.0" }
-                r = requests.get(url, headers=headers, timeout=5)
-                r.raise_for_status()
-                data = r.json()
-                meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-                name = meta.get("shortName", f"https://finance.yahoo.com/quote/{t}")
-                current_price = meta.get("regularMarketPrice", None)
-                fifty_two_week_high = meta.get("fiftyTwoWeekHigh", None)
-                result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
-                st.session_state.ticker_names_cache[t] = result
-                time.sleep(0.5)
-                return result
-            except Exception:
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+
+    @st.cache_data(ttl=3600)  # Cache pendant 1 heure
+    def fetch_yahoo_data(t):
+        t = str(t).strip().upper()
+        if t in st.session_state.ticker_names_cache:
+            cached = st.session_state.ticker_names_cache[t]
+            if isinstance(cached, dict) and "shortName" in cached:
+                return cached
+            else:
+                del st.session_state.ticker_names_cache[t]
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers, timeout=5)
+            r.raise_for_status()
+            data = r.json()
+            meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+            name = meta.get("shortName", f"https://finance.yahoo.com/quote/{t}")
+            current_price = meta.get("regularMarketPrice", None)
+            fifty_two_week_high = meta.get("fiftyTwoWeekHigh", None)
+            result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
+            st.session_state.ticker_names_cache[t] = result
+            time.sleep(0.5)
+            return result
+        except Exception:
+            return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
         yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
         df["shortName"] = yahoo_data.apply(lambda x: x["shortName"])
