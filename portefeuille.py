@@ -145,12 +145,6 @@ def afficher_portefeuille():
     total_h52 = df["Valeur_H52_conv"].sum()
     total_lt = df["Valeur_LT_conv"].sum()
 
-    # ... (le reste du code HTML + affichage HTML reste inchangé)
-
-    # Insertion du composant HTML à la fin
-    components.html(html_code, height=600, scrolling=True)
-
-
     cols = [
         ticker_col,
         "shortName",
