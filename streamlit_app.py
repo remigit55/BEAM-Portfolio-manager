@@ -40,7 +40,7 @@ st.markdown(f"""
 
         /* Personnalisation des onglets */
         div[data-testid="stTabs"] button[role="tab"] {{
-            /* background-color: #f5f5f5 !important;
+            background-color: #f5f5f5 !important;
             color: #888 !important;
             border: none;
             padding: 10px 15px;
