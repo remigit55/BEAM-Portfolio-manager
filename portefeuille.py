@@ -16,7 +16,7 @@ def fetch_fx_rates(base="EUR"):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates", {})
+        return data.get("rates ", {})
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
