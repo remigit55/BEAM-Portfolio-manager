@@ -1,4 +1,3 @@
-# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import datetime
@@ -40,14 +39,9 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-
-
-from PIL import Image
-import base64
-from io import BytesIO
-
+# Chargement du logo
 try:
-    logo = Image.open("Logo.png.png")  # ajuste le nom si besoin
+    logo = Image.open("Logo.png.png")
     buffer = BytesIO()
     logo.save(buffer, format="PNG")
     logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -57,16 +51,12 @@ except Exception:
 st.markdown(
     f"""
     <div style="display: flex; align-items: center; margin: -30px 0 10px 0;">
-        <img src="data:image/png;base64,{logo_base64}" style="height: 60px; margin-right: 12px;" />
+        <img src="data:image/png;base64,{logo_base64}" style="height: 42px; margin-right: 12px;" />
         <h1 style="font-size: 30px; margin: 0; padding: 0;">BEAM Portfolio Manager</h1>
     </div>
     """,
     unsafe_allow_html=True
 )
-
-
-
-
 
 # Initialisation des variables de session
 if "df" not in st.session_state:
@@ -82,9 +72,29 @@ if "ticker_names_cache" not in st.session_state:
 from portefeuille import afficher_portefeuille
 from performance import afficher_performance
 from transactions import afficher_transactions
-from taux_change import afficher_taux_change
+from taux_change import afficher_taux_change, actualiser_taux_change
 from parametres import afficher_parametres
 from od_comptables import afficher_od_comptables
+
+# Initialisation automatique des données au démarrage
+csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
+if st.session_state.df is None:
+    try:
+        with st.spinner("Chargement initial des données du portefeuille..."):
+            df = pd.read_csv(csv_url)
+            st.session_state.df = df
+            st.success("Données initiales importées avec succès.")
+        # Charger les taux de change immédiatement après
+        if "Devise" in df.columns:
+            devises_uniques = sorted(set(df["Devise"].dropna().unique()))
+            with st.spinner("Chargement initial des taux de change..."):
+                st.session_state.fx_rates = actualiser_taux_change(st.session_state.devise_cible, devises_uniques)
+                if st.session_state.fx_rates:
+                    st.success(f"Taux de change initialisés pour {st.session_state.devise_cible}.")
+                else:
+                    st.warning("Impossible de charger les taux de change initiaux.")
+    except Exception as e:
+        st.error(f"Erreur lors du chargement initial : {e}")
 
 # Onglets horizontaux
 onglets = st.tabs([
