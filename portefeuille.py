@@ -4,7 +4,7 @@ import requests
 import time
 import html
 import streamlit.components.v1 as components
-import yfinance as yf
+import yfinance as yf # Import de yfinance
 
 def safe_escape(text):
     """Escape HTML characters safely."""
@@ -12,7 +12,8 @@ def safe_escape(text):
         return html.escape(str(text))
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
 
-
+# Mise en cache pour les taux de change
+@st.cache_data(ttl=3600) # Cache pendant 1 heure pour les taux
 def fetch_fx_rates(base="EUR"):
     try:
         url = f"https://api.exchangerate.host/latest?base={base}"
@@ -23,6 +24,116 @@ def fetch_fx_rates(base="EUR"):
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
+
+# Mise en cache pour les données Yahoo Finance
+@st.cache_data(ttl=900) # Cache pendant 15 minutes pour Yahoo Finance
+def fetch_yahoo_data(t):
+    t = str(t).strip().upper()
+    if "ticker_names_cache" not in st.session_state:
+        st.session_state.ticker_names_cache = {}
+
+    if t in st.session_state.ticker_names_cache:
+        cached = st.session_state.ticker_names_cache[t]
+        if isinstance(cached, dict) and "shortName" in cached:
+            return cached
+        else:
+            del st.session_state.ticker_names_cache[t] # Supprimer l'entrée si le cache est invalide
+    
+    try:
+        # Utilisation de yfinance pour une meilleure robustesse
+        ticker_obj = yf.Ticker(t)
+        info = ticker_obj.info
+        
+        name = info.get("shortName", f"https://finance.yahoo.com/quote/{t}")
+        current_price = info.get("regularMarketPrice", None)
+        fifty_two_week_high = info.get("fiftyTwoWeekHigh", None)
+        result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
+        st.session_state.ticker_names_cache[t] = result
+        time.sleep(0.05) # Petite pause pour éviter de surcharger l'API
+        return result
+    except Exception as e:
+        # print(f"Erreur lors de la récupération des données Yahoo pour {t}: {e}") # Décommenter pour debug
+        return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
+
+# Mise en cache pour les données de momentum
+@st.cache_data(ttl=3600) # Cache pendant 1 heure
+def fetch_momentum_data(ticker, period="5y", interval="1wk"):
+    try:
+        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+        if data.empty:
+            return {
+                "Momentum (%)": None,
+                "Z-Score": None,
+                "Signal": "",
+                "Action": "",
+                "Justification": ""
+            }
+
+        # Assurez-vous que 'Close' est bien une colonne et non un MultiIndex
+        if isinstance(data.columns, pd.MultiIndex):
+            close = data['Close'][ticker] # Si le téléchargement est pour plusieurs tickers
+        else:
+            close = data['Close'] # Si le téléchargement est pour un seul ticker
+
+        df_m = pd.DataFrame({'Close': close})
+        df_m['MA_39'] = df_m['Close'].rolling(window=39).mean()
+        df_m['Momentum'] = (df_m['Close'] / df_m['MA_39']) - 1
+        df_m['Z_Momentum'] = (df_m['Momentum'] - df_m['Momentum'].rolling(10).mean()) / df_m['Momentum'].rolling(10).std()
+
+        latest = df_m.iloc[-1]
+        z = latest.get('Z_Momentum')
+        m = latest.get('Momentum', 0) * 100
+
+        if pd.isna(z):
+            return {
+                "Momentum (%)": None,
+                "Z-Score": None,
+                "Signal": "",
+                "Action": "",
+                "Justification": ""
+            }
+
+        if z > 2:
+            signal = "🔥 Surchauffe"
+            action = "Alléger / Prendre profits"
+            reason = "Momentum extrême, risque de retournement"
+        elif z > 1.5:
+            signal = "↗ Fort"
+            action = "Surveiller"
+            reason = "Momentum soutenu, proche de surchauffe"
+        elif z > 0.5:
+            signal = "↗ Haussier"
+            action = "Conserver / Renforcer"
+            reason = "Momentum sain"
+        elif z > -0.5:
+            signal = "➖ Neutre"
+            action = "Ne rien faire"
+            reason = "Pas de signal exploitable"
+        elif z > -1.5:
+            signal = "↘ Faible"
+            action = "Surveiller / Réduire si confirmé"
+            reason = "Dynamique en affaiblissement"
+        else:
+            signal = "🧊 Survendu"
+            action = "Acheter / Renforcer (si signal technique)"
+            reason = "Purge excessive, possible bas de cycle"
+
+        return {
+            "Momentum (%)": round(m, 2),
+            "Z-Score": round(z, 2),
+            "Signal": signal,
+            "Action": action,
+            "Justification": reason
+        }
+    except Exception as e:
+        # print(f"Erreur avec {ticker} pour Momentum: {e}") # Décommenter pour debug
+        return {
+            "Momentum (%)": None,
+            "Z-Score": None,
+            "Signal": "",
+            "Action": "",
+            "Justification": ""
+        }
 
 def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
@@ -59,7 +170,7 @@ def afficher_portefeuille():
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
-    # Ajout de la colonne Catégorie depuis la colonne F du CSV
+    # Ajout de la colonne Catégorie depuis la colonne F du CSV (index 5)
     if len(df.columns) > 5:
         df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
@@ -67,46 +178,48 @@ def afficher_portefeuille():
 
     # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
-    if ticker_col:
-        if "ticker_names_cache" not in st.session_state:
-            st.session_state.ticker_names_cache = {}
+    
+    # Assurez-vous que la colonne ticker_col existe et n'est pas vide avant de faire des appels API
+    if ticker_col and not df[ticker_col].dropna().empty:
+        # Collecter tous les tickers uniques pour éviter les appels redondants
+        unique_tickers = df[ticker_col].dropna().astype(str).str.strip().str.upper().unique()
+        
+        # Récupérer les données Yahoo et Momentum pour tous les tickers uniques
+        yahoo_results = {t: fetch_yahoo_data(t) for t in unique_tickers}
+        momentum_results = {t: fetch_momentum_data(t) for t in unique_tickers}
+        
+        # Appliquer les résultats aux lignes du DataFrame original
+        df["shortName"] = df[ticker_col].apply(lambda x: yahoo_results.get(str(x).strip().upper(), {}).get("shortName"))
+        df["currentPrice"] = df[ticker_col].apply(lambda x: yahoo_results.get(str(x).strip().upper(), {}).get("currentPrice"))
+        df["fiftyTwoWeekHigh"] = df[ticker_col].apply(lambda x: yahoo_results.get(str(x).strip().upper(), {}).get("fiftyTwoWeekHigh"))
+        
+        df["Momentum (%)"] = df[ticker_col].apply(lambda x: momentum_results.get(str(x).strip().upper(), {}).get("Momentum (%)"))
+        df["Z-Score"] = df[ticker_col].apply(lambda x: momentum_results.get(str(x).strip().upper(), {}).get("Z-Score"))
+        df["Signal"] = df[ticker_col].apply(lambda x: momentum_results.get(str(x).strip().upper(), {}).get("Signal"))
+        df["Action"] = df[ticker_col].apply(lambda x: momentum_results.get(str(x).strip().upper(), {}).get("Action"))
+        df["Justification"] = df[ticker_col].apply(lambda x: momentum_results.get(str(x).strip().upper(), {}).get("Justification"))
+    else:
+        # Initialiser les colonnes si aucun ticker n'est trouvé ou si la colonne est vide
+        df["shortName"] = pd.NA
+        df["currentPrice"] = pd.NA
+        df["fiftyTwoWeekHigh"] = pd.NA
+        df["Momentum (%)"] = pd.NA
+        df["Z-Score"] = pd.NA
+        df["Signal"] = ""
+        df["Action"] = ""
+        df["Justification"] = ""
 
-        @st.cache_data(ttl=900)
-        def fetch_yahoo_data(t):
-            t = str(t).strip().upper()
-            if t in st.session_state.ticker_names_cache:
-                cached = st.session_state.ticker_names_cache[t]
-                if isinstance(cached, dict) and "shortName" in cached:
-                    return cached
-                else:
-                    del st.session_state.ticker_names_cache[t]
-            try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
-                headers = {"User-Agent": "Mozilla/5.0"}
-                r = requests.get(url, headers=headers, timeout=5)
-                r.raise_for_status()
-                data = r.json()
-                meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-                name = meta.get("shortName", f"https://finance.yahoo.com/quote/{t}")
-                current_price = meta.get("regularMarketPrice", None)
-                fifty_two_week_high = meta.get("fiftyTwoWeekHigh", None)
-                result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
-                st.session_state.ticker_names_cache[t] = result
-                time.sleep(0.5)
-                return result
-            except Exception:
-                return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
-
-        yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
-        df["shortName"] = yahoo_data.apply(lambda x: x["shortName"])
-        df["currentPrice"] = yahoo_data.apply(lambda x: x["currentPrice"])
-        df["fiftyTwoWeekHigh"] = yahoo_data.apply(lambda x: x["fiftyTwoWeekHigh"])
 
     # Calcul des colonnes Valeur H52 et Valeur Actuelle
     if all(c in df.columns for c in ["Quantité", "fiftyTwoWeekHigh"]):
         df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
+    else:
+        df["Valeur_H52"] = pd.NA # Assurez-vous que la colonne existe
+    
     if all(c in df.columns for c in ["Quantité", "currentPrice"]):
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
+    else:
+        df["Valeur_Actuelle"] = pd.NA # Assurez-vous que la colonne existe
 
     # Conversion Objectif_LT et calcul de Valeur_LT
     if "Objectif_LT" not in df.columns:
@@ -121,99 +234,9 @@ def afficher_portefeuille():
         df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
-    # Momentum Analysis
-    @st.cache_data(ttl=3600)
-    def fetch_momentum_data(ticker, period="5y", interval="1wk"):
-        try:
-            data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
-            if data.empty:
-                print(f"Aucune donnée pour {ticker}")
-                return {
-                    "Last Price": None,
-                    "Momentum (%)": None,
-                    "Z-Score": None,
-                    "Signal": "",
-                    "Action": "",
-                    "Justification": ""
-                }
-
-            if isinstance(data.columns, pd.MultiIndex):
-                close = data['Close'][ticker]
-            else:
-                close = data['Close']
-
-            df_m = pd.DataFrame({'Close': close})
-            df_m['MA_39'] = df_m['Close'].rolling(window=39).mean()
-            df_m['Momentum'] = (df_m['Close'] / df_m['MA_39']) - 1
-            df_m['Z_Momentum'] = (df_m['Momentum'] - df_m['Momentum'].rolling(10).mean()) / df_m['Momentum'].rolling(10).std()
-
-            latest = df_m.iloc[-1]
-            z = latest['Z_Momentum']
-            m = latest['Momentum'] * 100
-
-            if pd.isna(z):
-                return {
-                    "Last Price": round(latest['Close'], 2) if not pd.isna(latest['Close']) else None,
-                    "Momentum (%)": None,
-                    "Z-Score": None,
-                    "Signal": "",
-                    "Action": "",
-                    "Justification": ""
-                }
-
-            if z > 2:
-                signal = "🔥 Surchauffe"
-                action = "Alléger / Prendre profits"
-                reason = "Momentum extrême, risque de retournement"
-            elif z > 1.5:
-                signal = "↗ Fort"
-                action = "Surveiller"
-                reason = "Momentum soutenu, proche de surchauffe"
-            elif z > 0.5:
-                signal = "↗ Haussier"
-                action = "Conserver / Renforcer"
-                reason = "Momentum sain"
-            elif z > -0.5:
-                signal = "➖ Neutre"
-                action = "Ne rien faire"
-                reason = "Pas de signal exploitable"
-            elif z > -1.5:
-                signal = "↘ Faible"
-                action = "Surveiller / Réduire si confirmé"
-                reason = "Dynamique en affaiblissement"
-            else:
-                signal = "🧊 Survendu"
-                action = "Acheter / Renforcer (si signal technique)"
-                reason = "Purge excessive, possible bas de cycle"
-
-            return {
-                "Last Price": round(latest['Close'], 2),
-                "Momentum (%)": round(m, 2),
-                "Z-Score": round(z, 2),
-                "Signal": signal,
-                "Action": action,
-                "Justification": reason
-            }
-        except Exception as e:
-            print(f"Erreur avec {ticker}: {e}")
-            return {
-                "Last Price": None,
-                "Momentum (%)": None,
-                "Z-Score": None,
-                "Signal": "",
-                "Action": "",
-                "Justification": ""
-            }
-
-    # Apply momentum analysis
-    momentum_results = {ticker: fetch_momentum_data(ticker) for ticker in df[ticker_col]}
-    momentum_df = pd.DataFrame.from_dict(momentum_results, orient='index').reset_index()
-    momentum_df = momentum_df.rename(columns={'index': ticker_col})
-    df = df.merge(momentum_df, on=ticker_col, how='left')
-
-    # Formatage
+    # Formatage des colonnes numériques
     def format_fr(x, dec):
-        if pd.isnull(x): return ""
+        if pd.isnull(x) or x is None: return ""
         s = f"{x:,.{dec}f}"
         return s.replace(",", " ").replace(".", ",")
 
@@ -227,11 +250,13 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
-        ("Momentum (%)", 2),
-        ("Z-Score", 2)
+        ("Momentum (%)", 2), # Ajout pour le Momentum
+        ("Z-Score", 2)       # Ajout pour le Z-Score
     ]:
-        if col in df.columns:
+        if col in df.columns: # Vérifier si la colonne existe avant de la formater
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
+        else:
+            df[f"{col}_fmt"] = "" # Crée une colonne vide si la base n'existe pas
 
     # Conversion en devise cible
     def convertir(val, devise):
@@ -240,22 +265,29 @@ def afficher_portefeuille():
         taux = fx_rates.get(devise.upper())
         return val * taux if taux else 0
 
-    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
-    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
-    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
+    if "Devise" in df.columns:
+        df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
+        df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
+        df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
+        df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
+    else: # Fallback si la colonne Devise n'existe pas
+        df["Valeur_conv"] = df["Valeur"].fillna(0)
+        df["Valeur_Actuelle_conv"] = df["Valeur_Actuelle"].fillna(0)
+        df["Valeur_H52_conv"] = df["Valeur_H52"].fillna(0)
+        df["Valeur_LT_conv"] = df["Valeur_LT"].fillna(0)
+
 
     total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
-    total_lt = df["Valeur_LT_conv"].sum()
+    total_lt = df["Valeur_LT_conv"].sum() # Utilisez total_lt pour le pied de tableau
 
-    # Préparer colonnes pour affichage
-    cols = [
-        ticker_col,
+    # Définition des colonnes internes et des labels d'affichage
+    cols_internal = [
+        ticker_col, # Utilisez le nom de colonne dynamique
         "shortName",
         "Catégorie",
-        "Devise",
+        "Devise", # Ajout de la devise ici
         "Quantité_fmt",
         "Acquisition_fmt",
         "Valeur_fmt",
@@ -265,17 +297,17 @@ def afficher_portefeuille():
         "Valeur_H52_fmt",
         "Objectif_LT_fmt",
         "Valeur_LT_fmt",
-        "Momentum (%)_fmt",
-        "Z-Score_fmt",
+        "Momentum (%)_fmt", # Ajout des colonnes de momentum formatées
+        "Z-Score_fmt",      # Ajout des colonnes de momentum formatées
         "Signal",
         "Action",
         "Justification"
     ]
-    labels = [
+    labels_display = [
         "Ticker",
         "Nom",
         "Catégorie",
-        "Devise",
+        "Devise", # Ajout de la devise ici
         "Quantité",
         "Prix d'Acquisition",
         "Valeur",
@@ -285,156 +317,118 @@ def afficher_portefeuille():
         "Valeur H52",
         "Objectif LT",
         "Valeur LT",
-        "Momentum (%)",
-        "Z-Score",
+        "Momentum (%)", # Labels d'affichage pour momentum
+        "Z-Score",      # Labels d'affichage pour Z-Score
         "Signal",
         "Action",
         "Justification"
-        
     ]
 
-    # S'assurer que seules les colonnes existantes sont sélectionnées pour df_disp
-    existing_cols_in_df = [c for c in cols if c in df.columns]
-    existing_labels = [labels[i] for i, c in enumerate(cols) if c in df.columns]
+    # Filtrer les colonnes pour s'assurer qu'elles existent dans le DataFrame
+    final_cols_internal = []
+    final_labels = []
+    for i, col_name in enumerate(cols_internal):
+        # Vérifier si la colonne non formatée existe ou si la colonne formatée peut être basée sur une colonne non formatée existante
+        if col_name in df.columns or (col_name and col_name.endswith("_fmt") and col_name.replace("_fmt", "") in df.columns):
+            final_cols_internal.append(col_name)
+            final_labels.append(labels_display[i])
+        elif col_name == "shortName" and "shortName" in df.columns: # Gérer shortName qui n'est pas forcément _fmt
+            final_cols_internal.append(col_name)
+            final_labels.append(labels_display[i])
+        elif col_name in ["Signal", "Action", "Justification"] and col_name in df.columns: # Gérer les colonnes de texte de momentum
+            final_cols_internal.append(col_name)
+            final_labels.append(labels_display[i])
+        elif col_name == "Devise" and "Devise" in df.columns: # Gérer la colonne devise
+            final_cols_internal.append(col_name)
+            final_labels.append(labels_display[i])
+            
+    df_disp = df[final_cols_internal].copy()
+    df_disp.columns = final_labels
 
-    df_disp = df[existing_cols_in_df].copy()
-    df_disp.columns = existing_labels
+    # Récupérer les paramètres de tri Streamlit pour initialiser le tri JS
+    query_params = st.query_params
+    initial_sort_col = query_params.get("sort_column", None)
+    initial_sort_dir = query_params.get("sort_direction", "asc")
 
-    # Gestion du tri (sans les boutons, le tri ne sera pas actif ici pour l'instant)
-    if "sort_column" not in st.session_state:
-        st.session_state.sort_column = None
-    if "sort_direction" not in st.session_state:
-        st.session_state.sort_direction = "asc"
+    # Si un tri est spécifié dans l'URL, appliquez-le au DataFrame Python AVANT le rendu HTML
+    # Cela garantit que le tableau est trié à la première visualisation
+    if initial_sort_col and initial_sort_col in df_disp.columns:
+        # Tente de trouver la colonne interne correspondante pour le tri numérique
+        original_col_for_sort = None
+        try:
+            idx = final_labels.index(initial_sort_col)
+            original_col_for_sort = final_cols_internal[idx]
+            if original_col_for_sort.endswith("_fmt"):
+                original_col_for_sort = original_col_for_sort.replace("_fmt", "")
+        except ValueError:
+            pass # Si le label n'est pas trouvé, pas de colonne originale spécifique
 
-    # Appliquer le tri (la logique de tri reste, mais sans UI pour l'activer)
-    if st.session_state.sort_column:
-        sort_key = {
-            "Quantité": "Quantité",
-            "Prix d'Acquisition": "Acquisition",
-            "Valeur": "Valeur",
-            "Prix Actuel": "currentPrice",
-            "Valeur Actuelle": "Valeur_Actuelle",
-            "Haut 52 Semaines": "fiftyTwoWeekHigh",
-            "Valeur H52": "Valeur_H52",
-            "Objectif LT": "Objectif_LT",
-            "Valeur LT": "Valeur_LT",
-            "Momentum (%)": "Momentum (%)",
-            "Z-Score": "Z-Score"
-        }.get(st.session_state.sort_column, st.session_state.sort_column)
-        if sort_key in df.columns:
+        if original_col_for_sort in df.columns and pd.api.types.is_numeric_dtype(df[original_col_for_sort]):
+            # Tri numérique en utilisant la colonne originale non formatée
+            # Assurez-vous que l'index de df correspond à celui de df_disp pour le key lambda
             df_disp = df_disp.sort_values(
-                by=st.session_state.sort_column,
-                ascending=(st.session_state.sort_direction == "asc"),
-                key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf')) if x.name in [
-                    "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle",
-                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT", "Last Price",
-                    "Momentum (%)", "Z-Score"
-                ] else x.str.lower()
+                by=initial_sort_col,
+                ascending=(initial_sort_dir == "asc"),
+                key=lambda x: pd.to_numeric(df[original_col_for_sort].reindex(x.index), errors='coerce').fillna(
+                    -float('inf') if initial_sort_dir == 'asc' else float('inf')
+                )
             )
         else:
+            # Tri alphabétique (pour les colonnes non numériques ou si la colonne originale n'est pas trouvée)
             df_disp = df_disp.sort_values(
-                by=st.session_state.sort_column,
-                ascending=(st.session_state.sort_direction == "asc"),
-                key=lambda x: x.str.lower() if x.name in ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification", "Devise"] else x
+                by=initial_sort_col,
+                ascending=(initial_sort_dir == "asc"),
+                key=lambda x: x.astype(str).str.lower()
             )
-
-    total_valeur_str = format_fr(total_valeur, 2)
-    total_actuelle_str = format_fr(total_actuelle, 2)
-    total_h52_str = format_fr(total_h52, 2)
-    total_lt_str = format_fr(total_lt, 2)
-
-    # Construction HTML pour la table
+    
+    # Construction du HTML
+    # Note: Le script sortTable sera dans le HTML pour un tri côté client
     html_code = f"""
     <style>
-      .scroll-wrapper {{
-        overflow-x: auto !important;
-        overflow-y: auto;
-        max-height: 500px;
-        max-width: none !important;
-        width: auto;
-        display: block;
-        position: relative;
-      }}
-      .portfolio-table {{
-        min-width: 2200px;
-        border-collapse: collapse;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }}
-      .portfolio-table th {{
-        background: #363636;
-        color: white;
-        padding: 8px;
-        text-align: center;
-        border: none;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        font-size: 12px;
-        box-sizing: border-box;
-      }}
-      .portfolio-table td {{
-        padding: 6px;
-        text-align: right;
-        border: none;
-        font-size: 11px;
-        white-space: nowrap;
-      }}
-      .portfolio-table td:nth-child(1), /* Ticker */
-      .portfolio-table td:nth-child(2), /* Nom */
-      .portfolio-table td:nth-child(3), /* Catégorie */
-      .portfolio-table td:nth-child(16), /* Signal */
-      .portfolio-table td:nth-child(17), /* Action */
-      .portfolio-table td:nth-child(18) {{ /* Justification */
-        text-align: left;
-        white-space: normal;
-      }}
-      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
-        width: 80px;
-      }}
-      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
-        width: 200px;
-      }}
-      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ /* Catégorie */
-        width: 100px;
-      }}
-      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
-      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
-      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
-      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Prix Actuel */
-      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
-      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
-      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10), /* Valeur H52 */
-      .portfolio-table th:nth-child(11), .portfolio-table td:nth-child(11), /* Objectif LT */
-      .portfolio-table th:nth-child(12), .portfolio-table td:nth-child(12), /* Valeur LT */
-      .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13), /* Last Price */
-      .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14), /* Momentum (%) */
-      .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ /* Z-Score */
-        width: 80px;
-      }}
-      .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16), /* Signal */
-      .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17), /* Action */
-      .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ /* Justification */
-        width: 150px;
-      }}
-      .portfolio-table th:nth-child(19), .portfolio-table td:nth-child(19) {{ /* Devise */
-        width: 60px;
-      }}
-      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
-      .total-row td {{
-        background: #A49B6D;
-        color: white;
-        font-weight: bold;
-      }}
+    .table-container {{ max-height: 500px; overflow-y: auto; }}
+    .portfolio-table {{ width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+    .portfolio-table th {{
+      background: #363636; color: white; padding: 6px; text-align: center; border: none;
+      position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
+    }}
+    .portfolio-table th:hover {{
+      background: #4a4a4a;
+    }}
+    .portfolio-table td {{
+      padding: 6px; text-align: right; border: none; font-size: 11px;
+      white-space: nowrap; /* Empêche le wrapping, mais peut être retiré si nécessaire */
+    }}
+    .portfolio-table td:first-child, /* Ticker */
+    .portfolio-table td:nth-child(2), /* Nom */
+    .portfolio-table td:nth-child(3), /* Catégorie */
+    .portfolio-table td:nth-child(16), /* Signal (adapté au nouveau nombre de colonnes) */
+    .portfolio-table td:nth-child(17), /* Action */
+    .portfolio-table td:nth-child(18) {{ /* Justification */
+      text-align: left;
+      white-space: normal; /* Autorise le wrapping pour ces colonnes */
+    }}
+    .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+    .total-row td {{
+      background: #A49B6D; color: white; font-weight: bold;
+    }}
+    /* Styles pour les indicateurs de tri */
+    .sort-asc::after {{ content: ' ▲'; }}
+    .sort-desc::after {{ content: ' ▼'; }}
     </style>
-    <div class="scroll-wrapper">
+    
+    <div class="table-container">
       <table class="portfolio-table">
         <thead><tr>
     """
-
-    # Ajouter les en-têtes statiques
-    for lbl in df_disp.columns: # Utiliser df_disp.columns pour les en-têtes
-        html_code += f'<th>{safe_escape(lbl)}</th>'
-
+    
+    # En-têtes du tableau avec le gestionnaire de clic JS
+    for i, label in enumerate(final_labels):
+        # Ajouter l'indicateur de tri initial si la colonne est triée à l'origine
+        sort_indicator = ""
+        if label == initial_sort_col:
+            sort_indicator = " ▲" if initial_sort_dir == "asc" else " ▼"
+        html_code += f'<th data-column-index="{i}">{safe_escape(label)}{sort_indicator}</th>'
+    
     html_code += """
         </tr></thead>
         <tbody>
@@ -442,7 +436,7 @@ def afficher_portefeuille():
 
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
-        for lbl in df_disp.columns: # Utiliser df_disp.columns pour les données
+        for lbl in final_labels:
             val = row[lbl]
             val_str = safe_escape(str(val)) if pd.notnull(val) else ""
             html_code += f"<td>{val_str}</td>"
@@ -452,31 +446,26 @@ def afficher_portefeuille():
     num_cols_displayed = len(df_disp.columns)
     total_row_cells = [""] * num_cols_displayed
     
-    # Trouver l'indice de la colonne "Valeur" dans les colonnes affichées
+    # Trouver l'indice des colonnes de totalisation
     try:
-        idx_valeur = list(df_disp.columns).index("Valeur")
-        total_row_cells[idx_valeur] = safe_escape(total_valeur_str)
-    except ValueError:
-        pass # La colonne n'est pas affichée, pas de total à cet endroit
+        idx_valeur = final_labels.index("Valeur")
+        total_row_cells[idx_valeur] = format_fr(total_valeur, 2)
+    except ValueError: pass
     
     try:
-        idx_actuelle = list(df_disp.columns).index("Valeur Actuelle")
-        total_row_cells[idx_actuelle] = safe_escape(total_actuelle_str)
-    except ValueError:
-        pass
+        idx_actuelle = final_labels.index("Valeur Actuelle")
+        total_row_cells[idx_actuelle] = format_fr(total_actuelle, 2)
+    except ValueError: pass
         
     try:
-        idx_h52 = list(df_disp.columns).index("Valeur H52")
-        total_row_cells[idx_h52] = safe_escape(total_h52_str)
-    except ValueError:
-        pass
+        idx_h52 = final_labels.index("Valeur H52")
+        total_row_cells[idx_h52] = format_fr(total_h52, 2)
+    except ValueError: pass
         
     try:
-        idx_lt = list(df_disp.columns).index("Valeur LT")
-        total_row_cells[idx_lt] = safe_escape(total_lt_str)
-    except ValueError:
-        pass
-
+        idx_lt = final_labels.index("Valeur LT")
+        total_row_cells[idx_lt] = format_fr(total_lt, 2)
+    except ValueError: pass
 
     # La première cellule pour "TOTAL (Devise)"
     total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
@@ -486,12 +475,54 @@ def afficher_portefeuille():
         html_code += f"<td>{cell_content}</td>"
     html_code += "</tr>"
 
-
     html_code += """
         </tbody>
       </table>
     </div>
-    """
+    
+    <script>
+    function sortTable(n) {
+      var table = document.querySelector(".portfolio-table");
+      var tbody = table.querySelector("tbody");
+      var rows = Array.from(tbody.rows);
+      var currentHeader = table.querySelectorAll("th")[n];
+      var dir = currentHeader.getAttribute("data-dir") || "asc";
+      
+      // Inverser la direction pour le prochain clic si c'est la même colonne
+      dir = (dir === "asc") ? "desc" : "asc";
+      
+      // Nettoyer tous les indicateurs et attributs
+      table.querySelectorAll("th").forEach(th => {
+        th.removeAttribute("data-dir");
+        th.classList.remove("sort-asc", "sort-desc");
+        th.innerHTML = th.innerHTML.replace(/ ▲| ▼/g, "");
+      });
+      
+      // Appliquer le nouvel indicateur et attribut à l'en-tête cliqué
+      currentHeader.setAttribute("data-dir", dir);
+      currentHeader.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
+    
+      rows.sort((a, b) => {
+        var x = a.cells[n].textContent.trim();
+        var y = b.cells[n].textContent.trim();
+    
+        // Tente de convertir en nombre. Gère les espaces et virgules.
+        var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
+        var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
+    
+        // Si les deux sont des nombres valides, trier numériquement
+        if (!isNaN(xNum) && !isNaN(yNum)) {
+          return dir === "asc" ? xNum - yNum : yNum - xNum;
+        }
+        // Sinon, trier alphabétiquement (insensible à la casse)
+        return dir === "asc" ? x.localeCompare(y, undefined, {sensitivity: 'base'}) : y.localeCompare(x, undefined, {sensitivity: 'base'});
+      });
+      
+      // Replacer les lignes triées dans le tableau
+      tbody.innerHTML = ""; // Vide le corps du tableau
+      rows.forEach(row => tbody.appendChild(row)); // Ajoute les lignes triées
+    }
+    </script>"""
 
     components.html(html_code, height=600, scrolling=True)
 
@@ -509,12 +540,7 @@ def main():
                 df_uploaded = pd.read_csv(uploaded_file)
                 st.session_state.df = df_uploaded
                 st.success("Fichier importé avec succès !")
-                # Réinitialiser le tri après un nouvel import (important pour la prochaine étape)
-                if "sort_column" in st.session_state:
-                    del st.session_state.sort_column
-                if "sort_direction" in st.session_state:
-                    del st.session_state.sort_direction
-                st.rerun() # Recharger pour appliquer les changements
+                # Pas besoin de vider les query_params ici car le tri est client-side
             except Exception as e:
                 st.error(f"Erreur lors de la lecture du fichier : {e}")
                 st.session_state.df = None
@@ -527,7 +553,11 @@ def main():
         )
         if selected_devise != st.session_state.get("devise_cible", "EUR"):
             st.session_state.devise_cible = selected_devise
-            st.rerun() # Recharger pour appliquer le changement de devise
+            # Pas besoin de st.rerun() ici si l'affichage se met à jour automatiquement via session_state
+            # mais si les taux de change doivent être rechargés, un rerun serait nécessaire.
+            # Pour l'instant, on se base sur la logique fetch_fx_rates qui met à jour session_state.fx_rates
+            st.rerun() # Un rerun est nécessaire pour que les calculs de conversion se mettent à jour
+
 
     afficher_portefeuille()
 
