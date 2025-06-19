@@ -42,7 +42,7 @@ def afficher_portefeuille():
             st.session_state.ticker_names_cache = {}
 
 
-            def fetch_yahoo_data(t):
+        def fetch_yahoo_data(t):
             t = str(t).strip().upper()
             if t in st.session_state.ticker_names_cache:
                 cached = st.session_state.ticker_names_cache[t]
