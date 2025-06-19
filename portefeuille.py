@@ -24,43 +24,39 @@ def fetch_fx_rates(base="EUR"):
         data = response.json()
         return data.get("rates", {})
     except Exception as e:
-        st.error(f"Erreur lors de la récupération des taux de change : {e}")
+        # print(f"Erreur lors de la récupération des taux : {e}") # Debugging print removed for cleaner output
         return {}
 
 @st.cache_data(ttl=900) # Cache Yahoo data for 15 minutes
 def fetch_yahoo_data(ticker):
     ticker = str(ticker).strip().upper()
-    if ticker in st.session_state.get("ticker_names_cache", {}):
+    # Use session_state for a simple, in-memory cache for Yahoo data
+    if "ticker_names_cache" not in st.session_state:
+        st.session_state.ticker_names_cache = {}
+
+    if ticker in st.session_state.ticker_names_cache:
         cached = st.session_state.ticker_names_cache[ticker]
         if isinstance(cached, dict) and "shortName" in cached:
             return cached
-        else: # Invalidate incomplete cache entries
+        else: # Invalidate incomplete cache entries to re-fetch
             del st.session_state.ticker_names_cache[ticker]
-            
+
     try:
-        # Using yfinance directly for data fetching is more robust than manual requests to Yahoo API for chart data
-        # For meta info, a direct call is often quicker if the yf.Ticker object is well-populated
-        # However, for robustness with caching, sometimes simple direct requests are better to avoid
-        # multiple calls from yfinance's internal methods. Your current request logic is okay.
-        
-        # Let's use yfinance.Ticker for more reliable access to info
+        # Using yfinance.Ticker to fetch information
         stock = yf.Ticker(ticker)
-        info = stock.info # This fetches a lot of data, and can be slow if not cached properly
-        
+        info = stock.info # This call fetches a lot of data, and can take time.
+                          # The @st.cache_data decorator helps here.
+
         name = info.get("shortName", f"https://finance.yahoo.com/quote/{ticker}")
         current_price = info.get("regularMarketPrice", None)
         fifty_two_week_high = info.get("fiftyTwoWeekHigh", None)
-        
+
         result = {"shortName": name, "currentPrice": current_price, "fiftyTwoWeekHigh": fifty_two_week_high}
-        
-        # Initialize cache if it doesn't exist
-        if "ticker_names_cache" not in st.session_state:
-            st.session_state.ticker_names_cache = {}
         st.session_state.ticker_names_cache[ticker] = result
-        time.sleep(0.1) # Small delay to be polite to APIs
+        time.sleep(0.05) # Small delay to be polite to APIs and avoid rate limiting
         return result
     except Exception as e:
-        print(f"Erreur lors de la récupération des données Yahoo pour {ticker}: {e}")
+        # print(f"Erreur lors de la récupération des données Yahoo pour {ticker}: {e}") # Debugging print removed
         return {"shortName": f"https://finance.yahoo.com/quote/{ticker}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
 @st.cache_data(ttl=3600) # Cache Momentum data for an hour
@@ -69,7 +65,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
         data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
         if data.empty:
             return {
-                "Last Price": None,
                 "Momentum (%)": None,
                 "Z-Score": None,
                 "Signal": "",
@@ -89,7 +84,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
 
         if pd.isna(z):
             return {
-                "Last Price": round(latest['Close'], 2) if not pd.isna(latest['Close']) else None,
                 "Momentum (%)": None,
                 "Z-Score": None,
                 "Signal": "",
@@ -123,7 +117,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             reason = "Purge excessive, possible bas de cycle"
 
         return {
-            "Last Price": round(latest['Close'], 2),
             "Momentum (%)": round(m, 2),
             "Z-Score": round(z, 2),
             "Signal": signal,
@@ -131,16 +124,14 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             "Justification": reason
         }
     except Exception as e:
-        print(f"Erreur avec {ticker} pour l'analyse de momentum : {e}")
+        # print(f"Erreur avec {ticker} pour l'analyse de momentum : {e}") # Debugging print removed
         return {
-            "Last Price": None,
             "Momentum (%)": None,
             "Z-Score": None,
             "Signal": "",
             "Action": "",
             "Justification": ""
         }
-
 
 def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
@@ -154,7 +145,7 @@ def afficher_portefeuille():
         df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
-    
+
     # Fetch FX rates only if the target currency changes or if not already fetched
     if "fx_rates" not in st.session_state or st.session_state.get("last_devise_cible") != devise_cible:
         st.session_state.fx_rates = fetch_fx_rates(devise_cible)
@@ -177,7 +168,6 @@ def afficher_portefeuille():
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV (index 5)
-    # Ensure there are enough columns before trying to access index 5
     if df.shape[1] > 5:
         df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
@@ -194,19 +184,27 @@ def afficher_portefeuille():
         df["fiftyTwoWeekHigh"] = yahoo_data_results.apply(lambda x: x["fiftyTwoWeekHigh"])
 
         # Apply momentum analysis
-        momentum_results = df[ticker_col].apply(fetch_momentum_data)
-        # Convert list of dicts to a DataFrame
-        momentum_df = pd.DataFrame(momentum_results.tolist(), index=df.index)
+        # Create a temporary DataFrame from momentum results to merge
+        momentum_results_list = [fetch_momentum_data(t) for t in df[ticker_col].dropna().unique()]
+        momentum_df = pd.DataFrame(momentum_results_list).set_index(df[ticker_col].dropna().unique())
         
-        # Merge momentum data back to the main DataFrame
-        # Ensure the column names are consistent if you merge using specific columns
-        df = pd.concat([df, momentum_df], axis=1)
+        # Add momentum data by mapping from the main DataFrame's ticker
+        # Ensure that the index for mapping is consistent
+        df["Momentum (%)"] = df[ticker_col].map(momentum_df["Momentum (%)"])
+        df["Z-Score"] = df[ticker_col].map(momentum_df["Z-Score"])
+        df["Signal"] = df[ticker_col].map(momentum_df["Signal"])
+        df["Action"] = df[ticker_col].map(momentum_df["Action"])
+        df["Justification"] = df[ticker_col].map(momentum_df["Justification"])
 
     # Calcul des colonnes Valeur H52 et Valeur Actuelle
     if all(c in df.columns for c in ["Quantité", "fiftyTwoWeekHigh"]):
         df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
+    else:
+        df["Valeur_H52"] = None # Initialize if columns don't exist
     if all(c in df.columns for c in ["Quantité", "currentPrice"]):
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
+    else:
+        df["Valeur_Actuelle"] = None # Initialize if columns don't exist
 
     # Conversion Objectif_LT et calcul de Valeur_LT
     if "Objectif_LT" not in df.columns:
@@ -224,7 +222,7 @@ def afficher_portefeuille():
     # Conversion en devise cible
     def convertir(val, devise):
         if pd.isnull(val) or pd.isnull(devise): return 0
-        if devise == devise_cible: return val
+        if devise.upper() == devise_cible.upper(): return val
         taux = fx_rates.get(devise.upper())
         return val * taux if taux else 0
 
@@ -244,109 +242,286 @@ def afficher_portefeuille():
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
     total_lt = df["Valeur_LT_conv"].sum()
-    
-    # Prepare columns for display and formatting
-    # Ensure all columns exist before trying to format them
-    columns_to_format = {
-        "Quantité": 0, "Acquisition": 4, "Valeur": 2, "currentPrice": 4,
-        "fiftyTwoWeekHigh": 4, "Valeur_H52": 2, "Valeur_Actuelle": 2,
-        "Objectif_LT": 4, "Valeur_LT": 2, "Momentum (%)": 2, "Z-Score": 2,
-        "Last Price": 2 # Add Last Price for formatting
-    }
 
-    for col, dec in columns_to_format.items():
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce') # Ensure numeric for formatting
-            df[f"{col}_fmt"] = df[col].apply(lambda x: f"{x:,.{dec}f}".replace(",", " ").replace(".", ",") if pd.notnull(x) else "")
-        else:
-            # Create placeholder formatted columns if the original doesn't exist
+    # Formatage des colonnes numériques pour l'affichage
+    def format_fr(x, dec):
+        if pd.isnull(x): return ""
+        s = f"{x:,.{dec}f}"
+        return s.replace(",", " ").replace(".", ",")
+
+    for col, dec in [
+        ("Quantité", 0),
+        ("Acquisition", 4),
+        ("Valeur", 2),
+        ("currentPrice", 4),
+        ("fiftyTwoWeekHigh", 4),
+        ("Valeur_H52", 2),
+        ("Valeur_Actuelle", 2),
+        ("Objectif_LT", 4),
+        ("Valeur_LT", 2),
+        ("Momentum (%)", 2),
+        ("Z-Score", 2)
+    ]:
+        if col in df.columns: # Only format if the column exists
+            df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
+        else: # Create an empty formatted column if the original doesn't exist
             df[f"{col}_fmt"] = ""
 
-    # Define columns to display and their labels
-    display_cols_mapping = {
-        ticker_col: "Ticker",
-        "shortName": "Nom",
-        "Catégorie": "Catégorie",
-        "Devise": "Devise",
-        "Quantité_fmt": "Quantité",
-        "Acquisition_fmt": "Prix d'Acquisition",
-        "Valeur_fmt": "Valeur",
-        "currentPrice_fmt": "Prix Actuel",
-        "Valeur_Actuelle_fmt": "Valeur Actuelle",
-        "fiftyTwoWeekHigh_fmt": "Haut 52 Semaines",
-        "Valeur_H52_fmt": "Valeur H52",
-        "Objectif_LT_fmt": "Objectif LT",
-        "Valeur_LT_fmt": "Valeur LT",
-        "Last Price_fmt": "Last Price", # Ensure this column is mapped
-        "Momentum (%)_fmt": "Momentum (%)",
-        "Z-Score_fmt": "Z-Score",
-        "Signal": "Signal",
-        "Action": "Action",
-        "Justification": "Justification"
-    }
-
-    # Filter out keys where the original column doesn't exist in df
-    final_display_cols = [k for k, v in display_cols_mapping.items() if k.replace('_fmt', '') in df.columns or k in df.columns]
-    final_labels = [display_cols_mapping[k] for k in final_display_cols]
-
-    # Create the DataFrame for display with formatted columns
-    df_disp = df[final_display_cols].copy()
-    df_disp.columns = final_labels
-
-    st.subheader(f"Portefeuille Actuel ({devise_cible})")
-
-    # Use st.data_editor for interactive sorting
-    # Key is important to uniquely identify the widget
-    # The 'num_rows' parameter is important for performance if you have many rows.
-    # Set it to 'dynamic' for auto-scrolling behavior.
+    # Préparer colonnes pour affichage et leurs labels
+    cols_to_display = [
+        ticker_col,
+        "shortName",
+        "Catégorie",
+        "Devise",
+        "Quantité_fmt",
+        "Acquisition_fmt",
+        "Valeur_fmt",
+        "currentPrice_fmt",
+        "Valeur_Actuelle_fmt",
+        "fiftyTwoWeekHigh_fmt",
+        "Valeur_H52_fmt",
+        "Objectif_LT_fmt",
+        "Valeur_LT_fmt",
+        "Momentum (%)_fmt",
+        "Z-Score_fmt",
+        "Signal",
+        "Action",
+        "Justification"
+    ]
+    labels = [
+        "Ticker",
+        "Nom",
+        "Catégorie",
+        "Devise",
+        "Quantité",
+        "Prix d'Acquisition",
+        "Valeur",
+        "Prix Actuel",
+        "Valeur Actuelle",
+        "Haut 52 Semaines",
+        "Valeur H52",
+        "Objectif LT",
+        "Valeur LT",
+        "Momentum (%)",
+        "Z-Score",
+        "Signal",
+        "Action",
+        "Justification"
+    ]
     
-    # Display the table using st.dataframe which offers built-in sorting
-    st.dataframe(
-        df_disp,
-        height=400, # Control initial height
-        use_container_width=True, # Make it fill the container
-        hide_index=True # Hides the pandas DataFrame index
-    )
+    # Filter out columns that don't exist in df to prevent errors
+    actual_cols_to_display = [col for col in cols_to_display if col in df.columns or col.replace('_fmt','') in df.columns]
+    actual_labels = [labels[cols_to_display.index(col)] for col in actual_cols_to_display]
 
-    # Display totals below the table
-    st.markdown(f"""
-        ---
-        **Totaux en {devise_cible}:**
-        * Valeur d'Acquisition : **{total_valeur:.2f} {devise_cible}**
-        * Valeur Actuelle : **{total_actuelle:.2f} {devise_cible}**
-        * Valeur Haut 52 Semaines : **{total_h52:.2f} {devise_cible}**
-        * Valeur Objectif Long Terme : **{total_lt:.2f} {devise_cible}**
-    """)
+    df_disp = df[actual_cols_to_display].copy()
+    df_disp.columns = actual_labels
 
-    # Removed the custom HTML and JavaScript for sorting as st.dataframe handles it.
-    # You no longer need the components.html call for the table itself.
+    # --- Tri du DataFrame pour l'affichage ---
+    if "sort_column" not in st.session_state:
+        st.session_state.sort_column = None
+    if "sort_direction" not in st.session_state:
+        st.session_state.sort_direction = "asc"
 
-# --- Main app structure (assuming you have a main part of your app) ---
-# Example of how you might call this function:
-# def main():
-#     st.set_page_config(layout="wide", page_title="Mon Portefeuille")
-#     st.title("Gestion de Portefeuille d'Investissement")
-#
-#     # Sidebar for file upload
-#     with st.sidebar:
-#         st.header("Importation de Données")
-#         uploaded_file = st.file_uploader("Choisissez un fichier CSV", type=["csv"])
-#         if uploaded_file is not None:
-#             try:
-#                 df_uploaded = pd.read_csv(uploaded_file)
-#                 st.session_state.df = df_uploaded
-#                 st.success("Fichier importé avec succès !")
-#             except Exception as e:
-#                 st.error(f"Erreur lors de la lecture du fichier : {e}")
-#
-#         st.header("Paramètres de Devise")
-#         st.session_state.devise_cible = st.selectbox(
-#             "Devise cible pour l'affichage",
-#             ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
-#             index=0 # Default to EUR
-#         )
-#
-#     afficher_portefeuille()
-#
-# if __name__ == "__main__":
-#     main()
+    # Convert query parameters to session_state
+    # This is crucial for Streamlit to know how to sort on subsequent runs
+    query_params = st.query_params
+    if "sort_column" in query_params:
+        st.session_state.sort_column = query_params["sort_column"]
+    if "sort_direction" in query_params:
+        st.session_state.sort_direction = query_params["sort_direction"]
+
+    if st.session_state.sort_column:
+        sort_col_label = st.session_state.sort_column
+        # Find the original numeric column name if it's a formatted one
+        original_col_name = None
+        for k, v in dict(zip(cols_to_display, labels)).items():
+            if v == sort_col_label:
+                original_col_name = k.replace('_fmt', '')
+                break
+
+        if original_col_name in df.columns:
+            # For numeric columns, use the original numeric data for sorting
+            # Handle potential non-numeric data in original columns (e.g., initial CSV import)
+            df_disp = df_disp.sort_values(
+                by=sort_col_label,
+                ascending=(st.session_state.sort_direction == "asc"),
+                key=lambda x: pd.to_numeric(
+                    df[original_col_name], errors="coerce"
+                ).fillna(-float('inf'))
+            )
+        else:
+            # For string columns, sort directly
+            df_disp = df_disp.sort_values(
+                by=sort_col_label,
+                ascending=(st.session_state.sort_direction == "asc")
+            )
+            
+    total_valeur_str = format_fr(total_valeur, 2)
+    total_actuelle_str = format_fr(total_actuelle, 2)
+    total_h52_str = format_fr(total_h52, 2)
+    total_lt_str = format_fr(total_lt, 2)
+    
+    # Injection JS sécurisée
+    # The JavaScript will now update query parameters, which then trigger a Streamlit rerun
+    # Streamlit will then sort based on these updated query parameters
+    safe_sort_column = safe_escape(str(st.session_state.get("sort_column", "")))
+    safe_sort_direction = safe_escape(str(st.session_state.get("sort_direction", "asc")))
+    
+    html_code = f"""
+    <style>
+      .scroll-wrapper {{
+        overflow-x: auto !important;
+        overflow-y: auto;
+        max-height: 500px;
+        max-width: none !important;
+        width: auto;
+        display: block;
+        position: relative;
+      }}
+      .portfolio-table {{
+        min-width: 2200px;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }}
+      .portfolio-table th {{
+        background: #363636;
+        color: white;
+        padding: 8px;
+        text-align: center;
+        border: none;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        font-size: 12px;
+        box-sizing: border-box;
+        cursor: pointer;
+      }}
+      .portfolio-table th:hover {{
+        background: #4a4a4a;
+      }}
+      .portfolio-table td {{
+        padding: 6px;
+        text-align: right;
+        border: none;
+        font-size: 11px;
+        white-space: nowrap;
+      }}
+      .portfolio-table td:nth-child(1),
+      .portfolio-table td:nth-child(2),
+      .portfolio-table td:nth-child(3),
+      .portfolio-table td:nth-child(16), /* Signal */
+      .portfolio-table td:nth-child(17), /* Action */
+      .portfolio-table td:nth-child(18) {{ /* Justification */
+        text-align: left;
+        white-space: normal;
+      }}
+      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+      .total-row td {{
+        background: #A49B6D;
+        color: white;
+        font-weight: bold;
+      }}
+      .sort-asc::after {{ content: ' ▲'; }}
+      .sort-desc::after {{ content: ' ▼'; }}
+    </style>
+    
+    <script>
+      function sortTable(column) {{
+        const currentSort = "{safe_sort_column}";
+        const currentDirection = "{safe_sort_direction}";
+        let direction = 'asc';
+        if (currentSort === column) {{
+          direction = currentDirection === 'asc' ? 'desc' : 'asc';
+        }}
+        // Use Streamlit's query parameters to trigger a rerun with sorting info
+        // This avoids full page reload issues.
+        window.parent.postMessage({{
+          type: 'streamlit:setFrameHeight',
+          height: document.body.scrollHeight
+        }}, '*');
+        window.parent.history.pushState({{}}, '', window.location.pathname + "?sort_column=" + encodeURIComponent(column) + "&sort_direction=" + direction);
+      }}
+    
+      window.onload = function() {{
+        const headers = document.querySelectorAll('.portfolio-table th');
+        headers.forEach(header => {{
+          if (header.textContent === currentSort) {{
+            header.classList.add(currentDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+          }}
+        }});
+      }};
+    </script>
+    
+    <div class="scroll-wrapper">
+      <table class="portfolio-table">
+        <thead><tr>
+    """
+    
+    # Ajouter les en-têtes avec tri cliquable
+    for lbl in actual_labels:
+        html_code += f'<th onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
+    
+    html_code += """
+        </tr></thead>
+        <tbody>
+    """
+    
+    # Corps du tableau
+    for _, row in df_disp.iterrows():
+        html_code += "<tr>"
+        for lbl in actual_labels:
+            val = row[lbl]
+            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+            html_code += f"<td>{val_str}</td>"
+        html_code += "</tr>"
+    
+    # Ligne total
+    html_code += f"""
+        <tr class='total-row'>
+          <td>TOTAL ({safe_escape(devise_cible)})</td>
+          <td></td><td></td><td></td><td></td><td></td>
+          <td>{safe_escape(total_valeur_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_actuelle_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_h52_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_lt_str)}</td>
+          <td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    """
+    
+    components.html(html_code, height=600, scrolling=True)
+
+# --- Structure de l'application principale (exemple) ---
+def main():
+    st.set_page_config(layout="wide", page_title="Mon Portefeuille")
+    st.title("Gestion de Portefeuille d'Investissement")
+
+    # Sidebar pour l'importation de fichiers et les paramètres
+    with st.sidebar:
+        st.header("Importation de Données")
+        uploaded_file = st.file_uploader("Choisissez un fichier CSV", type=["csv"])
+        if uploaded_file is not None:
+            try:
+                df_uploaded = pd.read_csv(uploaded_file)
+                st.session_state.df = df_uploaded
+                st.success("Fichier importé avec succès !")
+            except Exception as e:
+                st.error(f"Erreur lors de la lecture du fichier : {e}")
+                st.session_state.df = None # Clear df on error
+
+        st.header("Paramètres de Devise")
+        st.session_state.devise_cible = st.selectbox(
+            "Devise cible pour l'affichage",
+            ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
+            index=0 # Par défaut EUR
+        )
+
+    afficher_portefeuille()
+
+if __name__ == "__main__":
+    main()
