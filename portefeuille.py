@@ -73,7 +73,7 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
         if isinstance(data.columns, pd.MultiIndex):
             close = data['Close'][ticker] # Si le téléchargement est pour plusieurs tickers
         else:
-            close = data['Close'] # Si le téléchargement est pour un seul ticker
+            close = data['Close'] # If download is for a single ticker
 
         df_m = pd.DataFrame({'Close': close})
         df_m['MA_39'] = df_m['Close'].rolling(window=39).mean()
@@ -283,6 +283,7 @@ def afficher_portefeuille():
     total_lt = df["Valeur_LT_conv"].sum() # Utilisez total_lt pour le pied de tableau
 
     # Définition des colonnes internes et des labels d'affichage
+    # L'ordre ici est important car il correspondra à l'index de colonne dans le HTML pour le tri JS
     cols_internal = [
         ticker_col, # Utilisez le nom de colonne dynamique
         "shortName",
@@ -325,109 +326,84 @@ def afficher_portefeuille():
     ]
 
     # Filtrer les colonnes pour s'assurer qu'elles existent dans le DataFrame
+    # C'est cette étape qui détermine quelles colonnes sont réellement affichées.
     final_cols_internal = []
     final_labels = []
     for i, col_name in enumerate(cols_internal):
-        # Vérifier si la colonne non formatée existe ou si la colonne formatée peut être basée sur une colonne non formatée existante
+        # Vérifier si la colonne non formatée existe OU si la colonne formatée peut être basée sur une colonne non formatée existante
         if col_name in df.columns or (col_name and col_name.endswith("_fmt") and col_name.replace("_fmt", "") in df.columns):
             final_cols_internal.append(col_name)
             final_labels.append(labels_display[i])
-        elif col_name == "shortName" and "shortName" in df.columns: # Gérer shortName qui n'est pas forcément _fmt
-            final_cols_internal.append(col_name)
-            final_labels.append(labels_display[i])
-        elif col_name in ["Signal", "Action", "Justification"] and col_name in df.columns: # Gérer les colonnes de texte de momentum
-            final_cols_internal.append(col_name)
-            final_labels.append(labels_display[i])
-        elif col_name == "Devise" and "Devise" in df.columns: # Gérer la colonne devise
+        # Cas spécifiques pour les colonnes non formatées ajoutées par l'API (shortName, Signal, etc.)
+        elif col_name in ["shortName", "Signal", "Action", "Justification", "Devise"] and col_name in df.columns:
             final_cols_internal.append(col_name)
             final_labels.append(labels_display[i])
             
     df_disp = df[final_cols_internal].copy()
     df_disp.columns = final_labels
 
-    # Récupérer les paramètres de tri Streamlit pour initialiser le tri JS
-    query_params = st.query_params
-    initial_sort_col = query_params.get("sort_column", None)
-    initial_sort_dir = query_params.get("sort_direction", "asc")
-
-    # Si un tri est spécifié dans l'URL, appliquez-le au DataFrame Python AVANT le rendu HTML
-    # Cela garantit que le tableau est trié à la première visualisation
-    if initial_sort_col and initial_sort_col in df_disp.columns:
-        # Tente de trouver la colonne interne correspondante pour le tri numérique
-        original_col_for_sort = None
-        try:
-            idx = final_labels.index(initial_sort_col)
-            original_col_for_sort = final_cols_internal[idx]
-            if original_col_for_sort.endswith("_fmt"):
-                original_col_for_sort = original_col_for_sort.replace("_fmt", "")
-        except ValueError:
-            pass # Si le label n'est pas trouvé, pas de colonne originale spécifique
-
-        if original_col_for_sort in df.columns and pd.api.types.is_numeric_dtype(df[original_col_for_sort]):
-            # Tri numérique en utilisant la colonne originale non formatée
-            # Assurez-vous que l'index de df correspond à celui de df_disp pour le key lambda
-            df_disp = df_disp.sort_values(
-                by=initial_sort_col,
-                ascending=(initial_sort_dir == "asc"),
-                key=lambda x: pd.to_numeric(df[original_col_for_sort].reindex(x.index), errors='coerce').fillna(
-                    -float('inf') if initial_sort_dir == 'asc' else float('inf')
-                )
-            )
-        else:
-            # Tri alphabétique (pour les colonnes non numériques ou si la colonne originale n'est pas trouvée)
-            df_disp = df_disp.sort_values(
-                by=initial_sort_col,
-                ascending=(initial_sort_dir == "asc"),
-                key=lambda x: x.astype(str).str.lower()
-            )
-    
-    # Construction du HTML
-    # Note: Le script sortTable sera dans le HTML pour un tri côté client
+    # --- Construction du HTML avec CSS et JavaScript intégrés ---
     html_code = f"""
     <style>
-    .table-container {{ max-height: 500px; overflow-y: auto; }}
-    .portfolio-table {{ width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+    /* Conteneur principal pour le défilement */
+    .scroll-wrapper {{
+      overflow-x: auto !important; /* Active le défilement horizontal */
+      overflow-y: auto;
+      max-height: 500px; /* Hauteur maximale pour le défilement vertical */
+      width: 100%; /* Important pour que le tableau puisse déborder */
+      display: block;
+    }}
+
+    /* Styles de la table */
+    .portfolio-table {{
+      width: 100%; /* Laisser le tableau s'étendre si nécessaire */
+      min-width: 2000px; /* Minimum pour s'assurer qu'il y a assez d'espace pour le scroll */
+      border-collapse: collapse;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }}
     .portfolio-table th {{
       background: #363636; color: white; padding: 6px; text-align: center; border: none;
       position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
+      white-space: nowrap; /* Empêche les en-têtes de s'enrouler */
     }}
     .portfolio-table th:hover {{
       background: #4a4a4a;
     }}
     .portfolio-table td {{
       padding: 6px; text-align: right; border: none; font-size: 11px;
-      white-space: nowrap; /* Empêche le wrapping, mais peut être retiré si nécessaire */
+      white-space: nowrap; /* Garde les cellules sur une seule ligne par défaut */
     }}
-    .portfolio-table td:first-child, /* Ticker */
-    .portfolio-table td:nth-child(2), /* Nom */
-    .portfolio-table td:nth-child(3), /* Catégorie */
-    .portfolio-table td:nth-child(16), /* Signal (adapté au nouveau nombre de colonnes) */
-    .portfolio-table td:nth-child(17), /* Action */
-    .portfolio-table td:nth-child(18) {{ /* Justification */
+
+    /* Alignement à gauche pour certaines colonnes de texte */
+    /* Utilisez les NTH-CHILD appropriés en fonction du nombre de colonnes affichées */
+    .portfolio-table td:nth-child({final_labels.index("Ticker") + 1}),
+    .portfolio-table td:nth-child({final_labels.index("Nom") + 1}),
+    .portfolio-table td:nth-child({final_labels.index("Catégorie") + 1}),
+    .portfolio-table td:nth-child({final_labels.index("Signal") + 1}),
+    .portfolio-table td:nth-child({final_labels.index("Action") + 1}),
+    .portfolio-table td:nth-child({final_labels.index("Justification") + 1}) {{
       text-align: left;
       white-space: normal; /* Autorise le wrapping pour ces colonnes */
     }}
+
     .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
     .total-row td {{
       background: #A49B6D; color: white; font-weight: bold;
     }}
+
     /* Styles pour les indicateurs de tri */
     .sort-asc::after {{ content: ' ▲'; }}
     .sort-desc::after {{ content: ' ▼'; }}
     </style>
     
-    <div class="table-container">
+    <div class="scroll-wrapper">
       <table class="portfolio-table">
         <thead><tr>
     """
     
     # En-têtes du tableau avec le gestionnaire de clic JS
     for i, label in enumerate(final_labels):
-        # Ajouter l'indicateur de tri initial si la colonne est triée à l'origine
-        sort_indicator = ""
-        if label == initial_sort_col:
-            sort_indicator = " ▲" if initial_sort_dir == "asc" else " ▼"
-        html_code += f'<th data-column-index="{i}">{safe_escape(label)}{sort_indicator}</th>'
+        html_code += f'<th data-column-index="{i}">{safe_escape(label)}</th>'
     
     html_code += """
         </tr></thead>
@@ -446,7 +422,7 @@ def afficher_portefeuille():
     num_cols_displayed = len(df_disp.columns)
     total_row_cells = [""] * num_cols_displayed
     
-    # Trouver l'indice des colonnes de totalisation
+    # Trouver l'indice des colonnes de totalisation (basé sur final_labels)
     try:
         idx_valeur = final_labels.index("Valeur")
         total_row_cells[idx_valeur] = format_fr(total_valeur, 2)
@@ -481,32 +457,36 @@ def afficher_portefeuille():
     </div>
     
     <script>
+    // Fonction de tri appelée par le clic sur les en-têtes
     function sortTable(n) {
       var table = document.querySelector(".portfolio-table");
       var tbody = table.querySelector("tbody");
-      var rows = Array.from(tbody.rows);
+      var rows = Array.from(tbody.rows); // Convertir en tableau pour le tri
       var currentHeader = table.querySelectorAll("th")[n];
+      
+      // Récupérer la direction actuelle (par défaut 'asc' si non définie)
       var dir = currentHeader.getAttribute("data-dir") || "asc";
       
       // Inverser la direction pour le prochain clic si c'est la même colonne
       dir = (dir === "asc") ? "desc" : "asc";
       
-      // Nettoyer tous les indicateurs et attributs
+      // Nettoyer tous les indicateurs et attributs de tri des autres en-têtes
       table.querySelectorAll("th").forEach(th => {
         th.removeAttribute("data-dir");
         th.classList.remove("sort-asc", "sort-desc");
-        th.innerHTML = th.innerHTML.replace(/ ▲| ▼/g, "");
+        th.innerHTML = th.innerHTML.replace(' ▲', '').replace(' ▼', ''); // Supprimer les indicateurs existants
       });
       
       // Appliquer le nouvel indicateur et attribut à l'en-tête cliqué
       currentHeader.setAttribute("data-dir", dir);
       currentHeader.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
-    
+      currentHeader.innerHTML += (dir === "asc" ? " ▲" : " ▼"); // Ajouter l'indicateur visuel
+
       rows.sort((a, b) => {
         var x = a.cells[n].textContent.trim();
         var y = b.cells[n].textContent.trim();
     
-        // Tente de convertir en nombre. Gère les espaces et virgules.
+        // Tente de convertir en nombre. Gère les espaces et virgules (pour la France).
         var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
         var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
     
@@ -514,14 +494,29 @@ def afficher_portefeuille():
         if (!isNaN(xNum) && !isNaN(yNum)) {
           return dir === "asc" ? xNum - yNum : yNum - xNum;
         }
-        // Sinon, trier alphabétiquement (insensible à la casse)
+        // Sinon, trier alphabétiquement (insensible à la casse, insensible aux accents)
+        // 'undefined, {sensitivity: 'base'}' pour un tri insensible à la casse et aux accents
         return dir === "asc" ? x.localeCompare(y, undefined, {sensitivity: 'base'}) : y.localeCompare(x, undefined, {sensitivity: 'base'});
       });
       
-      // Replacer les lignes triées dans le tableau
+      // Replacer les lignes triées dans le corps du tableau
       tbody.innerHTML = ""; // Vide le corps du tableau
       rows.forEach(row => tbody.appendChild(row)); // Ajoute les lignes triées
     }
+
+    // Attacher les écouteurs d'événements une fois que le DOM est chargé
+    window.onload = function() {
+        const headers = document.querySelectorAll('.portfolio-table th');
+        headers.forEach(header => {
+            header.addEventListener('click', function() {
+                // Utilise l'attribut data-column-index pour passer l'index de la colonne
+                const colIndex = parseInt(this.getAttribute('data-column-index'));
+                if (!isNaN(colIndex)) {
+                    sortTable(colIndex);
+                }
+            });
+        });
+    };
     </script>"""
 
     components.html(html_code, height=600, scrolling=True)
@@ -553,9 +548,6 @@ def main():
         )
         if selected_devise != st.session_state.get("devise_cible", "EUR"):
             st.session_state.devise_cible = selected_devise
-            # Pas besoin de st.rerun() ici si l'affichage se met à jour automatiquement via session_state
-            # mais si les taux de change doivent être rechargés, un rerun serait nécessaire.
-            # Pour l'instant, on se base sur la logique fetch_fx_rates qui met à jour session_state.fx_rates
             st.rerun() # Un rerun est nécessaire pour que les calculs de conversion se mettent à jour
 
 
