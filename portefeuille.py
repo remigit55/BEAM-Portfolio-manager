@@ -12,19 +12,16 @@ def safe_escape(text):
         return html.escape(str(text))
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
 
-@st.cache_data(ttl=3600)
+
 def fetch_fx_rates(base="EUR"):
     try:
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        # --- FIX IS HERE ---
-        data = response.json() # Call .json() to parse the response content
-        # -------------------
+        data = response.json()
         return data.get("rates", {})
     except Exception as e:
-        # Using st.error for user feedback is better than print() in Streamlit
-        st.error(f"Erreur lors de la récupération des taux de change : {e}")
+        print(f"Erreur lors de la récupération des taux : {e}")
         return {}
 
 def afficher_portefeuille():
@@ -345,57 +342,6 @@ def afficher_portefeuille():
     total_actuelle_str = format_fr(total_actuelle, 2)
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
-
-    # --- DEBUT DE LA MODIFICATION: Suppression des boutons de tri Streamlit ---
-    # Le bloc suivant a été retiré:
-    # st.markdown("""
-    # <style>
-    #   .button-grid {
-    #     display: grid;
-    #     grid-template-columns: 60px 200px 100px 40px 60px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px;
-    #     gap: 0;
-    #     background: #363636;
-    #     position: sticky;
-    #     top: 0;
-    #     z-index: 3;
-    #   }
-    #   .header-button {
-    #     background: #363636;
-    #     color: white;
-    #     border: none;
-    #     padding: 8px;
-    #     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    #     font-size: 12px;
-    #     cursor: pointer;
-    #     text-align: center;
-    #     box-sizing: border-box;
-    #     width: 100%;
-    #   }
-    #   .header-button:hover {
-    #     background: #4a4a4a;
-    #   }
-    # </style>
-    # """, unsafe_allow_html=True)
-
-    # with st.container():
-    #     cols = st.columns([60, 200, 100, 40, 60, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150])
-    #     for idx, (col, lbl) in enumerate(zip(cols, labels)):
-    #         with col:
-    #             sort_indicator = ""
-    #             if st.session_state.sort_column == lbl:
-    #                 sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-    #             if st.button(
-    #                 f"{lbl}{sort_indicator}",
-    #                 key=f"sort_{lbl}_{idx}",
-    #                 help=f"Trier par {lbl}",
-    #                 use_container_width=True
-    #             ):
-    #                 if st.session_state.sort_column == lbl:
-    #                     st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-    #                 else:
-    #                     st.session_state.sort_column = lbl
-    #                     st.session_state.sort_direction = "asc"
-    # --- FIN DE LA MODIFICATION ---
 
     # Construction HTML pour la table
     html_code = f"""
