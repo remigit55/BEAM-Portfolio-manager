@@ -37,6 +37,13 @@ st.markdown(f"""
         section.main > div:nth-child(1) {{
             margin-top: -55px;
         }}
+
+        div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {{
+            background-color: {SECONDARY_COLOR} !important;
+            color: {PRIMARY_COLOR} !important;
+            font-weight: bold !important;
+            border-bottom: 3px solid {ACCENT_COLOR} !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
