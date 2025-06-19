@@ -72,7 +72,7 @@ def afficher_portefeuille():
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
 
     if "Objectif_LT" not in df.columns:
-        df["Objectif_LT"] = ""
+    df["Objectif_LT"] = ""
     df["Objectif_LT"] = (
         df["Objectif_LT"].astype(str)
                       .str.replace(" ", "", regex=False)
