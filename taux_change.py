@@ -1,10 +1,12 @@
 import streamlit as st
+from streamlit import cache_data
 import pandas as pd
 import datetime
-import requests  # Explicitly import requests
+import requests
 import html
 import streamlit.components.v1 as components
 
+@cache_data(ttl=3600)  # Cache pendant 1 heure
 def obtenir_taux(devise_source, devise_cible):
     if devise_source == devise_cible:
         return 1.0
