@@ -1,10 +1,10 @@
 import streamlit as st
+from streamlit import cache_data
 import pandas as pd
 import requests
 import time
 import html
 import streamlit.components.v1 as components
-from streamlit import cache_data
 
 def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
