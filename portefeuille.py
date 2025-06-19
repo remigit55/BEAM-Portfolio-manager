@@ -12,7 +12,7 @@ def fetch_fx_rates(base="EUR"):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates " {})
+        return data.get("rates", {})  # Fixed: removed trailing space, added comma
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
@@ -115,6 +115,7 @@ def afficher_portefeuille():
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
     # Momentum Analysis
+    @st.cache_data(ttl=3600)
     def fetch_momentum_data(ticker, period="5y", interval="1wk"):
         try:
             data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
@@ -197,7 +198,7 @@ def afficher_portefeuille():
                 "Justification": ""
             }
 
-    # Apply momentum analysis to tickers in df
+    # Apply momentum analysis
     momentum_results = {ticker: fetch_momentum_data(ticker) for ticker in df[ticker_col]}
     momentum_df = pd.DataFrame.from_dict(momentum_results, orient='index').reset_index()
     momentum_df = momentum_df.rename(columns={'index': ticker_col})
