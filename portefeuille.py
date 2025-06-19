@@ -10,7 +10,16 @@ def safe_escape(text):
     """Escape HTML characters safely."""
     if hasattr(html, 'escape'):
         return html.escape(str(text))
-    return str(text).replace("&", "&").replace("<", "<").replace(">", ">").replace('"', """).replace("'", "&#x27;")def fetch_fx_rates(base="EUR"):
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#x27;")
+    )
+    
+    def fetch_fx_rates(base="EUR"):
     try:
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
