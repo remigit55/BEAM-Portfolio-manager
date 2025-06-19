@@ -80,7 +80,7 @@ def afficher_portefeuille():
               .str.replace(" ", "", regex=False)
               .str.replace(",", ".", regex=False)
         )
-    df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
+        df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
 
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
