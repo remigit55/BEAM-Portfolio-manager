@@ -227,7 +227,7 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
-        ("Last Price", 2),
+        // ("Last Price", 2),
         ("Momentum (%)", 2),
         ("Z-Score", 2)
     ]:
