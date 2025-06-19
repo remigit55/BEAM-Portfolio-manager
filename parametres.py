@@ -1,35 +1,6 @@
 import streamlit as st
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_fixed
-
-def obtenir_taux(devise_source, devise_cible):
-    if devise_source == devise_cible:
-        return 1.0
-    ticker = f"{devise_source.upper()}{devise_cible.upper()}=X"
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        r = requests.get(url, headers=headers, timeout=5)
-        r.raise_for_status()
-        data = r.json()
-        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-        return float(meta.get("regularMarketPrice", 0))
-    except Exception as e:
-        st.warning(f"Taux non disponible pour {devise_source}/{devise_cible} : {e}")
-        return None
-
-def actualiser_taux_change(devise_cible, devises_uniques):
-    """Fonction pour actualiser les taux de change pour une devise cible donnée."""
-    taux_dict = {}
-    for d in devises_uniques:
-        try:
-            taux = obtenir_taux(d, devise_cible)
-            if taux:
-                taux_dict[d] = taux
-        except Exception as e:
-            st.warning(f"Taux non disponible pour {d}/{devise_cible} : {e}")
-            taux_dict[d] = None
-    return taux_dict
+from taux_change import actualiser_taux_change
 
 def afficher_parametres():
     if "devise_cible" not in st.session_state:
@@ -63,14 +34,18 @@ def afficher_parametres():
 
     if st.button("Rafraîchir les données du portefeuille"):
         try:
-            df = pd.read_csv(csv_url)
-            st.session_state.df = df
+            with st.spinner("Chargement des données du portefeuille..."):
+                df = pd.read_csv(csv_url)
+                st.session_state.df = df
+                st.success("Données importées avec succès.")
             # Actualiser les taux après le chargement du portefeuille
             if "Devise" in df.columns:
                 devises_uniques = sorted(set(df["Devise"].dropna().unique()))
                 with st.spinner("Mise à jour des taux de change..."):
                     st.session_state.fx_rates = actualiser_taux_change(st.session_state.devise_cible, devises_uniques)
-                    st.success(f"Taux de change actualisés pour {st.session_state.devise_cible}.")
-            st.success("Données importées avec succès.")
+                    if st.session_state.fx_rates:
+                        st.success(f"Taux de change actualisés pour {st.session_state.devise_cible}.")
+                    else:
+                        st.warning("Impossible d'actualiser les taux de change.")
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
