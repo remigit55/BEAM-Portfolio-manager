@@ -22,7 +22,19 @@ def afficher_portefeuille():
         st.session_state.last_devise_cible = devise_cible
     elif st.session_state.last_devise_cible != devise_cible:
         st.session_state.last_devise_cible = devise_cible
-        # Recalcul des taux ici si nécessaire
+        
+    # Recalcul des taux ici si nécessaire
+        def fetch_fx_rates(base="EUR"):
+    try:
+        url = f"https://api.exchangerate.host/latest?base={base}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("rates", {})
+    except Exception as e:
+        print(f"Erreur lors de la récupération des taux : {e}")
+        return {}
+        
         st.session_state.fx_rates = fetch_fx_rates()
     fx_rates = st.session_state.get("fx_rates", {})
 
