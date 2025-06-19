@@ -344,7 +344,7 @@ def afficher_portefeuille():
     <style>
       .button-grid {
         display: grid;
-        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
+        grid-template-columns: 80px 200px 100px 60px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px;
         gap: 0;
         background: #363636;
         position: sticky;
