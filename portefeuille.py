@@ -73,13 +73,13 @@ def afficher_portefeuille():
     if "Objectif_LT" not in df.columns:
     df["Objectif_LT"] = pd.NA  # ou np.nan
 
-else:
-    df["Objectif_LT"] = (
-        df["Objectif_LT"]
-          .astype(str)
-          .str.replace(" ", "", regex=False)
-          .str.replace(",", ".", regex=False)
-    )
+    else:
+        df["Objectif_LT"] = (
+            df["Objectif_LT"]
+              .astype(str)
+              .str.replace(" ", "", regex=False)
+              .str.replace(",", ".", regex=False)
+        )
     df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
 
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
