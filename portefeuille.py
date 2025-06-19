@@ -6,16 +6,16 @@ import time
 import html
 import streamlit.components.v1 as components
 
-        def fetch_fx_rates(base="EUR"):
-            try:
-                url = f"https://api.exchangerate.host/latest?base={base}"
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                data = response.json()
-                return data.get("rates", {})
-            except Exception as e:
-                print(f"Erreur lors de la récupération des taux : {e}")
-                return {}
+def fetch_fx_rates(base="EUR"):
+    try:
+        url = f"https://api.exchangerate.host/latest?base={base}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("rates", {})
+    except Exception as e:
+        print(f"Erreur lors de la récupération des taux : {e}")
+        return {}
 
 def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
@@ -23,27 +23,20 @@ def afficher_portefeuille():
         return
 
     df = st.session_state.df.copy()
-    
+
     # Harmoniser le nom de la colonne pour l’objectif long terme
     if "LT" in df.columns and "Objectif_LT" not in df.columns:
         df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
-        if "last_devise_cible" not in st.session_state:
-            st.session_state.last_devise_cible = devise_cible
-            st.session_state.fx_rates = fetch_fx_rates(devise_cible)
-        elif st.session_state.last_devise_cible != devise_cible:
-            st.session_state.last_devise_cible = devise_cible
-            st.session_state.fx_rates = fetch_fx_rates(devise_cible)
-
     if "last_devise_cible" not in st.session_state:
         st.session_state.last_devise_cible = devise_cible
+        st.session_state.fx_rates = fetch_fx_rates(devise_cible)
     elif st.session_state.last_devise_cible != devise_cible:
         st.session_state.last_devise_cible = devise_cible
-        
-    # Recalcul des taux ici si nécessaire     
-        st.session_state.fx_rates = fetch_fx_rates()
-            fx_rates = st.session_state.get("fx_rates", {})
+        st.session_state.fx_rates = fetch_fx_rates(devise_cible)
+
+    fx_rates = st.session_state.get("fx_rates", {})
 
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
@@ -67,7 +60,7 @@ def afficher_portefeuille():
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
 
-        @st.cache_data(ttl=900)  # Cache pendant 15 minutes
+        @st.cache_data(ttl=900)
         def fetch_yahoo_data(t):
             t = str(t).strip().upper()
             if t in st.session_state.ticker_names_cache:
@@ -78,7 +71,7 @@ def afficher_portefeuille():
                     del st.session_state.ticker_names_cache[t]
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"
-                headers = { "User-Agent": "Mozilla/5.0" }
+                headers = {"User-Agent": "Mozilla/5.0"}
                 r = requests.get(url, headers=headers, timeout=5)
                 r.raise_for_status()
                 data = r.json()
@@ -151,6 +144,12 @@ def afficher_portefeuille():
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
     total_lt = df["Valeur_LT_conv"].sum()
+
+    # ... (le reste du code HTML + affichage HTML reste inchangé)
+
+    # Insertion du composant HTML à la fin
+    components.html(html_code, height=600, scrolling=True)
+
 
     cols = [
         ticker_col,
