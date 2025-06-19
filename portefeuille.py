@@ -343,7 +343,7 @@ def afficher_portefeuille():
 from urllib.parse import parse_qs
 
 # Récupération des paramètres de tri (à placer avant le tri du DataFrame)
-query_params = st.experimental_get_query_params()
+query_params = st.query_params()
 st.session_state.sort_column = query_params.get("sort_column", [None])[0]
 st.session_state.sort_direction = query_params.get("sort_direction", ["asc"])[0]
 
