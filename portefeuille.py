@@ -8,7 +8,10 @@ import yfinance as yf
 
 def safe_escape(text):
     """Escape HTML characters safely."""
-    return html.escape(text) if hasattr(html, 'escape') else str(text).replace('&', '&').replace('<', '<').replace('>', '>').replace('"', '"').replace("'", ''')
+    if hasattr(html, 'escape'):
+        return html.escape(str(text))
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
+
 
 def fetch_fx_rates(base="EUR"):
     try:
