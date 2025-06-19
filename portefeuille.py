@@ -109,10 +109,6 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             signal = "➖ Neutre"
             action = "Ne rien faire"
             reason = "Pas de signal exploitable"
-        elif z > -1.5:
-            signal = "↘ Faible"
-            action = "Surveiller / Réduire si confirmé"
-            reason = "Dynamique en affaiblissement"
         else:
             signal = "🧊 Survendu"
             action = "Acheter / Renforcer (si signal technique)"
@@ -343,7 +339,13 @@ def afficher_portefeuille():
     df_disp.columns = final_labels
 
     # --- Construction du HTML avec CSS et JavaScript intégrés ---
+    # Ajout d'un paramètre de version pour forcer l'invalidation du cache
+    html_version = int(time.time()) # Utilise le timestamp actuel pour une version unique
+    
     html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
     <style>
     /* Conteneur principal pour le défilement */
     .scroll-wrapper {{
@@ -352,28 +354,30 @@ def afficher_portefeuille():
       max-height: 500px; /* Hauteur maximale pour le défilement vertical */
       width: 100%; /* Important pour que le tableau puisse déborder */
       display: block;
+      /* Ajoutez une bordure pour mieux visualiser le conteneur */
+      border: 1px solid #ddd; 
     }}
 
     /* Styles de la table */
     .portfolio-table {{
       width: 100%; /* Laisser le tableau s'étendre si nécessaire */
-      min-width: 2000px; /* Minimum pour s'assurer qu'il y a assez d'espace pour le scroll */
+      min-width: 1800px; /* Minimum pour s'assurer qu'il y a assez d'espace pour le scroll. Ajustez si nécessaire. */
       border-collapse: collapse;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }}
+    .portfolio-table th, .portfolio-table td {{
+      padding: 6px;
+      border: none; /* Pas de bordures de cellules par défaut */
+      font-size: 11px;
+      white-space: nowrap; /* Garde les cellules sur une seule ligne par défaut */
+    }}
     .portfolio-table th {{
-      background: #363636; color: white; padding: 6px; text-align: center; border: none;
+      background: #363636; color: white; text-align: center;
       position: sticky; top: 0; z-index: 2; font-size: 12px; cursor: pointer;
-      white-space: nowrap; /* Empêche les en-têtes de s'enrouler */
     }}
     .portfolio-table th:hover {{
       background: #4a4a4a;
     }}
-    .portfolio-table td {{
-      padding: 6px; text-align: right; border: none; font-size: 11px;
-      white-space: nowrap; /* Garde les cellules sur une seule ligne par défaut */
-    }}
-
     /* Alignement à gauche pour certaines colonnes de texte */
     /* Utilisez les NTH-CHILD appropriés en fonction du nombre de colonnes affichées */
     .portfolio-table td:nth-child({final_labels.index("Ticker") + 1}),
@@ -395,13 +399,14 @@ def afficher_portefeuille():
     .sort-asc::after {{ content: ' ▲'; }}
     .sort-desc::after {{ content: ' ▼'; }}
     </style>
-    
+    </head>
+    <body>
     <div class="scroll-wrapper">
       <table class="portfolio-table">
         <thead><tr>
     """
     
-    # En-têtes du tableau avec le gestionnaire de clic JS
+    # En-têtes du tableau avec le gestionnaire de clic JS (via data-attribut)
     for i, label in enumerate(final_labels):
         html_code += f'<th data-column-index="{i}">{safe_escape(label)}</th>'
     
@@ -451,75 +456,86 @@ def afficher_portefeuille():
         html_code += f"<td>{cell_content}</td>"
     html_code += "</tr>"
 
-    html_code += """
+    html_code += f"""
         </tbody>
       </table>
     </div>
     
     <script>
-    // Fonction de tri appelée par le clic sur les en-têtes
-    function sortTable(n) {
-      var table = document.querySelector(".portfolio-table");
-      var tbody = table.querySelector("tbody");
-      var rows = Array.from(tbody.rows); // Convertir en tableau pour le tri
-      var currentHeader = table.querySelectorAll("th")[n];
-      
-      // Récupérer la direction actuelle (par défaut 'asc' si non définie)
-      var dir = currentHeader.getAttribute("data-dir") || "asc";
-      
-      // Inverser la direction pour le prochain clic si c'est la même colonne
-      dir = (dir === "asc") ? "desc" : "asc";
-      
-      // Nettoyer tous les indicateurs et attributs de tri des autres en-têtes
-      table.querySelectorAll("th").forEach(th => {
-        th.removeAttribute("data-dir");
-        th.classList.remove("sort-asc", "sort-desc");
-        th.innerHTML = th.innerHTML.replace(' ▲', '').replace(' ▼', ''); // Supprimer les indicateurs existants
-      });
-      
-      // Appliquer le nouvel indicateur et attribut à l'en-tête cliqué
-      currentHeader.setAttribute("data-dir", dir);
-      currentHeader.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
-      currentHeader.innerHTML += (dir === "asc" ? " ▲" : " ▼"); // Ajouter l'indicateur visuel
+    // Utiliser une fonction auto-exécutante et 'DOMContentLoaded'
+    (function() {{
+        // Fonction de tri appelée par le clic sur les en-têtes
+        function sortTable(n) {{
+            var table = document.querySelector(".portfolio-table");
+            var tbody = table.querySelector("tbody");
+            var rows = Array.from(tbody.rows); // Convertir en tableau pour le tri
+            var currentHeader = table.querySelectorAll("th")[n];
+            
+            // Récupérer la direction actuelle (par défaut 'asc' si non définie)
+            var dir = currentHeader.getAttribute("data-dir") || "asc";
+            
+            // Inverser la direction pour le prochain clic si c'est la même colonne
+            dir = (dir === "asc") ? "desc" : "asc";
+            
+            // Nettoyer tous les indicateurs et attributs de tri des autres en-têtes
+            table.querySelectorAll("th").forEach(th => {{
+                th.removeAttribute("data-dir");
+                th.classList.remove("sort-asc", "sort-desc");
+                th.innerHTML = th.innerHTML.replace(' ▲', '').replace(' ▼', ''); // Supprimer les indicateurs existants
+            }});
+            
+            // Appliquer le nouvel indicateur et attribut à l'en-tête cliqué
+            currentHeader.setAttribute("data-dir", dir);
+            currentHeader.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
+            currentHeader.innerHTML += (dir === "asc" ? " ▲" : " ▼"); // Ajouter l'indicateur visuel
 
-      rows.sort((a, b) => {
-        var x = a.cells[n].textContent.trim();
-        var y = b.cells[n].textContent.trim();
-    
-        // Tente de convertir en nombre. Gère les espaces et virgules (pour la France).
-        var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
-        var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
-    
-        // Si les deux sont des nombres valides, trier numériquement
-        if (!isNaN(xNum) && !isNaN(yNum)) {
-          return dir === "asc" ? xNum - yNum : yNum - xNum;
-        }
-        // Sinon, trier alphabétiquement (insensible à la casse, insensible aux accents)
-        // 'undefined, {sensitivity: 'base'}' pour un tri insensible à la casse et aux accents
-        return dir === "asc" ? x.localeCompare(y, undefined, {sensitivity: 'base'}) : y.localeCompare(x, undefined, {sensitivity: 'base'});
-      });
-      
-      // Replacer les lignes triées dans le corps du tableau
-      tbody.innerHTML = ""; // Vide le corps du tableau
-      rows.forEach(row => tbody.appendChild(row)); // Ajoute les lignes triées
-    }
+            rows.sort((a, b) => {{
+                var x = a.cells[n].textContent.trim();
+                var y = b.cells[n].textContent.trim();
+            
+                // Tente de convertir en nombre. Gère les espaces et virgules (pour la France).
+                var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
+                var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
+            
+                // Si les deux sont des nombres valides, trier numériquement
+                if (!isNaN(xNum) && !isNaN(yNum)) {{
+                    // Gérer les valeurs manquantes/non numériques en les plaçant à la fin
+                    if (isNaN(xNum) && !isNaN(yNum)) return dir === "asc" ? 1 : -1;
+                    if (!isNaN(xNum) && isNaN(yNum)) return dir === "asc" ? -1 : 1;
+                    if (isNaN(xNum) && isNaN(yNum)) return 0; // Si les deux sont NaN, leur ordre n'importe pas
+                    
+                    return dir === "asc" ? xNum - yNum : yNum - xNum;
+                }}
+                // Sinon, trier alphabétiquement (insensible à la casse, insensible aux accents)
+                // 'undefined, {sensitivity: 'base'}' pour un tri insensible à la casse et aux accents
+                return dir === "asc" ? x.localeCompare(y, undefined, {{sensitivity: 'base'}}) : y.localeCompare(x, undefined, {{sensitivity: 'base'}});
+            }});
+            
+            // Replacer les lignes triées dans le corps du tableau
+            tbody.innerHTML = ""; // Vide le corps du tableau
+            rows.forEach(row => tbody.appendChild(row)); // Ajoute les lignes triées
+        }}
 
-    // Attacher les écouteurs d'événements une fois que le DOM est chargé
-    window.onload = function() {
-        const headers = document.querySelectorAll('.portfolio-table th');
-        headers.forEach(header => {
-            header.addEventListener('click', function() {
-                // Utilise l'attribut data-column-index pour passer l'index de la colonne
-                const colIndex = parseInt(this.getAttribute('data-column-index'));
-                if (!isNaN(colIndex)) {
-                    sortTable(colIndex);
-                }
-            });
-        });
-    };
-    </script>"""
+        // Attacher les écouteurs d'événements une fois que le DOM est chargé
+        document.addEventListener('DOMContentLoaded', function() {{
+            const headers = document.querySelectorAll('.portfolio-table th');
+            headers.forEach(header => {{
+                header.addEventListener('click', function() {{
+                    // Utilise l'attribut data-column-index pour passer l'index de la colonne
+                    const colIndex = parseInt(this.getAttribute('data-column-index'));
+                    if (!isNaN(colIndex)) {{
+                        sortTable(colIndex);
+                    }}
+                }});
+            }});
+        }});
+    }})();
+    </script>
+    </body>
+    </html>
+    """
 
-    components.html(html_code, height=600, scrolling=True)
+    components.html(html_code, height=600, scrolling=True, key=f"portfolio_table_{html_version}")
 
 # --- Structure de l'application principale ---
 def main():
