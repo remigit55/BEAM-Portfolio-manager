@@ -11,6 +11,11 @@ def afficher_portefeuille():
         return
 
     df = st.session_state.df.copy()
+    
+    # Harmoniser le nom de la colonne pour l’objectif long terme
+    if "LT" in df.columns and "Objectif_LT" not in df.columns:
+        df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
+
     devise_cible = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.get("fx_rates", {})
 
