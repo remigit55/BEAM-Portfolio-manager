@@ -339,133 +339,136 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
     
-    # Récupération des paramètres de tri
-query_params = st.query_params
-sort_column = query_params.get("sort_column", [None])[0]
-sort_direction = query_params.get("sort_direction", ["asc"])[0]
-st.session_state.sort_column = sort_column
-st.session_state.sort_direction = sort_direction
-
-# Injection JS sécurisée
-safe_sort_column = safe_escape(str(sort_column or ""))
-safe_sort_direction = safe_escape(str(sort_direction or "asc"))
-
-# Début HTML
-html_code = """
-<style>
-  .scroll-wrapper {
-    overflow-x: auto !important;
-    overflow-y: auto;
-    max-height: 500px;
-    max-width: none !important;
-    width: auto;
-    display: block;
-    position: relative;
-  }
-  .portfolio-table {
-    min-width: 2200px;
-    border-collapse: collapse;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  }
-  .portfolio-table th {
-    background: #363636;
-    color: white;
-    padding: 8px;
-    text-align: center;
-    border: none;
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    font-size: 12px;
-    box-sizing: border-box;
-    cursor: pointer;
-  }
-  .portfolio-table th:hover {
-    background: #4a4a4a;
-  }
-  .portfolio-table td {
-    padding: 6px;
-    text-align: right;
-    border: none;
-    font-size: 11px;
-    white-space: nowrap;
-  }
-  .portfolio-table td:nth-child(1),
-  .portfolio-table td:nth-child(2),
-  .portfolio-table td:nth-child(3),
-  .portfolio-table td:nth-child(16),
-  .portfolio-table td:nth-child(17),
-  .portfolio-table td:nth-child(18) {
-    text-align: left;
-    white-space: normal;
-  }
-  .portfolio-table tr:nth-child(even) { background: #efefef; }
-  .total-row td {
-    background: #A49B6D;
-    color: white;
-    font-weight: bold;
-  }
-  .sort-asc::after { content: ' ▲'; }
-  .sort-desc::after { content: ' ▼'; }
-</style>
-
-<script>
-  const currentSort = "{safe_sort_column}";
-  const currentDirection = "{safe_sort_direction}";
-
-  function sortTable(column) {
-    let direction = 'asc';
-    if (currentSort === column) {
-      direction = currentDirection === 'asc' ? 'desc' : 'asc';
-    }
-    const newPath = window.location.pathname + "?sort_column=" + encodeURIComponent(column) + "&sort_direction=" + direction;
-    window.location.href = newPath;
-  }
-
-  window.onload = function() {
-    const headers = document.querySelectorAll('.portfolio-table th');
-    headers.forEach(header => {
-      if (header.textContent === currentSort) {
-        header.classList.add(currentDirection === 'asc' ? 'sort-asc' : 'sort-desc');
-      }
-    });
-  };
-</script>
-
-<div class="scroll-wrapper">
-  <table class="portfolio-table">
-    <thead><tr>
-"""
-
-# En-têtes cliquables
-for lbl in labels:
-    html_code += f'<th onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
-
-html_code += "</tr></thead><tbody>"
-
-# Corps du tableau
-for _, row in df_disp.iterrows():
-    html_code += "<tr>"
+    # Récupération des paramètres de tri (à placer avant le tri du DataFrame)
+    query_params = st.query_params
+    st.session_state.sort_column = query_params.get("sort_column", None)
+    st.session_state.sort_direction = query_params.get("sort_direction", "asc")
+    
+    # Injection JS sécurisée
+    safe_sort_column = safe_escape(str(st.session_state.get("sort_column", "")))
+    safe_sort_direction = safe_escape(str(st.session_state.get("sort_direction", "asc")))
+    
+    html_code = f"""
+    <style>
+      .scroll-wrapper {{
+        overflow-x: auto !important;
+        overflow-y: auto;
+        max-height: 500px;
+        max-width: none !important;
+        width: auto;
+        display: block;
+        position: relative;
+      }}
+      .portfolio-table {{
+        min-width: 2200px;
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }}
+      .portfolio-table th {{
+        background: #363636;
+        color: white;
+        padding: 8px;
+        text-align: center;
+        border: none;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        font-size: 12px;
+        box-sizing: border-box;
+        cursor: pointer;
+      }}
+      .portfolio-table th:hover {{
+        background: #4a4a4a;
+      }}
+      .portfolio-table td {{
+        padding: 6px;
+        text-align: right;
+        border: none;
+        font-size: 11px;
+        white-space: nowrap;
+      }}
+      .portfolio-table td:nth-child(1),
+      .portfolio-table td:nth-child(2),
+      .portfolio-table td:nth-child(3),
+      .portfolio-table td:nth-child(16),
+      .portfolio-table td:nth-child(17),
+      .portfolio-table td:nth-child(18) {{
+        text-align: left;
+        white-space: normal;
+      }}
+      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+      .total-row td {{
+        background: #A49B6D;
+        color: white;
+        font-weight: bold;
+      }}
+      .sort-asc::after {{ content: ' ▲'; }}
+      .sort-desc::after {{ content: ' ▼'; }}
+    </style>
+    
+    <script>
+      const currentSort = "{safe_sort_column}";
+      const currentDirection = "{safe_sort_direction}";
+    
+      function sortTable(column) {{
+        let direction = 'asc';
+        if (currentSort === column) {{
+          direction = currentDirection === 'asc' ? 'desc' : 'asc';
+        }}
+        const newPath = window.location.pathname + "?sort_column=" + encodeURIComponent(column) + "&sort_direction=" + direction;
+        window.location.href = newPath;
+      }}
+    
+      window.onload = function() {{
+        const headers = document.querySelectorAll('.portfolio-table th');
+        headers.forEach(header => {{
+          if (header.textContent === currentSort) {{
+            header.classList.add(currentDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+          }}
+        }});
+      }};
+    </script>
+    
+    <div class="scroll-wrapper">
+      <table class="portfolio-table">
+        <thead><tr>
+    """
+    
+    # Ajouter les en-têtes avec tri cliquable
     for lbl in labels:
-        val = row[lbl]
-        html_code += f"<td>{safe_escape(str(val)) if pd.notnull(val) else ''}</td>"
-    html_code += "</tr>"
-
-# Ligne de totaux
-html_code += f"""
-<tr class='total-row'>
-  <td>TOTAL ({safe_escape(devise_cible)})</td>
-  <td></td><td></td><td></td><td></td><td></td>
-  <td>{safe_escape(total_valeur_str)}</td>
-  <td></td>
-  <td>{safe_escape(total_actuelle_str)}</td>
-  <td></td>
-  <td>{safe_escape(total_h52_str)}</td>
-  <td></td>
-  <td>{safe_escape(total_lt_str)}</td>
-  <td></td><td></td><td></td><td></td><td></td>
-</tr>
-</tbody></table></div>
-"""
-
-components.html(html_code, height=600, scrolling=True)
+        html_code += f'<th onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
+    
+    html_code += """
+        </tr></thead>
+        <tbody>
+    """
+    
+    # Corps du tableau
+    for _, row in df_disp.iterrows():
+        html_code += "<tr>"
+        for lbl in labels:
+            val = row[lbl]
+            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+            html_code += f"<td>{val_str}</td>"
+        html_code += "</tr>"
+    
+    # Ligne total
+    html_code += f"""
+        <tr class='total-row'>
+          <td>TOTAL ({safe_escape(devise_cible)})</td>
+          <td></td><td></td><td></td><td></td><td></td>
+          <td>{safe_escape(total_valeur_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_actuelle_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_h52_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_lt_str)}</td>
+          <td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    """
+    
+    components.html(html_code, height=600, scrolling=True)
