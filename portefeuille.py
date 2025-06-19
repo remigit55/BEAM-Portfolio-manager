@@ -16,7 +16,7 @@ def fetch_fx_rates(base="EUR"):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates", {})  # Fixed: comma added, trailing space removed
+        return data.get("rates", {})
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
@@ -339,18 +339,69 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
 
-    # Construction HTML
+    # Boutons de tri en grille
+    st.markdown("""
+    <style>
+      .button-grid {
+        display: grid;
+        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
+        gap: 0;
+        background: #363636;
+        position: sticky;
+        top: 0;
+        z-index: 3;
+      }
+      .header-button {
+        background: #363636;
+        color: white;
+        border: none;
+        padding: 8px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 12px;
+        cursor: pointer;
+        text-align: center;
+        box-sizing: border-box;
+        width: 100%;
+      }
+      .header-button:hover {
+        background: #4a4a4a;
+      }
+    </style>
+    """, unsafe_allow_html=True)
+
+    with st.container():
+        cols = st.columns([80, 200, 100, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150, 60])
+        for idx, (col, lbl) in enumerate(zip(cols, labels)):
+            with col:
+                sort_indicator = ""
+                if st.session_state.sort_column == lbl:
+                    sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
+                if st.button(
+                    f"{lbl}{sort_indicator}",
+                    key=f"sort_{lbl}_{idx}",
+                    help=f"Trier par {lbl}",
+                    use_container_width=True
+                ):
+                    if st.session_state.sort_column == lbl:
+                        st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
+                    else:
+                        st.session_state.sort_column = lbl
+                        st.session_state.sort_direction = "asc"
+
+    # Construction HTML pour la table
     html_code = f"""
     <style>
-      .table-wrapper {{
+      .scroll-wrapper {{
         overflow-x: auto !important;
         overflow-y: auto;
         max-height: 500px;
+        max-width: none !important;
+        width: auto;
         display: block;
         position: relative;
       }}
       .portfolio-table {{
-        min-width: 2000px;
+        min-width: 2200px;
         border-collapse: collapse;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }}
@@ -362,7 +413,7 @@ def afficher_portefeuille():
         border: none;
         position: sticky;
         top: 0;
-        z-index: 3;
+        z-index: 2;
         font-size: 12px;
         box-sizing: border-box;
       }}
@@ -419,46 +470,15 @@ def afficher_portefeuille():
         color: white;
         font-weight: bold;
       }}
-      .header-button {{
-        background: #363636;
-        color: white;
-        border: none;
-        width: 100%;
-        padding: 8px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 12px;
-        cursor: pointer;
-        text-align: center;
-        box-sizing: border-box;
-        display: block;
-      }}
-      .header-button:hover {{
-        background: #4a4a4a;
-      }}
     </style>
-    <div class="table-wrapper">
+    <div class="scroll-wrapper">
       <table class="portfolio-table">
         <thead><tr>
     """
 
-    # Ajouter les en-têtes avec boutons
-    for idx, lbl in enumerate(labels):
-        sort_indicator = ""
-        if st.session_state.sort_column == lbl:
-            sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-        button_key = f"sort_{lbl}_{idx}"
-        html_code += f'<th><button class="header-button" onclick="document.getElementById(\'{button_key}\').click()">{safe_escape(lbl + sort_indicator)}</button></th>'
-        st.button(
-            "",
-            key=button_key,
-            help=f"Trier par {lbl}",
-            on_click=lambda l=lbl: (
-                st.session_state.update({
-                    "sort_column": l,
-                    "sort_direction": "desc" if st.session_state.sort_column == l and st.session_state.sort_direction == "asc" else "asc"
-                })
-            )
-        )
+    # Ajouter les en-têtes statiques
+    for lbl in labels:
+        html_code += f'<th>{safe_escape(lbl)}</th>'
 
     html_code += """
         </tr></thead>
