@@ -255,6 +255,7 @@ def afficher_portefeuille():
         ticker_col,
         "shortName",
         "Catégorie",
+        "Devise",
         "Quantité_fmt",
         "Acquisition_fmt",
         "Valeur_fmt",
@@ -268,13 +269,13 @@ def afficher_portefeuille():
         "Z-Score_fmt",
         "Signal",
         "Action",
-        "Justification",
-        "Devise"
+        "Justification"
     ]
     labels = [
         "Ticker",
         "Nom",
         "Catégorie",
+        "Devise",
         "Quantité",
         "Prix d'Acquisition",
         "Valeur",
@@ -288,8 +289,8 @@ def afficher_portefeuille():
         "Z-Score",
         "Signal",
         "Action",
-        "Justification",
-        "Devise"
+        "Justification"
+        
     ]
 
     df_disp = df[cols].copy()
@@ -313,7 +314,6 @@ def afficher_portefeuille():
             "Valeur H52": "Valeur_H52",
             "Objectif LT": "Objectif_LT",
             "Valeur LT": "Valeur_LT",
-            "Last Price": "Last Price",
             "Momentum (%)": "Momentum (%)",
             "Z-Score": "Z-Score"
         }.get(st.session_state.sort_column, st.session_state.sort_column)
@@ -344,7 +344,7 @@ def afficher_portefeuille():
     <style>
       .button-grid {
         display: grid;
-        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
+        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
         gap: 0;
         background: #363636;
         position: sticky;
