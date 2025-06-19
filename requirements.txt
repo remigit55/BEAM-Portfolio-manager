@@ -9,3 +9,4 @@ yfinance
 requests
 tenacity
 pillow
+forex-python
