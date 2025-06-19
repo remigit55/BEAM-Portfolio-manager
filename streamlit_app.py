@@ -67,6 +67,8 @@ if "devise_cible" not in st.session_state:
     st.session_state.devise_cible = "EUR"
 if "ticker_names_cache" not in st.session_state:
     st.session_state.ticker_names_cache = {}
+if "momentum_results" not in st.session_state:
+    st.session_state.momentum_results = pd.DataFrame()
 
 # Importation des modules fonctionnels
 from portefeuille import afficher_portefeuille
