@@ -32,9 +32,13 @@ def afficher_taux_change():
         taux_dict = {}
         with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
             for d in devises_uniques:
-                taux = obtenir_taux(d, devise_cible)
-                if taux:
-                    taux_dict[d] = taux
+                try:
+                    taux = obtenir_taux(d, devise_cible)
+                    if taux:
+                        taux_dict[d] = taux
+                except Exception as e:
+                    st.warning(f"Taux non disponible pour {d}/{devise_cible} : {e}")
+                    taux_dict[d] = None
 
         if taux_dict:
             st.session_state.fx_rates = taux_dict
