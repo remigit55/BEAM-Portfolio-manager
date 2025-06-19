@@ -36,7 +36,7 @@ def afficher_portefeuille():
         
     # Recalcul des taux ici si nécessaire     
         st.session_state.fx_rates = fetch_fx_rates()
-    fx_rates = st.session_state.get("fx_rates", {})
+            fx_rates = st.session_state.get("fx_rates", {})
 
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
