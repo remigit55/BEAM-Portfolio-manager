@@ -143,15 +143,6 @@ def afficher_portefeuille():
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
-    # Affichage HTML (inchangé)
-    # ... (vous pouvez garder ici la même structure HTML et JS que dans votre code original)
-
-    # Exemple de rendu (réduit ici)
-    st.dataframe(df_disp, use_container_width=True)
-
-    st.markdown(f"**Total ({devise_cible})** : {format_fr(total_valeur, 2)} | Actuelle : {format_fr(total_actuelle, 2)} | H52 : {format_fr(total_h52, 2)}")
-
-
     html_code = """
 <style>
   .table-container { max-height: 500px; overflow-y: auto; }
