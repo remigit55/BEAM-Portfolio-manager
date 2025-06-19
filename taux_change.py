@@ -4,20 +4,6 @@ import datetime
 import requests
 import html
 import streamlit.components.v1 as components
-from tenacity import retry, stop_after_attempt, wait_fixed
-
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-def obtenir_taux(devise_source, devise_cible):
-    if devise_source == devise_cible:
-        return 1.0
-    ticker = f"{devise_source.upper()}{devise_cible.upper()}=X"
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=5)
-    r.raise_for_status()
-    data = r.json()
-    meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-    return float(meta.get("regularMarketPrice", 0))
 
 def afficher_taux_change():
     df = st.session_state.get("df")
@@ -29,22 +15,12 @@ def afficher_taux_change():
     devises_uniques = sorted(set(df["Devise"].dropna().unique()))
 
     if st.button("Actualiser les taux"):
-        taux_dict = {}
         with st.spinner("Mise à jour des taux de change depuis Yahoo Finance..."):
-            for d in devises_uniques:
-                try:
-                    taux = obtenir_taux(d, devise_cible)
-                    if taux:
-                        taux_dict[d] = taux
-                except Exception as e:
-                    st.warning(f"Taux non disponible pour {d}/{devise_cible} : {e}")
-                    taux_dict[d] = None
-
-        if taux_dict:
-            st.session_state.fx_rates = taux_dict
-        else:
-            st.warning("Aucun taux de change valide récupéré.")
-            return
+            st.session_state.fx_rates = actualiser_taux_change(devise_cible, devises_uniques)
+            if st.session_state.fx_rates:
+                st.success(f"Taux de change actualisés pour {devise_cible}.")
+            else:
+                st.warning("Aucun taux de change valide récupéré.")
 
     fx_rates = st.session_state.get("fx_rates", {})
     if not fx_rates:
@@ -76,7 +52,7 @@ def afficher_taux_change():
         <tbody>
     """
     for _, row in df_fx.iterrows():
-        html_code += f"<tr><td>{html.escape(str(row[0]))}</td><td>{row[1]:,.6f}</td></tr>"
+        html_code += f"<tr><td>{html.escape(str(row[0]))}</td><td>{row[1]:,.6f if pd.notnull(row[1]) else ''}</td></tr>"
     html_code += """
         </tbody>
       </table>
