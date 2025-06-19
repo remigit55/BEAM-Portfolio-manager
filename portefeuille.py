@@ -345,157 +345,165 @@ if sort_column_from_url in actual_labels:  # Validate against display labels
     total_lt_str = format_fr(total_lt, 2)
     
     safe_sort_column = safe_escape(str(sort_column_from_url if sort_column_from_url else ""))
-    safe_sort_direction = safe_escape(str(sort_direction_from_url))
-    
-    html_code = f"""
-    <style>
-      .scroll-wrapper {{
-        overflow-x: auto !important;
-        overflow-y: auto;
-        max-height: 500px;
-        max-width: none !important;
-        width: auto;
-        display: block;
-        position: relative;
+safe_sort_direction = safe_escape(str(sort_direction_from_url))
+
+html_code = f"""
+<style>
+  .scroll-wrapper {{
+    overflow-x: auto !important;
+    overflow-y: auto;
+    max-height: 500px;
+    max-width: none !important;
+    width: auto;
+    display: block;
+    position: relative;
+  }}
+  .portfolio-table {{
+    min-width: 2200px;
+    border-collapse: collapse;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }}
+  .portfolio-table th {{
+    background: #363636;
+    color: white;
+    padding: 8px;
+    text-align: center;
+    border: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 12px;
+    box-sizing: border-box;
+    cursor: pointer;
+  }}
+  .portfolio-table th:hover {{
+    background: #4a4a4a;
+  }}
+  .portfolio-table td {{
+    padding: 6px;
+    text-align: right;
+    border: none;
+    font-size: 11px;
+    white-space: nowrap;
+  }}
+  .portfolio-table td:nth-child(1),
+  .portfolio-table td:nth-child(2),
+  .portfolio-table td:nth-child(3),
+  .portfolio-table td:nth-child({len(actual_labels)-2}),
+  .portfolio-table td:nth-child({len(actual_labels)-1}),
+  .portfolio-table td:nth-child({len(actual_labels)}) {{
+    text-align: left;
+    white-space: normal;
+  }}
+  .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ width: 80px; }}
+  .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ width: 200px; }}
+  .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ width: 100px; }}
+  .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4) {{ width: 60px; }}
+  .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5) {{ width: 60px; }}
+  .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6) {{ width: 80px; }}
+  .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7) {{ width: 80px; }}
+  .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8) {{ width: 80px; }}
+  .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ width: 80px; }}
+  .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ width: 80px; }}
+  .portfolio-table th:nth-child(11), .portfolio-table td:nth-child(11) {{ width: 80px; }}
+  .portfolio-table th:nth-child(12), .portfolio-table td:nth-child(12) {{ width: 80px; }}
+  .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13) {{ width: 80px; }}
+  .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14) {{ width: 80px; }}
+  .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ width: 80px; }}
+  .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16) {{ width: 150px; }}
+  .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17) {{ width: 150px; }}
+  .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ width: 150px; }}
+  .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+  .total-row td {{
+    background: #A49B6D;
+    color: white;
+    font-weight: bold;
+  }}
+  .sort-asc::after {{ content: ' ▲'; }}
+  .sort-desc::after {{ content: ' ▼'; }}
+</style>
+<script>
+  const currentSort = "{safe_sort_column}";
+  const currentDirection = "{safe_sort_direction}";
+
+  function sortTable(column) {{
+    let direction = 'asc';
+    if (currentSort === column) {{
+      direction = currentDirection === 'asc' ? 'desc' : 'asc';
+    }}
+    // Create a form to submit sorting parameters to Streamlit
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = window.location.pathname;
+    // Add sort_column
+    const inputColumn = document.createElement('input');
+    inputColumn.type = 'hidden';
+    inputColumn.name = 'sort_column';
+    inputColumn.value = column;
+    form.appendChild(inputColumn);
+    // Add sort_direction
+    const inputDirection = document.createElement('input');
+    inputDirection.type = 'hidden';
+    inputDirection.name = 'sort_direction';
+    inputDirection.value = direction;
+    form.appendChild(inputDirection);
+    // Append form to body and submit
+    document.body.appendChild(form);
+    form.submit();
+  }}
+
+  window.onload = function() {{
+    const headers = document.querySelectorAll('.portfolio-table th');
+    headers.forEach(header => {{
+      if (header.textContent === currentSort) {{
+        header.classList.add(currentDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+      }} else {{
+        header.classList.remove('sort-asc', 'sort-desc');
       }}
-      .portfolio-table {{
-        min-width: 2200px; 
-        border-collapse: collapse;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }}
-      .portfolio-table th {{
-        background: #363636;
-        color: white;
-        padding: 8px;
-        text-align: center;
-        border: none;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        font-size: 12px;
-        box-sizing: border-box;
-        cursor: pointer;
-      }}
-      .portfolio-table th:hover {{
-        background: #4a4a4a;
-      }}
-      .portfolio-table td {{
-        padding: 6px;
-        text-align: right;
-        border: none;
-        font-size: 11px;
-        white-space: nowrap;
-      }}
-      /* Adjust nth-child for left-aligned columns based on your current labels list */
-      /* Make sure these match the actual order of columns in actual_labels */
-      /* Ticker (1), Nom (2), Catégorie (3), Signal (16), Action (17), Justification (18) */
-      .portfolio-table td:nth-child(1),
-      .portfolio-table td:nth-child(2),
-      .portfolio-table td:nth-child(3),
-      .portfolio-table td:nth-child(16), 
-      .portfolio-table td:nth-child(17), 
-      .portfolio-table td:nth-child(18) {{
-        text-align: left;
-        white-space: normal;
-      }}
-      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
-      .total-row td {{
-        background: #A49B6D;
-        color: white;
-        font-weight: bold;
-      }}
-      .sort-asc::after {{ content: ' ▲'; }}
-      .sort-desc::after {{ content: ' ▼'; }}
-    </style>
-    
-    <script>
-      const currentSort = "{safe_sort_column}";
-      const currentDirection = "{safe_sort_direction}";
-    
-      function sortTable(column) {{
-        let direction = 'asc';
-        if (currentSort === column) {{
-          direction = currentDirection === 'asc' ? 'desc' : 'asc';
-        }}
-        const newPath = window.location.pathname + "?sort_column=" + encodeURIComponent(column) + "&sort_direction=" + direction;
-        window.location.href = newPath;
-      }}
-    
-      window.onload = function() {{
-        const headers = document.querySelectorAll('.portfolio-table th');
-        headers.forEach(header => {{
-          if (header.textContent === currentSort) {{
-            header.classList.add(currentDirection === 'asc' ? 'sort-asc' : 'sort-desc');
-          }}
-        }});
-      }};
-    </script>
-    
-    <div class="scroll-wrapper">
-      <table class="portfolio-table">
-        <thead><tr>
-    """
-    
+    }});
+  }};
+</script>
+<div class="scroll-wrapper">
+  <table class="portfolio-table">
+    <thead><tr>
+"""
+
+# Add clickable headers with sort indicators
+for lbl in actual_labels:
+    sort_indicator = ""
+    if sort_column_from_url == lbl:
+        sort_indicator = f' class="sort-{"asc" if sort_direction_from_url == "asc" else "desc"}"'
+    html_code += f'<th{sort_indicator} onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
+
+html_code += """
+    </tr></thead>
+    <tbody>
+"""
+
+# Table body
+for _, row in df_disp.iterrows():
+    html_code += "<tr>"
     for lbl in actual_labels:
-        html_code += f'<th onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
-    
-    html_code += """
-        </tr></thead>
-        <tbody>
-    """
-    
-    for _, row in df_disp.iterrows():
-        html_code += "<tr>"
-        for lbl in actual_labels:
-            val = row[lbl]
-            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-            html_code += f"<td>{val_str}</td>"
-        html_code += "</tr>"
-    
-    html_code += f"""
-        <tr class='total-row'>
-          <td>TOTAL ({safe_escape(devise_cible)})</td>
-          <td></td><td></td><td></td><td></td><td></td>
-          <td>{safe_escape(total_valeur_str)}</td>
-          <td></td>
-          <td>{safe_escape(total_actuelle_str)}</td>
-          <td></td>
-          <td>{safe_escape(total_h52_str)}</td>
-          <td></td>
-          <td>{safe_escape(total_lt_str)}</td>
-          <td></td><td></td><td></td><td></td><td></td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
-    """
-    
-    components.html(html_code, height=600, scrolling=True)
+        val = row[lbl]
+        val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+        html_code += f"<td>{val_str}</td>"
+    html_code += "</tr>"
 
-def main():
-    st.set_page_config(layout="wide", page_title="Mon Portefeuille")
-    st.title("Gestion de Portefeuille d'Investissement")
+# TOTAL row, dynamically generated based on actual_labels
+html_code += "<tr class='total-row'>"
+for i, lbl in enumerate(actual_labels):
+    if lbl == "Valeur" and total_valeur_str:
+        html_code += f"<td>{safe_escape(total_valeur_str)}</td>"
+    elif lbl == "Valeur Actuelle" and total_actuelle_str:
+        html_code += f"<td>{safe_escape(total_actuelle_str)}</td>"
+    elif lbl == "Valeur H52" and total_h52_str:
+        html_code += f"<td>{safe_escape(total_h52_str)}</td>"
+    elif lbl == "Valeur LT" and total_lt_str:
+        html_code += f"<td>{safe_escape(total_lt_str)}</td>"
+    elif i == 0:  # First column (Ticker)
+        html_code += f"<td>TOTAL ({safe_escape(devise_cible)})</td>"
+    else:
+        html_code += "<td></td>"
+html_code += "</tr></tbody></table></div>"
 
-    with st.sidebar:
-        st.header("Importation de Données")
-        uploaded_file = st.file_uploader("Choisissez un fichier CSV", type=["csv"])
-        if uploaded_file is not None:
-            try:
-                df_uploaded = pd.read_csv(uploaded_file)
-                st.session_state.df = df_uploaded
-                st.success("Fichier importé avec succès !")
-            except Exception as e:
-                st.error(f"Erreur lors de la lecture du fichier : {e}")
-                st.session_state.df = None
-
-        st.header("Paramètres de Devise")
-        st.session_state.devise_cible = st.selectbox(
-            "Devise cible pour l'affichage",
-            ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
-            index=0
-        )
-
-    afficher_portefeuille()
-
-if __name__ == "__main__":
-    main()
+components.html(html_code, height=600, scrolling=True)
