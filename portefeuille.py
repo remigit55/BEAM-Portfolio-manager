@@ -122,6 +122,7 @@ def afficher_portefeuille():
     total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
+    total_lt = df["Valeur_lt_conv"].sum()
 
     cols = [
         ticker_col,
