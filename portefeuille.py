@@ -10,8 +10,7 @@ def safe_escape(text):
     """Escape HTML characters safely."""
     if hasattr(html, 'escape'):
         return html.escape(str(text))
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
-
+    return str(text).replace("&", "&").replace("<", "<").replace(">", ">").replace('"', """).replace("'", "'")
 
 def fetch_fx_rates(base="EUR"):
     try:
@@ -121,15 +120,14 @@ def afficher_portefeuille():
         df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
-    # Momentum Analysis
-    @st.cache_data(ttl=3600)
-    def fetch_momentum_data(ticker, period="5y", interval="1wk"):
+    # Momentum Analysis using currentPrice
+    def fetch_momentum_data(row):
         try:
-            data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
-            if data.empty:
-                print(f"Aucune donnée pour {ticker}")
+            current_price = row['currentPrice']
+            ticker = row[ticker_col]
+            if pd.isna(current_price):
+                print(f"Aucune donnée de prix pour {ticker}")
                 return {
-                    "Last Price": None,
                     "Momentum (%)": None,
                     "Z-Score": None,
                     "Signal": "",
@@ -137,23 +135,42 @@ def afficher_portefeuille():
                     "Justification": ""
                 }
 
-            if isinstance(data.columns, pd.MultiIndex):
-                close = data['Close'][ticker]
-            else:
-                close = data['Close']
+            # Fetch historical data for MA_39 calculation
+            data = yf.download(ticker, period="5y", interval="1wk", auto_adjust=True, progress=False)
+            if data.empty:
+                print(f"Aucune donnée historique pour {ticker}")
+                return {
+                    "Momentum (%)": None,
+                    "Z-Score": None,
+                    "Signal": "",
+                    "Action": "",
+                    "Justification": ""
+                }
 
+            close = data['Close']
             df_m = pd.DataFrame({'Close': close})
             df_m['MA_39'] = df_m['Close'].rolling(window=39).mean()
             df_m['Momentum'] = (df_m['Close'] / df_m['MA_39']) - 1
             df_m['Z_Momentum'] = (df_m['Momentum'] - df_m['Momentum'].rolling(10).mean()) / df_m['Momentum'].rolling(10).std()
 
-            latest = df_m.iloc[-1]
-            z = latest['Z_Momentum']
-            m = latest['Momentum'] * 100
+            # Use currentPrice for latest momentum
+            latest_ma_39 = df_m['MA_39'].iloc[-1]
+            if pd.isna(latest_ma_39):
+                return {
+                    "Momentum (%)": None,
+                    "Z-Score": None,
+                    "Signal": "",
+                    "Action": "",
+                    "Justification": ""
+                }
+
+            momentum = (current_price / latest_ma_39) - 1
+            z_momentum = (momentum - df_m['Momentum'].rolling(10).mean().iloc[-1]) / df_m['Momentum'].rolling(10).std().iloc[-1]
+            m = momentum * 100
+            z = z_momentum
 
             if pd.isna(z):
                 return {
-                    "Last Price": round(latest['Close'], 2) if not pd.isna(latest['Close']) else None,
                     "Momentum (%)": None,
                     "Z-Score": None,
                     "Signal": "",
@@ -187,7 +204,6 @@ def afficher_portefeuille():
                 reason = "Purge excessive, possible bas de cycle"
 
             return {
-                "Last Price": round(latest['Close'], 2),
                 "Momentum (%)": round(m, 2),
                 "Z-Score": round(z, 2),
                 "Signal": signal,
@@ -197,7 +213,6 @@ def afficher_portefeuille():
         except Exception as e:
             print(f"Erreur avec {ticker}: {e}")
             return {
-                "Last Price": None,
                 "Momentum (%)": None,
                 "Z-Score": None,
                 "Signal": "",
@@ -206,10 +221,8 @@ def afficher_portefeuille():
             }
 
     # Apply momentum analysis
-    momentum_results = {ticker: fetch_momentum_data(ticker) for ticker in df[ticker_col]}
-    momentum_df = pd.DataFrame.from_dict(momentum_results, orient='index').reset_index()
-    momentum_df = momentum_df.rename(columns={'index': ticker_col})
-    df = df.merge(momentum_df, on=ticker_col, how='left')
+    momentum_df = df.apply(fetch_momentum_data, axis=1, result_type='expand')
+    df = pd.concat([df, momentum_df], axis=1)
 
     # Formatage
     def format_fr(x, dec):
@@ -227,7 +240,6 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
-        ("Last Price", 2),
         ("Momentum (%)", 2),
         ("Z-Score", 2)
     ]:
@@ -265,13 +277,12 @@ def afficher_portefeuille():
         "Valeur_H52_fmt",
         "Objectif_LT_fmt",
         "Valeur_LT_fmt",
-        "Last Price_fmt",
+        "Devise",
         "Momentum (%)_fmt",
         "Z-Score_fmt",
         "Signal",
         "Action",
-        "Justification",
-        "Devise"
+        "Justification"
     ]
     labels = [
         "Ticker",
@@ -286,13 +297,12 @@ def afficher_portefeuille():
         "Valeur H52",
         "Objectif LT",
         "Valeur LT",
-        "Last Price",
+        "Devise",
         "Momentum (%)",
         "Z-Score",
         "Signal",
         "Action",
-        "Justification",
-        "Devise"
+        "Justification"
     ]
 
     df_disp = df[cols].copy()
@@ -316,7 +326,6 @@ def afficher_portefeuille():
             "Valeur H52": "Valeur_H52",
             "Objectif LT": "Objectif_LT",
             "Valeur LT": "Valeur_LT",
-            "Last Price": "Last Price",
             "Momentum (%)": "Momentum (%)",
             "Z-Score": "Z-Score"
         }.get(st.session_state.sort_column, st.session_state.sort_column)
@@ -326,7 +335,7 @@ def afficher_portefeuille():
                 ascending=(st.session_state.sort_direction == "asc"),
                 key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf')) if x.name in [
                     "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle",
-                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT", "Last Price",
+                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT",
                     "Momentum (%)", "Z-Score"
                 ] else x.str.lower()
             )
@@ -347,12 +356,13 @@ def afficher_portefeuille():
     <style>
       .button-grid {
         display: grid;
-        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
+        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 60px 80px 80px 150px 150px 150px;
         gap: 0;
         background: #363636;
         position: sticky;
         top: 0;
         z-index: 3;
+        align-items: center;
       }
       .header-button {
         background: #363636;
@@ -365,6 +375,7 @@ def afficher_portefeuille():
         text-align: center;
         box-sizing: border-box;
         width: 100%;
+        min-height: 28px;
       }
       .header-button:hover {
         background: #4a4a4a;
@@ -373,7 +384,7 @@ def afficher_portefeuille():
     """, unsafe_allow_html=True)
 
     with st.container():
-        cols = st.columns([80, 200, 100, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150, 60])
+        cols = st.columns([80, 200, 100, 80, 80, 80, 80, 80, 80, 80, 80, 80, 60, 80, 80, 150, 150, 150])
         for idx, (col, lbl) in enumerate(zip(cols, labels)):
             with col:
                 sort_indicator = ""
@@ -404,7 +415,7 @@ def afficher_portefeuille():
         position: relative;
       }}
       .portfolio-table {{
-        min-width: 2200px;
+        min-width: 2000px !important;
         border-collapse: collapse;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }}
@@ -430,6 +441,7 @@ def afficher_portefeuille():
       .portfolio-table td:nth-child(1), /* Ticker */
       .portfolio-table td:nth-child(2), /* Nom */
       .portfolio-table td:nth-child(3), /* Catégorie */
+      .portfolio-table td:nth-child(13), /* Devise */
       .portfolio-table td:nth-child(16), /* Signal */
       .portfolio-table td:nth-child(17), /* Action */
       .portfolio-table td:nth-child(18) {{ /* Justification */
@@ -437,13 +449,13 @@ def afficher_portefeuille():
         white-space: normal;
       }}
       .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
-        width: 80px;
+        width: 80px !important;
       }}
       .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
-        width: 200px;
+        width: 200px !important;
       }}
       .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ /* Catégorie */
-        width: 100px;
+        width: 100px !important;
       }}
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
@@ -454,18 +466,17 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10), /* Valeur H52 */
       .portfolio-table th:nth-child(11), .portfolio-table td:nth-child(11), /* Objectif LT */
       .portfolio-table th:nth-child(12), .portfolio-table td:nth-child(12), /* Valeur LT */
-      .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13), /* Last Price */
       .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14), /* Momentum (%) */
       .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ /* Z-Score */
-        width: 80px;
+        width: 80px !important;
+      }}
+      .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13) {{ /* Devise */
+        width: 60px !important;
       }}
       .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16), /* Signal */
       .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17), /* Action */
       .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ /* Justification */
-        width: 150px;
-      }}
-      .portfolio-table th:nth-child(19), .portfolio-table td:nth-child(19) {{ /* Devise */
-        width: 60px;
+        width: 150px !important;
       }}
       .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
@@ -508,7 +519,7 @@ def afficher_portefeuille():
           <td>{safe_escape(total_h52_str)}</td>
           <td></td>
           <td>{safe_escape(total_lt_str)}</td>
-          <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
         </tr>
         </tbody>
       </table>
