@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import requests  # Ensure requests is imported
+import requests  # Explicitly import requests
 import html
 import streamlit.components.v1 as components
 
