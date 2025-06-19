@@ -40,14 +40,9 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-
-
-from PIL import Image
-import base64
-from io import BytesIO
-
+# Chargement du logo
 try:
-    logo = Image.open("Logo.png.png")  # ajuste le nom si besoin
+    logo = Image.open("Logo.png.png")  # Ajuste le nom si besoin
     buffer = BytesIO()
     logo.save(buffer, format="PNG")
     logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -64,16 +59,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 # Initialisation des variables de session
-if "df" not in st.session_state:
-    st.session_state.df = None
-if "fx_rates" not in st.session_state:
-    st.session_state.fx_rates = {}
-if "devise_cible" not in st.session_state:
-    st.session_state.devise_cible = "EUR"
-if "ticker_names_cache" not in st.session_state:
-    st.session_state.ticker_names_cache = {}
+for key, default in {
+    "df": None,
+    "fx_rates": {},
+    "devise_cible": "EUR",
+    "ticker_names_cache": {},
+    "sort_column": None,
+    "sort_direction": "asc",
+    "momentum_results": {}
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 # Importation des modules fonctionnels
 from portefeuille import afficher_portefeuille
