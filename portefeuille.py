@@ -12,16 +12,19 @@ def safe_escape(text):
         return html.escape(str(text))
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
 
-
+@st.cache_data(ttl=3600)
 def fetch_fx_rates(base="EUR"):
     try:
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        data = response.json()
+        # --- FIX IS HERE ---
+        data = response.json() # Call .json() to parse the response content
+        # -------------------
         return data.get("rates", {})
     except Exception as e:
-        print(f"Erreur lors de la récupération des taux : {e}")
+        # Using st.error for user feedback is better than print() in Streamlit
+        st.error(f"Erreur lors de la récupération des taux de change : {e}")
         return {}
 
 def afficher_portefeuille():
