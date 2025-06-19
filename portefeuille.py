@@ -504,15 +504,14 @@ def afficher_portefeuille():
                 // Si les deux sont des nombres valides, trier numériquement
                 if (!isNaN(xNum) && !isNaN(yNum)) {{
                     // Gérer les valeurs manquantes/non numériques en les plaçant à la fin
-                    // C'est pour le JS, donc pas besoin de la ligne de commentaire Python.
                     if (isNaN(xNum) && !isNaN(yNum)) return dir === "asc" ? 1 : -1;
                     if (!isNaN(xNum) && isNaN(yNum)) return dir === "asc" ? -1 : 1;
-                    if (isNaN(xNum) && isNaN(yNum)) return 0; // Si les deux sont NaN, leur ordre n'importe pas
+                    if (isNaN(xNum) && isNaN(yNum)) return 0; 
                     
                     return dir === "asc" ? xNum - yNum : yNum - xNum;
                 }}
                 // Sinon, trier alphabétiquement (insensible à la casse, insensible aux accents)
-                // 'undefined, {sensitivity: 'base'}' pour un tri insensible à la casse et aux accents
+                // Le commentaire JS ci-dessous a été retiré pour éviter l'erreur.
                 return dir === "asc" ? x.localeCompare(y, undefined, {{sensitivity: 'base'}}) : y.localeCompare(x, undefined, {{sensitivity: 'base'}});
             }});
             
