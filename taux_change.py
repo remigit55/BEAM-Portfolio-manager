@@ -4,23 +4,20 @@ import datetime
 import requests
 import html
 import streamlit.components.v1 as components
+from tenacity import retry, stop_after_attempt, wait_fixed
 
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 def obtenir_taux(devise_source, devise_cible):
     if devise_source == devise_cible:
         return 1.0
     ticker = f"{devise_source.upper()}{devise_cible.upper()}=X"
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-    headers = { "User-Agent": "Mozilla/5.0" }
-
-    try:
-        r = requests.get(url, headers=headers, timeout=5)
-        r.raise_for_status()
-        data = r.json()
-        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-        return float(meta.get("regularMarketPrice", 0))
-    except Exception as e:
-        st.warning(f"Taux non disponible pour {devise_source}/{devise_cible} : {e}")
-        return None
+    headers = {"User-Agent": "Mozilla/5.0"}
+    r = requests.get(url, headers=headers, timeout=5)
+    r.raise_for_status()
+    data = r.json()
+    meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+    return float(meta.get("regularMarketPrice", 0))
 
 def afficher_taux_change():
     df = st.session_state.get("df")
