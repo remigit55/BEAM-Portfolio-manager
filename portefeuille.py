@@ -132,7 +132,7 @@ def afficher_portefeuille():
         "Valeur",
         "Prix Actuel",
         "Valeur Actuelle",
-        "Haut 52 Semaines",
+        "Prix H52",
         "Valeur H52",
         "Objectif LT",
         "Valeur LT",
