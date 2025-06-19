@@ -339,55 +339,6 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
 
-    # Boutons de tri en grille
-    st.markdown("""
-    <style>
-      .button-grid {
-        display: grid;
-        grid-template-columns: 60px 200px 100px 40px 60px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px;
-        gap: 0;
-        background: #363636;
-        position: sticky;
-        top: 0;
-        z-index: 3;
-      }
-      .header-button {
-        background: #363636;
-        color: white;
-        border: none;
-        padding: 8px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 12px;
-        cursor: pointer;
-        text-align: center;
-        box-sizing: border-box;
-        width: 100%;
-      }
-      .header-button:hover {
-        background: #4a4a4a;
-      }
-    </style>
-    """, unsafe_allow_html=True)
-
-    with st.container():
-        cols = st.columns([20, 200, 100, 40, 60, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150])
-        for idx, (col, lbl) in enumerate(zip(cols, labels)):
-            with col:
-                sort_indicator = ""
-                if st.session_state.sort_column == lbl:
-                    sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-                if st.button(
-                    f"{lbl}{sort_indicator}",
-                    key=f"sort_{lbl}_{idx}",
-                    help=f"Trier par {lbl}",
-                    use_container_width=True
-                ):
-                    if st.session_state.sort_column == lbl:
-                        st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-                    else:
-                        st.session_state.sort_column = lbl
-                        st.session_state.sort_direction = "asc"
-
     # Construction HTML pour la table
     html_code = f"""
     <style>
