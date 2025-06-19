@@ -6,3 +6,5 @@ gdown
 gspread
 oauth2client
 yfinance
+requests
+tenacity
