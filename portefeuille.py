@@ -103,9 +103,9 @@ def afficher_portefeuille():
     total_h52 = df["Valeur_H52_conv"].sum()
 
     if "Objectif_LT" not in df.columns:
-    df["Objectif_LT"] = ""
+        df["Objectif_LT"] = ""
     if "Valeur_LT" not in df.columns:
-    df["Valeur_LT"] = ""
+        df["Valeur_LT"] = ""
 
 
     cols = [
@@ -134,7 +134,7 @@ def afficher_portefeuille():
         "Valeur Actuelle",
         "Haut 52 Semaines",
         "Valeur H52",
-        "Objectif LT,
+        "Objectif LT",
         "Valeur LT",
         "Devise"
     ]
