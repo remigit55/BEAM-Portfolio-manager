@@ -71,12 +71,6 @@ def afficher_portefeuille():
     if all(c in df.columns for c in ["Quantité", "currentPrice"]):
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
 
-    # Conversion Objectif_LT et calcul de Valeur_LT
-    if "Objectif_LT" not in df.columns:
-        df["Objectif_LT"] = ""
-    df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"].astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce")
-    df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
-
     def format_fr(x, dec):
         if pd.isnull(x): return ""
         s = f"{x:,.{dec}f}"
@@ -89,9 +83,7 @@ def afficher_portefeuille():
         ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4),
         ("Valeur_H52", 2),
-        ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4),
-        ("Valeur_LT", 2)
+        ("Valeur_Actuelle", 2)
     ]:
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
@@ -110,6 +102,12 @@ def afficher_portefeuille():
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
 
+    if "Objectif_LT" not in df.columns:
+    df["Objectif_LT"] = ""
+    if "Valeur_LT" not in df.columns:
+    df["Valeur_LT"] = ""
+
+
     cols = [
         ticker_col,
         "shortName",
@@ -121,8 +119,8 @@ def afficher_portefeuille():
         "Valeur_Actuelle_fmt",
         "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt",
-        "Objectif_LT_fmt",
-        "Valeur_LT_fmt",
+        "Objectif_LT",
+        "Valeur_LT",
         "Devise"
     ]
     labels = [
@@ -136,7 +134,7 @@ def afficher_portefeuille():
         "Valeur Actuelle",
         "Haut 52 Semaines",
         "Valeur H52",
-        "Objectif LT",
+        "Objectif LT,
         "Valeur LT",
         "Devise"
     ]
@@ -191,6 +189,8 @@ def afficher_portefeuille():
         <td>{format_fr(total_actuelle, 2)}</td>
         <td></td>
         <td>{format_fr(total_h52, 2)}</td>
+        <td></td>
+        <td></td>
         <td></td>
       </tr>
     </tfoot>
