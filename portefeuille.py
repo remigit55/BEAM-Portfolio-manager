@@ -18,6 +18,12 @@ def afficher_portefeuille():
         df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
+    if "last_devise_cible" not in st.session_state:
+    st.session_state.last_devise_cible = devise_cible
+elif st.session_state.last_devise_cible != devise_cible:
+    st.session_state.last_devise_cible = devise_cible
+    # Recalcul des taux ici si nécessaire
+    st.session_state.fx_rates = fetch_fx_rates()
     fx_rates = st.session_state.get("fx_rates", {})
 
     for col in ["Quantité", "Acquisition"]:
