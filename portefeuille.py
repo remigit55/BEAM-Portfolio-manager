@@ -102,6 +102,12 @@ def afficher_portefeuille():
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
 
+    if "Objectif_LT" not in df.columns:
+    df["Objectif_LT"] = ""
+    if "Valeur_LT" not in df.columns:
+    df["Valeur_LT"] = ""
+
+
     cols = [
         ticker_col,
         "shortName",
@@ -113,6 +119,8 @@ def afficher_portefeuille():
         "Valeur_Actuelle_fmt",
         "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt",
+        "Objectif_LT",
+        "Valeur_LT",
         "Devise"
     ]
     labels = [
@@ -126,6 +134,8 @@ def afficher_portefeuille():
         "Valeur Actuelle",
         "Haut 52 Semaines",
         "Valeur H52",
+        "Objectif LT,
+        "Valeur LT",
         "Devise"
     ]
 
