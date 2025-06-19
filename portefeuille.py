@@ -125,6 +125,11 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
+        ("Momentum", 2),
+        ("Z-score", 2),
+        ("Signal", 2),
+        ("Action", 2),
+        ("Justification", 2),
     ]:
         if col in df.columns:
             df[f"{col}_fmt"] = df[col].map(lambda x: format_fr(x, dec))
