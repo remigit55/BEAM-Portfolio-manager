@@ -72,15 +72,9 @@ def afficher_portefeuille():
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
 
     if "Objectif_LT" not in df.columns:
-    df["Objectif_LT"] = ""
-    df["Objectif_LT"] = (
-        df["Objectif_LT"].astype(str)
-                      .str.replace(" ", "", regex=False)
-                      .str.replace(",", ".", regex=False)
-    )
-    df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
-
-    df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
+        df["Objectif_LT"] = 0.0
+    df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce").fillna(0.0)
+    df["Valeur_LT"] = df["Objectif_LT"] * df["Quantité"]
 
     def format_fr(x, dec):
         if pd.isnull(x): return ""
@@ -148,6 +142,15 @@ def afficher_portefeuille():
 
     df_disp = df[cols].copy()
     df_disp.columns = labels
+
+    # Affichage HTML (inchangé)
+    # ... (vous pouvez garder ici la même structure HTML et JS que dans votre code original)
+
+    # Exemple de rendu (réduit ici)
+    st.dataframe(df_disp, use_container_width=True)
+
+    st.markdown(f"**Total ({devise_cible})** : {format_fr(total_valeur, 2)} | Actuelle : {format_fr(total_actuelle, 2)} | H52 : {format_fr(total_h52, 2)}")
+
 
     html_code = """
 <style>
