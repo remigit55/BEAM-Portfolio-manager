@@ -202,7 +202,9 @@ def afficher_portefeuille():
         <td>{format_fr(total_actuelle, 2)}</td>
         <td></td>
         <td>{format_fr(total_h52, 2)}</td>
-        <td></td><td></td><td></td>
+        <td></td>
+        <td>{format_fr(total_valeur_lt, 2)}</td>
+        <td></td>
       </tr>
     </tfoot>
   </table>
