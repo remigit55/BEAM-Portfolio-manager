@@ -227,7 +227,6 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
-        // ("Last Price", 2),
         ("Momentum (%)", 2),
         ("Z-Score", 2)
     ]:
@@ -265,7 +264,6 @@ def afficher_portefeuille():
         "Valeur_H52_fmt",
         "Objectif_LT_fmt",
         "Valeur_LT_fmt",
-        "Last Price_fmt",
         "Momentum (%)_fmt",
         "Z-Score_fmt",
         "Signal",
@@ -286,7 +284,6 @@ def afficher_portefeuille():
         "Valeur H52",
         "Objectif LT",
         "Valeur LT",
-        "Last Price",
         "Momentum (%)",
         "Z-Score",
         "Signal",
