@@ -51,13 +51,16 @@ except Exception:
 
 st.markdown(
     f"""
-    <div style="display: flex; justify-content: center; align-items: center; margin-top: -10px; margin-bottom: 20px;">
-        <img src="data:image/png;base64,{logo_base64}" style="height: 55px; margin-right: 10px;" />
-        <h1 style='font-size: 32px; margin: 0;'>BEAM Portfolio Manager</h1>
+    <div style="width: 100%; display: flex; justify-content: center; align-items: center; margin-top: -10px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center;">
+            <img src="data:image/png;base64,{logo_base64}" style="height: 55px; margin-right: 12px;" />
+            <h1 style="font-size: 32px; margin: 0;">BEAM Portfolio Manager</h1>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
 
 
 # Initialisation des variables de session
