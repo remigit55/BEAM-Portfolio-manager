@@ -305,40 +305,39 @@ def afficher_portefeuille():
     df_disp.columns = actual_labels # Set display labels as column names for df_disp
 
     # --- Tri du DataFrame pour l'affichage ---
-    query_params = st.query_params
-    sort_column_from_url = query_params.get("sort_column", None)
-    sort_direction_from_url = query_params.get("sort_direction", "asc")
-    
-    if sort_column_from_url in df_disp.columns:
-        sort_col_label = sort_column_from_url # The label of the column to sort by in df_disp
-        
-        # Find the original numeric column name in df that corresponds to sort_col_label
-        # We need this to sort by numeric values for formatted columns
-        original_numeric_col_name = None
-        for internal_col_key, label in full_columns_mapping.items():
-            if label == sort_col_label:
-                original_numeric_col_name = internal_col_key.replace('_fmt', '')
-                break
+    # --- Tri du DataFrame pour l'affichage ---
+query_params = st.query_params
+# Handle cases where get returns a list (Streamlit behavior)
+sort_column_from_url = query_params.get("sort_column", [None])[0]
+sort_direction_from_url = query_params.get("sort_direction", ["asc"])[0]
 
-        # Check if the original column exists in 'df' and if it's numeric
-        if original_numeric_col_name and original_numeric_col_name in df.columns:
-            # Sort df_disp using the numeric values from the original df column
-            # This is the key fix for the TypeError
-            df_disp = df_disp.sort_values(
-                by=sort_col_label, # Sort by the displayed column label
-                ascending=(sort_direction_from_url == "asc"),
-                # Use a lambda key to convert to numeric for sorting, handling errors
-                key=lambda x: pd.to_numeric(
-                    df[original_numeric_col_name], errors='coerce'
-                ).reindex(x.index).fillna(-float('inf')) # Reindex to match df_disp's index
-            )
-        else:
-            # For non-numeric or string columns, sort directly on the displayed column
-            df_disp = df_disp.sort_values(
-                by=sort_col_label,
-                ascending=(sort_direction_from_url == "asc"),
-                key=lambda x: x.astype(str).str.lower() if x.dtype == 'object' else x 
-            )
+if sort_column_from_url in actual_labels:  # Validate against display labels
+    sort_col_label = sort_column_from_url
+
+    # Find the original column name in df for numeric sorting
+    original_numeric_col_name = None
+    for internal_col_key, label in full_columns_mapping.items():
+        if label == sort_col_label:
+            original_numeric_col_name = internal_col_key.replace('_fmt', '')
+            break
+
+    if original_numeric_col_name and original_numeric_col_name in df.columns:
+        # Sort using the original numeric column from df
+        df_disp = df_disp.sort_values(
+            by=sort_col_label,
+            ascending=(sort_direction_from_url == "asc"),
+            key=lambda x: pd.to_numeric(
+                df[original_numeric_col_name].reindex(df_disp.index, fill_value=float('nan')),
+                errors='coerce'
+            ).fillna(-float('inf'))
+        )
+    else:
+        # Sort non-numeric columns as strings, handling None/NaN
+        df_disp = df_disp.sort_values(
+            by=sort_col_label,
+            ascending=(sort_direction_from_url == "asc"),
+            key=lambda x: x.fillna('').astype(str).str.lower()
+        )
             
     total_valeur_str = format_fr(total_valeur, 2)
     total_actuelle_str = format_fr(total_actuelle, 2)
