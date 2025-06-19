@@ -42,7 +42,7 @@ def afficher_portefeuille():
         if "ticker_names_cache" not in st.session_state:
             st.session_state.ticker_names_cache = {}
 
-
+        @st.cache_data(ttl=3600)  # Cache pendant 1 heure
         def fetch_yahoo_data(t):
             t = str(t).strip().upper()
             if t in st.session_state.ticker_names_cache:
