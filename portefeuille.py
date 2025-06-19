@@ -10,8 +10,7 @@ def safe_escape(text):
     """Escape HTML characters safely."""
     if hasattr(html, 'escape'):
         return html.escape(str(text))
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
-
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
 
 def fetch_fx_rates(base="EUR"):
     try:
@@ -290,7 +289,6 @@ def afficher_portefeuille():
         "Signal",
         "Action",
         "Justification"
-        
     ]
 
     df_disp = df[cols].copy()
@@ -323,8 +321,7 @@ def afficher_portefeuille():
                 ascending=(st.session_state.sort_direction == "asc"),
                 key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf')) if x.name in [
                     "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle",
-                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT", "Last Price",
-                    "Momentum (%)", "Z-Score"
+                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT", "Momentum (%)", "Z-Score"
                 ] else x.str.lower()
             )
         else:
@@ -339,56 +336,7 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
 
-    # Boutons de tri en grille
-    st.markdown("""
-    <style>
-      .button-grid {
-        display: grid;
-        grid-template-columns: 60px 200px 100px 40px 60px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px;
-        gap: 0;
-        background: #363636;
-        position: sticky;
-        top: 0;
-        z-index: 3;
-      }
-      .header-button {
-        background: #363636;
-        color: white;
-        border: none;
-        padding: 8px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 12px;
-        cursor: pointer;
-        text-align: center;
-        box-sizing: border-box;
-        width: 100%;
-      }
-      .header-button:hover {
-        background: #4a4a4a;
-      }
-    </style>
-    """, unsafe_allow_html=True)
-
-    with st.container():
-        cols = st.columns([60, 200, 100, 40, 60, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150])
-        for idx, (col, lbl) in enumerate(zip(cols, labels)):
-            with col:
-                sort_indicator = ""
-                if st.session_state.sort_column == lbl:
-                    sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-                if st.button(
-                    f"{lbl}{sort_indicator}",
-                    key=f"sort_{lbl}_{idx}",
-                    help=f"Trier par {lbl}",
-                    use_container_width=True
-                ):
-                    if st.session_state.sort_column == lbl:
-                        st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-                    else:
-                        st.session_state.sort_column = lbl
-                        st.session_state.sort_direction = "asc"
-
-    # Construction HTML pour la table
+    # Construction HTML pour la table avec en-têtes cliquables
     html_code = f"""
     <style>
       .scroll-wrapper {{
@@ -416,6 +364,10 @@ def afficher_portefeuille():
         z-index: 2;
         font-size: 12px;
         box-sizing: border-box;
+        cursor: pointer;
+      }}
+      .portfolio-table th:hover {{
+        background: #4a4a4a;
       }}
       .portfolio-table td {{
         padding: 6px;
@@ -424,67 +376,89 @@ def afficher_portefeuille():
         font-size: 11px;
         white-space: nowrap;
       }}
-      .portfolio-table td:nth-child(1), /* Ticker */
-      .portfolio-table td:nth-child(2), /* Nom */
-      .portfolio-table td:nth-child(3), /* Catégorie */
-      .portfolio-table td:nth-child(16), /* Signal */
-      .portfolio-table td:nth-child(17), /* Action */
-      .portfolio-table td:nth-child(18) {{ /* Justification */
+      .portfolio-table td:nth-child(1),
+      .portfolio-table td:nth-child(2),
+      .portfolio-table td:nth-child(3),
+      .portfolio-table td:nth-child(16),
+      .portfolio-table td:nth-child(17),
+      .portfolio-table td:nth-child(18) {{
         text-align: left;
         white-space: normal;
       }}
-      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
-        width: 80px;
-      }}
-      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
-        width: 200px;
-      }}
-      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ /* Catégorie */
-        width: 100px;
-      }}
-      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
-      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
-      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6), /* Valeur */
-      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7), /* Prix Actuel */
-      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8), /* Valeur Actuelle */
-      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9), /* Haut 52 Semaines */
-      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10), /* Valeur H52 */
-      .portfolio-table th:nth-child(11), .portfolio-table td:nth-child(11), /* Objectif LT */
-      .portfolio-table th:nth-child(12), .portfolio-table td:nth-child(12), /* Valeur LT */
-      .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13), /* Last Price */
-      .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14), /* Momentum (%) */
-      .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ /* Z-Score */
-        width: 80px;
-      }}
-      .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16), /* Signal */
-      .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17), /* Action */
-      .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ /* Justification */
-        width: 150px;
-      }}
-      .portfolio-table th:nth-child(19), .portfolio-table td:nth-child(19) {{ /* Devise */
-        width: 60px;
-      }}
+      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ width: 80px; }}
+      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ width: 200px; }}
+      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ width: 100px; }}
+      .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4) {{ width: 60px; }}
+      .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5) {{ width: 60px; }}
+      .portfolio-table th:nth-child(6), .portfolio-table td:nth-child(6) {{ width: 80px; }}
+      .portfolio-table th:nth-child(7), .portfolio-table td:nth-child(7) {{ width: 80px; }}
+      .portfolio-table th:nth-child(8), .portfolio-table td:nth-child(8) {{ width: 80px; }}
+      .portfolio-table th:nth-child(9), .portfolio-table td:nth-child(9) {{ width: 80px; }}
+      .portfolio-table th:nth-child(10), .portfolio-table td:nth-child(10) {{ width: 80px; }}
+      .portfolio-table th:nth-child(11), .portfolio-table td:nth-child(11) {{ width: 80px; }}
+      .portfolio-table th:nth-child(12), .portfolio-table td:nth-child(12) {{ width: 80px; }}
+      .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13) {{ width: 80px; }}
+      .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14) {{ width: 80px; }}
+      .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ width: 80px; }}
+      .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16) {{ width: 150px; }}
+      .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17) {{ width: 150px; }}
+      .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ width: 150px; }}
       .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
         background: #A49B6D;
         color: white;
         font-weight: bold;
       }}
+      .sort-asc::after {{ content: ' ▲'; }}
+      .sort-desc::after {{ content: ' ▼'; }}
     </style>
+    <script>
+    function sortTable(column) {{
+      let currentSort = '{st.session_state.sort_column or ""}';
+      let currentDirection = '{st.session_state.sort_direction}';
+      let direction = 'asc';
+      if (currentSort === column) {{
+        direction = currentDirection === 'asc' ? 'desc' : 'asc';
+      }}
+      const url = new URL(window.location);
+      url.searchParams.set('sort_column', column);
+      url.searchParams.set('sort_direction', direction);
+      window.location = url.toString();
+    }}
+    window.onload = function() {{
+      const urlParams = new URLSearchParams(window.location.search);
+      const sortColumn = urlParams.get('sort_column');
+      const sortDirection = urlParams.get('sort_direction');
+      if (sortColumn) {{
+        const headers = document.querySelectorAll('.portfolio-table th');
+        headers.forEach(header => {{
+          if (header.textContent === sortColumn) {{
+            header.classList.add(sortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+          }} else {{
+            header.classList.remove('sort-asc', 'sort-desc');
+          }}
+        });
+      }}
+    }};
+    </script>
     <div class="scroll-wrapper">
       <table class="portfolio-table">
         <thead><tr>
     """
 
-    # Ajouter les en-têtes statiques
-    for lbl in labels:
-        html_code += f'<th>{safe_escape(lbl)}</th>'
+    # Ajouter les en-têtes avec événement onclick
+    for idx, lbl in enumerate(labels):
+        sort_indicator = ""
+        if st.session_state.sort_column == lbl:
+            sort_indicator = f' class="sort-{"asc" if st.session_state.sort_direction == "asc" else "desc"}"'
+        html_code += f'<th{sort_indicator} onclick="sortTable(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}</th>'
 
     html_code += """
         </tr></thead>
         <tbody>
     """
 
+    # Corps du tableau
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
         for lbl in labels:
@@ -505,7 +479,7 @@ def afficher_portefeuille():
           <td>{safe_escape(total_h52_str)}</td>
           <td></td>
           <td>{safe_escape(total_lt_str)}</td>
-          <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
         </tr>
         </tbody>
       </table>
@@ -513,3 +487,10 @@ def afficher_portefeuille():
     """
 
     components.html(html_code, height=600, scrolling=True)
+
+    # Gestion des paramètres d'URL pour le tri
+    url_params = st.query_params
+    if "sort_column" in url_params:
+        st.session_state.sort_column = url_params["sort_column"]
+    if "sort_direction" in url_params:
+        st.session_state.sort_direction = url_params["sort_direction"]
