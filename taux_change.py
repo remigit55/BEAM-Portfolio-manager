@@ -5,6 +5,19 @@ import requests
 import html
 import streamlit.components.v1 as components
 
+def actualiser_taux_change(devise_cible, devises_uniques):
+    """Fonction pour actualiser les taux de change pour une devise cible donnée."""
+    taux_dict = {}
+    for d in devises_uniques:
+        try:
+            taux = obtenir_taux(d, devise_cible)
+            if taux:
+                taux_dict[d] = taux
+        except Exception as e:
+            st.warning(f"Taux non disponible pour {d}/{devise_cible} : {e}")
+            taux_dict[d] = None
+    return taux_dict
+
 def afficher_taux_change():
     df = st.session_state.get("df")
     if df is None or "Devise" not in df.columns:
@@ -52,7 +65,9 @@ def afficher_taux_change():
         <tbody>
     """
     for _, row in df_fx.iterrows():
-        html_code += f"<tr><td>{html.escape(str(row[0]))}</td><td>{row[1]:,.6f if pd.notnull(row[1]) else ''}</td></tr>"
+        # Format the rate conditionally
+        taux = f"{row[1]:,.6f}" if pd.notnull(row[1]) else ""
+        html_code += f"<tr><td>{html.escape(str(row[0]))}</td><td>{taux}</td></tr>"
     html_code += """
         </tbody>
       </table>
