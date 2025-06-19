@@ -18,15 +18,17 @@ def fetch_fx_rates(base="EUR"):
         url = f"https://api.exchangerate.host/latest?base={base}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        data = response.json()
-        return data.get("rates", {})
+        data = response.get("rates", {})
+        return data
     except Exception as e:
-        print(f"Erreur lors de la récupération des taux : {e}")
+        st.error(f"Erreur lors de la récupération des taux de change : {e}")
         return {}
 
 @st.cache_data(ttl=900)
 def fetch_yahoo_data(t):
     t = str(t).strip().upper()
+    if not t: return {"shortName": "", "currentPrice": None, "fiftyTwoWeekHigh": None}
+
     if "ticker_names_cache" not in st.session_state:
         st.session_state.ticker_names_cache = {}
 
@@ -95,6 +97,10 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             signal = "➖ Neutre"
             action = "Ne rien faire"
             reason = "Pas de signal exploitable"
+        elif z > -1.5:
+            signal = "↘ Faible"
+            action = "Surveiller / Réduire si confirmé"
+            reason = "Dynamique en affaiblissement"
         else:
             signal = "🧊 Survendu"
             action = "Acheter / Renforcer (si signal technique)"
@@ -251,9 +257,9 @@ def afficher_portefeuille():
     df_disp = df[final_cols_internal].copy()
     df_disp.columns = final_labels
 
-    html_version = int(time.time())
-    
-    # Construction de la partie HTML du tableau
+    # Génération du contenu HTML du tableau
+    table_headers_html = "".join([f'<th data-column-index="{i}">{safe_escape(label)}</th>' for i, label in enumerate(final_labels)])
+
     table_rows_html = ""
     for _, row in df_disp.iterrows():
         table_rows_html += "<tr>"
@@ -263,7 +269,6 @@ def afficher_portefeuille():
             table_rows_html += f"<td>{val_str}</td>"
         table_rows_html += "</tr>"
 
-    # Ligne TOTAL
     num_cols_displayed = len(df_disp.columns)
     total_row_cells = [""] * num_cols_displayed
     
@@ -294,8 +299,7 @@ def afficher_portefeuille():
         total_row_html += f"<td>{cell_content}</td>"
     total_row_html += "</tr>"
 
-    # Utilisation de triple guillemets simples pour encapsuler le HTML/JS
-    # Cela aide à éviter les problèmes avec les guillemets doubles et les accolades à l'intérieur.
+    # Le HTML principal, avec la feuille de style et le script externe
     html_code = f'''
     <!DOCTYPE html>
     <html>
@@ -311,7 +315,7 @@ def afficher_portefeuille():
     }}
     .portfolio-table {{
       width: 100%;
-      min-width: 1800px;
+      min-width: 1800px; /* Ajustez cette valeur si votre tableau est plus large ou moins large */
       border-collapse: collapse;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }}
@@ -348,99 +352,24 @@ def afficher_portefeuille():
     <body>
     <div class="scroll-wrapper">
       <table class="portfolio-table">
-        <thead><tr>
-    '''
-
-    for i, label in enumerate(final_labels):
-        html_code += f'<th data-column-index="{i}">{safe_escape(label)}</th>'
-    
-    html_code += f'''
-        </tr></thead>
+        <thead>
+          <tr>
+            {table_headers_html}
+          </tr>
+        </thead>
         <tbody>
-        {table_rows_html}
-        {total_row_html}
+          {table_rows_html}
+          {total_row_html}
         </tbody>
       </table>
     </div>
-    
-    <script>
-    (function() {{
-        function sortTable(n) {{
-            var table = document.querySelector(".portfolio-table");
-            var tbody = table.querySelector("tbody");
-            var rows = Array.from(tbody.rows);
-            var currentHeader = table.querySelectorAll("th")[n];
-            
-            var dir = currentHeader.getAttribute("data-dir") || "asc";
-            dir = (dir === "asc") ? "desc" : "asc";
-            
-            table.querySelectorAll("th").forEach(th => {{
-                th.removeAttribute("data-dir");
-                th.classList.remove("sort-asc", "sort-desc");
-                th.innerHTML = th.innerHTML.replace(' ▲', '').replace(' ▼', '');
-            }});
-            
-            currentHeader.setAttribute("data-dir", dir);
-            currentHeader.classList.add(dir === "asc" ? "sort-asc" : "sort-desc");
-            currentHeader.innerHTML += (dir === "asc" ? " ▲" : " ▼");
-
-            rows.sort((a, b) => {{
-                // Skip the total row from sorting
-                if (a.classList.contains('total-row') || b.classList.contains('total-row')) {{
-                    return 0; 
-                }}
-
-                var x = a.cells[n].textContent.trim();
-                var y = b.cells[n].textContent.trim();
-            
-                var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
-                var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
-            
-                if (!isNaN(xNum) && !isNaN(yNum)) {{
-                    if (isNaN(xNum) && !isNaN(yNum)) return dir === "asc" ? 1 : -1;
-                    if (!isNaN(xNum) && isNaN(yNum)) return dir === "asc" ? -1 : 1;
-                    if (isNaN(xNum) && isNaN(yNum)) return 0;
-                    
-                    return dir === "asc" ? xNum - yNum : yNum - xNum;
-                }}
-                return dir === "asc" ? x.localeCompare(y, undefined, {{sensitivity: 'base'}}) : y.localeCompare(x, undefined, {{sensitivity: 'base'}});
-            }});
-            
-            // Re-append rows, ensuring the total row is always at the bottom
-            tbody.innerHTML = "";
-            let totalRow = null;
-            rows.forEach(row => {{
-                if (row.classList.contains('total-row')) {{
-                    totalRow = row;
-                }} else {{
-                    tbody.appendChild(row);
-                }}
-            }});
-            if (totalRow) {{
-                tbody.appendChild(totalRow);
-            }}
-        }}
-
-        document.addEventListener('DOMContentLoaded', function() {{
-            const headers = document.querySelectorAll('.portfolio-table th');
-            headers.forEach(header => {{
-                header.addEventListener('click', function() {{
-                    const colIndex = parseInt(this.getAttribute('data-column-index'));
-                    if (!isNaN(colIndex)) {{
-                        sortTable(colIndex);
-                    }}
-                }});
-            }});
-        }});
-    }})();
-    </script>
+    <script src="sort_table.js"></script> 
     </body>
     </html>
     '''
-
-    # La clé est maintenant un simple string fixe, car le timestamp n'est plus nécessaire si l'on ne veut pas forcer le re-rendu du composant à chaque exécution.
-    # Si le problème de cache persiste après cela, nous pourrions remettre le timestamp.
-    components.html(html_code, height=600, scrolling=True, key="portfolio_table_component")
+    # Utilisez un key unique pour forcer Streamlit à re-renderer si le contenu change (par exemple, si le DataFrame est mis à jour)
+    # Le timestamp est une bonne méthode pour garantir l'unicité à chaque chargement de la page.
+    components.html(html_code, height=600, scrolling=True, key=f"portfolio_table_component_{time.time()}")
 
 def main():
     st.set_page_config(layout="wide", page_title="Mon Portefeuille")
