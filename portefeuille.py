@@ -9,7 +9,8 @@ def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
         return
-        df = st.session_state.df.copy()
+
+    df = st.session_state.df.copy()
     devise_cible = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.get("fx_rates", {})
 
@@ -71,8 +72,7 @@ def afficher_portefeuille():
         df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
 
     if "Objectif_LT" not in df.columns:
-    df["Objectif_LT"] = pd.NA  # ou np.nan
-
+        df["Objectif_LT"] = pd.NA
     else:
         df["Objectif_LT"] = (
             df["Objectif_LT"]
@@ -151,8 +151,7 @@ def afficher_portefeuille():
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
-    html_code = f"""
-<style>
+    html_code = f"""<style>
   .table-container {{ max-height: 500px; overflow-y: auto; }}
   .portfolio-table {{ width: 100%; border-collapse: collapse; table-layout: auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
   .portfolio-table th {{
@@ -174,8 +173,7 @@ def afficher_portefeuille():
 </style>
 <div class="table-container">
   <table class="portfolio-table">
-    <thead><tr>
-"""
+    <thead><tr>"""
     for i, label in enumerate(labels):
         html_code += f'<th onclick="sortTable({i})">{html.escape(label)}</th>'
     html_code += "</tr></thead><tbody>"
@@ -230,6 +228,6 @@ function sortTable(n) {{
   tbody.innerHTML = "";
   rows.forEach(row => tbody.appendChild(row));
 }}
-</script>
-"""
+</script>"""
+
     components.html(html_code, height=600, scrolling=True)
