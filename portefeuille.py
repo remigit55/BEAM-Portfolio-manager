@@ -16,7 +16,7 @@ def fetch_fx_rates(base="EUR"):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data.get("rates ", {})
+        return data.get("rates", {})  # Fixed: comma added, trailing space removed
     except Exception as e:
         print(f"Erreur lors de la récupération des taux : {e}")
         return {}
@@ -343,14 +343,14 @@ def afficher_portefeuille():
     html_code = f"""
     <style>
       .table-wrapper {{
-        overflow-x: auto;
+        overflow-x: auto !important;
         overflow-y: auto;
         max-height: 500px;
-        width: 100%;
+        display: block;
         position: relative;
       }}
       .portfolio-table {{
-        min-width: 2000px; /* Ensure wide table for 19 columns */
+        min-width: 2000px;
         border-collapse: collapse;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }}
@@ -362,7 +362,7 @@ def afficher_portefeuille():
         border: none;
         position: sticky;
         top: 0;
-        z-index: 2;
+        z-index: 3;
         font-size: 12px;
         box-sizing: border-box;
       }}
@@ -371,7 +371,7 @@ def afficher_portefeuille():
         text-align: right;
         border: none;
         font-size: 11px;
-        white-space: nowrap; /* Prevent text wrapping */
+        white-space: nowrap;
       }}
       .portfolio-table td:nth-child(1), /* Ticker */
       .portfolio-table td:nth-child(2), /* Nom */
@@ -380,7 +380,7 @@ def afficher_portefeuille():
       .portfolio-table td:nth-child(17), /* Action */
       .portfolio-table td:nth-child(18) {{ /* Justification */
         text-align: left;
-        white-space: normal; /* Allow wrapping for text columns */
+        white-space: normal;
       }}
       .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
         width: 80px;
@@ -430,6 +430,7 @@ def afficher_portefeuille():
         cursor: pointer;
         text-align: center;
         box-sizing: border-box;
+        display: block;
       }}
       .header-button:hover {{
         background: #4a4a4a;
@@ -440,39 +441,29 @@ def afficher_portefeuille():
         <thead><tr>
     """
 
-    # Ajouter les en-têtes avec des boutons
+    # Ajouter les en-têtes avec boutons
     for idx, lbl in enumerate(labels):
         sort_indicator = ""
         if st.session_state.sort_column == lbl:
             sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
         button_key = f"sort_{lbl}_{idx}"
-        html_code += f'<th><div id="button_{button_key}"></div></th>'
-        if st.button(
-            f"{lbl}{sort_indicator}",
+        html_code += f'<th><button class="header-button" onclick="document.getElementById(\'{button_key}\').click()">{safe_escape(lbl + sort_indicator)}</button></th>'
+        st.button(
+            "",
             key=button_key,
             help=f"Trier par {lbl}",
-            use_container_width=True
-        ):
-            if st.session_state.sort_column == lbl:
-                st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-            else:
-                st.session_state.sort_column = lbl
-                st.session_state.sort_direction = "asc"
-        st.markdown(
-            f"""
-            <script>
-            var btn = document.querySelector('button[data-testid="stButton"][data-key="{button_key}"]');
-            var placeholder = document.getElementById("button_{button_key}");
-            if (btn && placeholder) {{
-                btn.className = "header-button";
-                placeholder.appendChild(btn);
-            }}
-            </script>
-            """,
-            unsafe_allow_html=True
+            on_click=lambda l=lbl: (
+                st.session_state.update({
+                    "sort_column": l,
+                    "sort_direction": "desc" if st.session_state.sort_column == l and st.session_state.sort_direction == "asc" else "asc"
+                })
+            )
         )
 
-    html_code += "</tr></thead><tbody>"
+    html_code += """
+        </tr></thead>
+        <tbody>
+    """
 
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
@@ -484,19 +475,21 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html_code += f"""
-    <tr class='total-row'>
-      <td>TOTAL ({safe_escape(devise_cible)})</td>
-      <td></td><td></td><td></td><td></td>
-      <td>{safe_escape(total_valeur_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_actuelle_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_h52_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_lt_str)}</td>
-      <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-    </tr>
-    </tbody></table></div>
+        <tr class='total-row'>
+          <td>TOTAL ({safe_escape(devise_cible)})</td>
+          <td></td><td></td><td></td><td></td>
+          <td>{safe_escape(total_valeur_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_actuelle_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_h52_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_lt_str)}</td>
+          <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
     """
 
     components.html(html_code, height=600, scrolling=True)
