@@ -50,8 +50,8 @@ def afficher_portefeuille():
         if col in df.columns:
             df[col] = (
                 df[col].astype(str)
-                       .str.replace(" ", "", regex=False)
-                       .str.replace(",", ".", regex=False)
+                      .str.replace(" ", "", regex=False)
+                      .str.replace(",", ".", regex=False)
             )
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -227,6 +227,7 @@ def afficher_portefeuille():
         ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4),
         ("Valeur_LT", 2),
+        ("Last Price", 2),
         ("Momentum (%)", 2),
         ("Z-Score", 2)
     ]:
@@ -255,7 +256,6 @@ def afficher_portefeuille():
         ticker_col,
         "shortName",
         "Catégorie",
-        "Devise",
         "Quantité_fmt",
         "Acquisition_fmt",
         "Valeur_fmt",
@@ -265,17 +265,18 @@ def afficher_portefeuille():
         "Valeur_H52_fmt",
         "Objectif_LT_fmt",
         "Valeur_LT_fmt",
+        "Last Price_fmt",
         "Momentum (%)_fmt",
         "Z-Score_fmt",
         "Signal",
         "Action",
-        "Justification"
+        "Justification",
+        "Devise"
     ]
     labels = [
         "Ticker",
         "Nom",
         "Catégorie",
-        "Devise",
         "Quantité",
         "Prix d'Acquisition",
         "Valeur",
@@ -285,28 +286,25 @@ def afficher_portefeuille():
         "Valeur H52",
         "Objectif LT",
         "Valeur LT",
+        "Last Price",
         "Momentum (%)",
         "Z-Score",
         "Signal",
         "Action",
-        "Justification"
-        
+        "Justification",
+        "Devise"
     ]
 
-    # S'assurer que seules les colonnes existantes sont sélectionnées pour df_disp
-    existing_cols_in_df = [c for c in cols if c in df.columns]
-    existing_labels = [labels[i] for i, c in enumerate(cols) if c in df.columns]
+    df_disp = df[cols].copy()
+    df_disp.columns = labels
 
-    df_disp = df[existing_cols_in_df].copy()
-    df_disp.columns = existing_labels
-
-    # Gestion du tri (sans les boutons, le tri ne sera pas actif ici pour l'instant)
+    # Gestion du tri
     if "sort_column" not in st.session_state:
         st.session_state.sort_column = None
     if "sort_direction" not in st.session_state:
         st.session_state.sort_direction = "asc"
 
-    # Appliquer le tri (la logique de tri reste, mais sans UI pour l'activer)
+    # Appliquer le tri
     if st.session_state.sort_column:
         sort_key = {
             "Quantité": "Quantité",
@@ -318,6 +316,7 @@ def afficher_portefeuille():
             "Valeur H52": "Valeur_H52",
             "Objectif LT": "Objectif_LT",
             "Valeur LT": "Valeur_LT",
+            "Last Price": "Last Price",
             "Momentum (%)": "Momentum (%)",
             "Z-Score": "Z-Score"
         }.get(st.session_state.sort_column, st.session_state.sort_column)
@@ -342,6 +341,55 @@ def afficher_portefeuille():
     total_actuelle_str = format_fr(total_actuelle, 2)
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
+
+    # Boutons de tri en grille
+    st.markdown("""
+    <style>
+      .button-grid {
+        display: grid;
+        grid-template-columns: 80px 200px 100px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 80px 150px 150px 150px 60px;
+        gap: 0;
+        background: #363636;
+        position: sticky;
+        top: 0;
+        z-index: 3;
+      }
+      .header-button {
+        background: #363636;
+        color: white;
+        border: none;
+        padding: 8px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 12px;
+        cursor: pointer;
+        text-align: center;
+        box-sizing: border-box;
+        width: 100%;
+      }
+      .header-button:hover {
+        background: #4a4a4a;
+      }
+    </style>
+    """, unsafe_allow_html=True)
+
+    with st.container():
+        cols = st.columns([80, 200, 100, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150, 60])
+        for idx, (col, lbl) in enumerate(zip(cols, labels)):
+            with col:
+                sort_indicator = ""
+                if st.session_state.sort_column == lbl:
+                    sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
+                if st.button(
+                    f"{lbl}{sort_indicator}",
+                    key=f"sort_{lbl}_{idx}",
+                    help=f"Trier par {lbl}",
+                    use_container_width=True
+                ):
+                    if st.session_state.sort_column == lbl:
+                        st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
+                    else:
+                        st.session_state.sort_column = lbl
+                        st.session_state.sort_direction = "asc"
 
     # Construction HTML pour la table
     html_code = f"""
@@ -432,7 +480,7 @@ def afficher_portefeuille():
     """
 
     # Ajouter les en-têtes statiques
-    for lbl in df_disp.columns: # Utiliser df_disp.columns pour les en-têtes
+    for lbl in labels:
         html_code += f'<th>{safe_escape(lbl)}</th>'
 
     html_code += """
@@ -442,94 +490,29 @@ def afficher_portefeuille():
 
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
-        for lbl in df_disp.columns: # Utiliser df_disp.columns pour les données
+        for lbl in labels:
             val = row[lbl]
             val_str = safe_escape(str(val)) if pd.notnull(val) else ""
             html_code += f"<td>{val_str}</td>"
         html_code += "</tr>"
 
     # Ligne TOTAL
-    num_cols_displayed = len(df_disp.columns)
-    total_row_cells = [""] * num_cols_displayed
-    
-    # Trouver l'indice de la colonne "Valeur" dans les colonnes affichées
-    try:
-        idx_valeur = list(df_disp.columns).index("Valeur")
-        total_row_cells[idx_valeur] = safe_escape(total_valeur_str)
-    except ValueError:
-        pass # La colonne n'est pas affichée, pas de total à cet endroit
-    
-    try:
-        idx_actuelle = list(df_disp.columns).index("Valeur Actuelle")
-        total_row_cells[idx_actuelle] = safe_escape(total_actuelle_str)
-    except ValueError:
-        pass
-        
-    try:
-        idx_h52 = list(df_disp.columns).index("Valeur H52")
-        total_row_cells[idx_h52] = safe_escape(total_h52_str)
-    except ValueError:
-        pass
-        
-    try:
-        idx_lt = list(df_disp.columns).index("Valeur LT")
-        total_row_cells[idx_lt] = safe_escape(total_lt_str)
-    except ValueError:
-        pass
-
-
-    # La première cellule pour "TOTAL (Devise)"
-    total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
-
-    html_code += "<tr class='total-row'>"
-    for cell_content in total_row_cells:
-        html_code += f"<td>{cell_content}</td>"
-    html_code += "</tr>"
-
-
-    html_code += """
+    html_code += f"""
+        <tr class='total-row'>
+          <td>TOTAL ({safe_escape(devise_cible)})</td>
+          <td></td><td></td><td></td><td></td>
+          <td>{safe_escape(total_valeur_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_actuelle_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_h52_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_lt_str)}</td>
+          <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
         </tbody>
       </table>
     </div>
     """
 
     components.html(html_code, height=600, scrolling=True)
-
-# --- Structure de l'application principale ---
-def main():
-    st.set_page_config(layout="wide", page_title="Mon Portefeuille")
-    st.title("Gestion de Portefeuille d'Investissement")
-
-    # Sidebar pour l'importation de fichiers et les paramètres
-    with st.sidebar:
-        st.header("Importation de Données")
-        uploaded_file = st.file_uploader("Choisissez un fichier CSV", type=["csv"])
-        if uploaded_file is not None:
-            try:
-                df_uploaded = pd.read_csv(uploaded_file)
-                st.session_state.df = df_uploaded
-                st.success("Fichier importé avec succès !")
-                # Réinitialiser le tri après un nouvel import (important pour la prochaine étape)
-                if "sort_column" in st.session_state:
-                    del st.session_state.sort_column
-                if "sort_direction" in st.session_state:
-                    del st.session_state.sort_direction
-                st.rerun() # Recharger pour appliquer les changements
-            except Exception as e:
-                st.error(f"Erreur lors de la lecture du fichier : {e}")
-                st.session_state.df = None
-
-        st.header("Paramètres de Devise")
-        selected_devise = st.selectbox(
-            "Devise cible pour l'affichage",
-            ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
-            index=["EUR", "USD", "GBP", "JPY", "CAD", "CHF"].index(st.session_state.get("devise_cible", "EUR"))
-        )
-        if selected_devise != st.session_state.get("devise_cible", "EUR"):
-            st.session_state.devise_cible = selected_devise
-            st.rerun() # Recharger pour appliquer le changement de devise
-
-    afficher_portefeuille()
-
-if __name__ == "__main__":
-    main()
