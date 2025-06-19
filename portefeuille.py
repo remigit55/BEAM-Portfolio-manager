@@ -12,13 +12,12 @@ def safe_escape(text):
         return html.escape(str(text))
     return (
         str(text)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#x27;")
+        .replace("&", "&")
+        .replace("<", "<")
+        .replace(">", ">")
+        .replace('"', """)
+        .replace("'", "'")
     )
-
 
 def fetch_fx_rates(base="EUR"):
     try:
@@ -28,7 +27,7 @@ def fetch_fx_rates(base="EUR"):
         data = response.json()
         return data.get("rates", {})
     except Exception as e:
-        print(f"Erreur lors de la récupération des taux : {e}")
+        st.error(f"Erreur lors de la récupération des taux : {e}")
         return {}
 
 def afficher_portefeuille():
@@ -81,6 +80,8 @@ def afficher_portefeuille():
         @st.cache_data(ttl=900)
         def fetch_yahoo_data(t):
             t = str(t).strip().upper()
+            if not t or t == "NAN":
+                return {"shortName": "", "currentPrice": None, "fiftyTwoWeekHigh": None}
             if t in st.session_state.ticker_names_cache:
                 cached = st.session_state.ticker_names_cache[t]
                 if isinstance(cached, dict) and "shortName" in cached:
@@ -101,7 +102,8 @@ def afficher_portefeuille():
                 st.session_state.ticker_names_cache[t] = result
                 time.sleep(0.5)
                 return result
-            except Exception:
+            except Exception as e:
+                st.error(f"Erreur Yahoo Finance pour {t}: {e}")
                 return {"shortName": f"https://finance.yahoo.com/quote/{t}", "currentPrice": None, "fiftyTwoWeekHigh": None}
 
         yahoo_data = df[ticker_col].apply(fetch_yahoo_data)
@@ -129,24 +131,41 @@ def afficher_portefeuille():
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
     # Momentum Analysis using currentPrice
+    @st.cache_data(ttl=3600)
+    def fetch_historical_data(ticker, period="5y", interval="1wk"):
+        for attempt in range(3):
+            try:
+                data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False, timeout=10)
+                if not data.empty:
+                    return data
+                st.warning(f"Données historiques vides pour {ticker}, tentative {attempt + 1}")
+                time.sleep(2)
+            except Exception as e:
+                st.error(f"Erreur yfinance pour {ticker}: {e}")
+                time.sleep(2)
+        return pd.DataFrame()
+
     def fetch_momentum_data(row):
+        ticker = row[ticker_col]
+        current_price = row['currentPrice']
+        
+        if pd.isna(ticker) or ticker == "" or ticker == "NAN":
+            st.warning(f"Ticker invalide: {ticker}")
+            return {
+                "Momentum (%)": None,
+                "Z-Score": None,
+                "Signal": "",
+                "Action": "",
+                "Justification": ""
+            }
+
+        if pd.isna(current_price):
+            st.warning(f"Prix actuel manquant pour {ticker}")
+        
         try:
-            current_price = row['currentPrice']
-            ticker = row[ticker_col]
-            if pd.isna(current_price):
-                print(f"Aucune donnée de prix pour {ticker}")
-                return {
-                    "Momentum (%)": None,
-                    "Z-Score": None,
-                    "Signal": "",
-                    "Action": "",
-                    "Justification": ""
-                }
-
-            # Fetch historical data for MA_39 calculation
-            data = yf.download(ticker, period="5y", interval="1wk", auto_adjust=True, progress=False)
+            data = fetch_historical_data(ticker)
             if data.empty:
-                print(f"Aucune donnée historique pour {ticker}")
+                st.warning(f"Aucune donnée historique pour {ticker}")
                 return {
                     "Momentum (%)": None,
                     "Z-Score": None,
@@ -155,15 +174,32 @@ def afficher_portefeuille():
                     "Justification": ""
                 }
 
+            # Handle single ticker or multi-index
             close = data['Close']
+            if isinstance(close, pd.DataFrame):
+                close = close[ticker] if ticker in close.columns else close.iloc[:, 0]
+
             df_m = pd.DataFrame({'Close': close})
+            if len(df_m) < 49:  # 39 for MA + 10 for Z-score
+                st.warning(f"Données insuffisantes pour {ticker}: {len(df_m)} semaines")
+                return {
+                    "Momentum (%)": None,
+                    "Z-Score": None,
+                    "Signal": "",
+                    "Action": "",
+                    "Justification": ""
+                }
+
             df_m['MA_39'] = df_m['Close'].rolling(window=39).mean()
             df_m['Momentum'] = (df_m['Close'] / df_m['MA_39']) - 1
             df_m['Z_Momentum'] = (df_m['Momentum'] - df_m['Momentum'].rolling(10).mean()) / df_m['Momentum'].rolling(10).std()
 
-            # Use currentPrice for latest momentum
             latest_ma_39 = df_m['MA_39'].iloc[-1]
-            if pd.isna(latest_ma_39):
+            latest_momentum_mean = df_m['Momentum'].rolling(10).mean().iloc[-1]
+            latest_momentum_std = df_m['Momentum'].rolling(10).std().iloc[-1]
+
+            if pd.isna(latest_ma_39) or pd.isna(latest_momentum_std) or latest_momentum_std == 0:
+                st.warning(f"MA_39 ou Z-Score invalide pour {ticker}")
                 return {
                     "Momentum (%)": None,
                     "Z-Score": None,
@@ -172,12 +208,25 @@ def afficher_portefeuille():
                     "Justification": ""
                 }
 
-            momentum = (current_price / latest_ma_39) - 1
-            z_momentum = (momentum - df_m['Momentum'].rolling(10).mean().iloc[-1]) / df_m['Momentum'].rolling(10).std().iloc[-1]
+            # Use currentPrice if available, else latest Close
+            price = current_price if not pd.isna(current_price) else df_m['Close'].iloc[-1]
+            if pd.isna(price):
+                st.warning(f"Aucun prix valide pour {ticker}")
+                return {
+                    "Momentum (%)": None,
+                    "Z-Score": None,
+                    "Signal": "",
+                    "Action": "",
+                    "Justification": ""
+                }
+
+            momentum = (price / latest_ma_39) - 1
+            z_momentum = (momentum - latest_momentum_mean) / latest_momentum_std
             m = momentum * 100
             z = z_momentum
 
             if pd.isna(z):
+                st.warning(f"Z-Score calculé comme NaN pour {ticker}")
                 return {
                     "Momentum (%)": None,
                     "Z-Score": None,
@@ -219,7 +268,7 @@ def afficher_portefeuille():
                 "Justification": reason
             }
         except Exception as e:
-            print(f"Erreur avec {ticker}: {e}")
+            st.error(f"Erreur momentum pour {ticker}: {e}")
             return {
                 "Momentum (%)": None,
                 "Z-Score": None,
