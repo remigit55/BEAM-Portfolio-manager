@@ -9,8 +9,7 @@ def afficher_portefeuille():
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
         return
-
-    df = st.session_state.df.copy()
+        df = st.session_state.df.copy()
     devise_cible = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.get("fx_rates", {})
 
