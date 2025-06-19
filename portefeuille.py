@@ -33,7 +33,7 @@ def afficher_portefeuille():
             return data.get("rates", {})
         except Exception as e:
             print(f"Erreur lors de la récupération des taux : {e}")
-        return {}
+            return {}
         
         st.session_state.fx_rates = fetch_fx_rates()
     fx_rates = st.session_state.get("fx_rates", {})
