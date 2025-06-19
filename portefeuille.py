@@ -102,8 +102,11 @@ def afficher_portefeuille():
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
 
-    if "Objectif_LT" not in df.columns:
+    if len(df.columns) > 6:
+        df["Objectif_LT"] = df.iloc[:, 6].astype(str).fillna("")
+    else:
         df["Objectif_LT"] = ""
+
     if "Valeur_LT" not in df.columns:
         df["Valeur_LT"] = ""
 
