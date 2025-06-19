@@ -10,7 +10,15 @@ def safe_escape(text):
     """Escape HTML characters safely."""
     if hasattr(html, 'escape'):
         return html.escape(str(text))
-    return str(text).replace("&", "&").replace("<", "<").replace(">", ">").replace('"', """).replace("'", "'")
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#x27;")
+    )
+
 
 def fetch_fx_rates(base="EUR"):
     try:
