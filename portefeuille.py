@@ -109,6 +109,10 @@ def fetch_momentum_data(ticker, period="5y", interval="1wk"):
             signal = "➖ Neutre"
             action = "Ne rien faire"
             reason = "Pas de signal exploitable"
+        elif z > -1.5:
+            signal = "↘ Faible"
+            action = "Surveiller / Réduire si confirmé"
+            reason = "Dynamique en affaiblissement"
         else:
             signal = "🧊 Survendu"
             action = "Acheter / Renforcer (si signal technique)"
@@ -500,6 +504,7 @@ def afficher_portefeuille():
                 // Si les deux sont des nombres valides, trier numériquement
                 if (!isNaN(xNum) && !isNaN(yNum)) {{
                     // Gérer les valeurs manquantes/non numériques en les plaçant à la fin
+                    // C'est pour le JS, donc pas besoin de la ligne de commentaire Python.
                     if (isNaN(xNum) && !isNaN(yNum)) return dir === "asc" ? 1 : -1;
                     if (!isNaN(xNum) && isNaN(yNum)) return dir === "asc" ? -1 : 1;
                     if (isNaN(xNum) && isNaN(yNum)) return 0; // Si les deux sont NaN, leur ordre n'importe pas
