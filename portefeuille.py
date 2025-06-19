@@ -370,7 +370,7 @@ def afficher_portefeuille():
     """, unsafe_allow_html=True)
 
     with st.container():
-        cols = st.columns([20, 200, 100, 40, 60, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150])
+        cols = st.columns([60, 200, 100, 40, 60, 80, 80, 80, 80, 80, 80, 80, 80, 80, 80, 150, 150, 150])
         for idx, (col, lbl) in enumerate(zip(cols, labels)):
             with col:
                 sort_indicator = ""
