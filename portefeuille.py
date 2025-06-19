@@ -7,8 +7,8 @@ import streamlit.components.v1 as components
 import yfinance as yf
 
 def safe_escape(text):
-    """Escape HTML characters safely, with fallback if html.escape is unavailable."""
-    return html.escape(text) if hasattr(html, 'escape') else str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;')
+    """Escape HTML characters safely."""
+    return html.escape(text) if hasattr(html, 'escape') else str(text).replace('&', '&').replace('<', '<').replace('>', '>').replace('"', '"').replace("'", ''')
 
 def fetch_fx_rates(base="EUR"):
     try:
@@ -295,45 +295,6 @@ def afficher_portefeuille():
     df_disp = df[cols].copy()
     df_disp.columns = labels
 
-    # Gestion du tri
-    if "sort_column" not in st.session_state:
-        st.session_state.sort_column = None
-    if "sort_direction" not in st.session_state:
-        st.session_state.sort_direction = "asc"
-
-    # Appliquer le tri
-    if st.session_state.sort_column:
-        sort_key = {
-            "Quantité": "Quantité",
-            "Prix d'Acquisition": "Acquisition",
-            "Valeur": "Valeur",
-            "Prix Actuel": "currentPrice",
-            "Valeur Actuelle": "Valeur_Actuelle",
-            "Haut 52 Semaines": "fiftyTwoWeekHigh",
-            "Valeur H52": "Valeur_H52",
-            "Objectif LT": "Objectif_LT",
-            "Valeur LT": "Valeur_LT",
-            "Last Price": "Last Price",
-            "Momentum (%)": "Momentum (%)",
-            "Z-Score": "Z-Score"
-        }.get(st.session_state.sort_column, st.session_state.sort_column)
-        if sort_key in df.columns:
-            df_disp = df_disp.sort_values(
-                by=st.session_state.sort_column,
-                ascending=(st.session_state.sort_direction == "asc"),
-                key=lambda x: pd.to_numeric(x.str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf')) if x.name in [
-                    "Quantité", "Prix d'Acquisition", "Valeur", "Prix Actuel", "Valeur Actuelle",
-                    "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT", "Last Price",
-                    "Momentum (%)", "Z-Score"
-                ] else x.str.lower()
-            )
-        else:
-            df_disp = df_disp.sort_values(
-                by=st.session_state.sort_column,
-                ascending=(st.session_state.sort_direction == "asc"),
-                key=lambda x: x.str.lower() if x.name in ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification", "Devise"] else x
-            )
-
     total_valeur_str = format_fr(total_valeur, 2)
     total_actuelle_str = format_fr(total_actuelle, 2)
     total_h52_str = format_fr(total_h52, 2)
@@ -342,18 +303,53 @@ def afficher_portefeuille():
     # Construction HTML
     html_code = f"""
     <style>
-      .table-container {{ max-height:500px; overflow-y:auto; }}
-      .portfolio-table {{ width:100%; border-collapse:collapse; table-layout:fixed; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+      .table-container {{
+        max-height: 500px;
+        overflow-y: auto;
+        overflow-x: auto;
+        width: 100%;
+        position: relative;
+      }}
+      .portfolio-table {{
+        width: 100%;
+        min-width: 1800px; /* Ensure table is wide enough for all columns */
+        border-collapse: collapse;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      }}
       .portfolio-table th {{
-        background:#363636; color:white; padding:0; text-align:center; border:none;
-        position:sticky; top:0; z-index:2; font-size:12px;
+        background: #363636;
+        color: white;
+        padding: 8px;
+        text-align: center;
+        border: none;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        font-size: 12px;
+        cursor: pointer;
       }}
       .portfolio-table td {{
-        padding:6px; text-align:right; border:none; font-size:11px;
+        padding: 6px;
+        text-align: right;
+        border: none;
+        font-size: 11px;
       }}
-      .portfolio-table td:nth-child(1), .portfolio-table td:nth-child(2), .portfolio-table td:nth-child(3),
-      .portfolio-table td:nth-child(16), .portfolio-table td:nth-child(17), .portfolio-table td:nth-child(18) {{
-        text-align:left;
+      .portfolio-table td:nth-child(1), /* Ticker */
+      .portfolio-table td:nth-child(2), /* Nom */
+      .portfolio-table td:nth-child(3), /* Catégorie */
+      .portfolio-table td:nth-child(16), /* Signal */
+      .portfolio-table td:nth-child(17), /* Action */
+      .portfolio-table td:nth-child(18) {{ /* Justification */
+        text-align: left;
+      }}
+      .portfolio-table th:nth-child(1), .portfolio-table td:nth-child(1) {{ /* Ticker */
+        width: 80px;
+      }}
+      .portfolio-table th:nth-child(2), .portfolio-table td:nth-child(2) {{ /* Nom */
+        width: 200px;
+      }}
+      .portfolio-table th:nth-child(3), .portfolio-table td:nth-child(3) {{ /* Catégorie */
+        width: 100px;
       }}
       .portfolio-table th:nth-child(4), .portfolio-table td:nth-child(4), /* Quantité */
       .portfolio-table th:nth-child(5), .portfolio-table td:nth-child(5), /* Prix d'Acquisition */
@@ -367,19 +363,21 @@ def afficher_portefeuille():
       .portfolio-table th:nth-child(13), .portfolio-table td:nth-child(13), /* Last Price */
       .portfolio-table th:nth-child(14), .portfolio-table td:nth-child(14), /* Momentum (%) */
       .portfolio-table th:nth-child(15), .portfolio-table td:nth-child(15) {{ /* Z-Score */
-        width: 6%;
+        width: 80px;
       }}
-      .portfolio-table tr:nth-child(even) {{ background:#efefef; }}
+      .portfolio-table th:nth-child(16), .portfolio-table td:nth-child(16), /* Signal */
+      .portfolio-table th:nth-child(17), .portfolio-table td:nth-child(17), /* Action */
+      .portfolio-table th:nth-child(18), .portfolio-table td:nth-child(18) {{ /* Justification */
+        width: 150px;
+      }}
+      .portfolio-table th:nth-child(19), .portfolio-table td:nth-child(19) {{ /* Devise */
+        width: 60px;
+      }}
+      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
-        background:#A49B6D; color:white; font-weight:bold;
-      }}
-      .header-button {{
-        background:#363636; color:white; border:none; width:100%; height:100%;
-        padding:6px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size:12px;
-        cursor:pointer; text-align:center;
-      }}
-      .header-button:hover {{
-        background:#4a4a4a;
+        background: #A49B6D;
+        color: white;
+        font-weight: bold;
       }}
     </style>
     <div class="table-container">
@@ -387,39 +385,14 @@ def afficher_portefeuille():
         <thead><tr>
     """
 
-    # Ajouter les en-têtes avec des boutons
-    for idx, lbl in enumerate(labels):
-        sort_indicator = ""
-        if st.session_state.sort_column == lbl:
-            sort_indicator = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-        button_key = f"sort_{lbl}_{idx}"
-        html_code += f'<th><div id="button_{button_key}"></div></th>'
-        if st.button(
-            f"{lbl}{sort_indicator}",
-            key=button_key,
-            help=f"Trier par {lbl}",
-            use_container_width=True
-        ):
-            if st.session_state.sort_column == lbl:
-                st.session_state.sort_direction = "desc" if st.session_state.sort_direction == "asc" else "asc"
-            else:
-                st.session_state.sort_column = lbl
-                st.session_state.sort_direction = "asc"
-        st.markdown(
-            f"""
-            <script>
-            var btn = document.querySelector('button[data-testid="stButton"][data-key="{button_key}"]');
-            var placeholder = document.getElementById("button_{button_key}");
-            if (btn && placeholder) {{
-                btn.className = "header-button";
-                placeholder.appendChild(btn);
-            }}
-            </script>
-            """,
-            unsafe_allow_html=True
-        )
+    # Ajouter les en-têtes
+    for i, lbl in enumerate(labels):
+        html_code += f'<th onclick="sortTable({i})">{safe_escape(lbl)}</th>'
 
-    html_code += "</tr></thead><tbody>"
+    html_code += f"""
+        </tr></thead>
+        <tbody>
+    """
 
     for _, row in df_disp.iterrows():
         html_code += "<tr>"
@@ -431,19 +404,49 @@ def afficher_portefeuille():
 
     # Ligne TOTAL
     html_code += f"""
-    <tr class='total-row'>
-      <td>TOTAL ({devise_cible})</td>
-      <td></td><td></td><td></td><td></td>
-      <td>{safe_escape(total_valeur_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_actuelle_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_h52_str)}</td>
-      <td></td>
-      <td>{safe_escape(total_lt_str)}</td>
-      <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-    </tr>
-    </tbody></table></div>
+        <tr class='total-row'>
+          <td>TOTAL ({safe_escape(devise_cible)})</td>
+          <td></td><td></td><td></td><td></td>
+          <td>{safe_escape(total_valeur_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_actuelle_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_h52_str)}</td>
+          <td></td>
+          <td>{safe_escape(total_lt_str)}</td>
+          <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    <script>
+    function sortTable(n) {{
+      var table = document.querySelector(".portfolio-table");
+      var tbody = table.querySelector("tbody");
+      var rows = Array.from(tbody.rows);
+      var dir = table.querySelectorAll("th")[n].getAttribute("data-dir") || "asc";
+      dir = (dir === "asc") ? "desc" : "asc";
+      table.querySelectorAll("th").forEach(th => {{
+        th.removeAttribute("data-dir");
+        th.innerHTML = th.innerHTML.replace(/ ▲| ▼/g, "");
+      }});
+      table.querySelectorAll("th")[n].setAttribute("data-dir", dir);
+      table.querySelectorAll("th")[n].innerHTML += dir === "asc" ? " ▲" : " ▼";
+
+      rows.sort((a, b) => {{
+        var x = a.cells[n].textContent.trim();
+        var y = b.cells[n].textContent.trim();
+        var xNum = parseFloat(x.replace(/ /g, "").replace(",", "."));
+        var yNum = parseFloat(y.replace(/ /g, "").replace(",", "."));
+        if (!isNaN(xNum) && !isNaN(yNum)) {{
+          return dir === "asc" ? xNum - yNum : yNum - xNum;
+        }}
+        return dir === "asc" ? x.localeCompare(y) : y.localeCompare(x);
+      }});
+      tbody.innerHTML = "";
+      rows.forEach(row => tbody.appendChild(row));
+    }}
+    </script>
     """
 
     components.html(html_code, height=600, scrolling=True)
