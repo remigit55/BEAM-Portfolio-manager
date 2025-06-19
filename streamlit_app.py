@@ -56,13 +56,16 @@ except Exception:
 
 st.markdown(
     f"""
-    <div style="display: flex; align-items: center; gap: 12px; margin-top: -10px; margin-bottom: 20px;">
-        <img src="data:image/png;base64,{logo_base64}" style="height: 55px;" />
-        <h1 style="font-size: 32px; margin: 0; line-height: 1;">BEAM Portfolio Manager</h1>
+    <div style="display: flex; align-items: center; margin-top: -10px; margin-bottom: 20px;">
+        <div style="display: inline-flex; align-items: center;">
+            <img src="data:image/png;base64,{logo_base64}" style="height: 48px; vertical-align: middle; margin-right: 10px;" />
+            <h1 style="font-size: 32px; margin: 0; line-height: 1;">BEAM Portfolio Manager</h1>
+        </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
 
 
 
