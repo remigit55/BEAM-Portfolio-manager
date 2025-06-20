@@ -90,6 +90,7 @@ def fetch_yahoo_data(ticker_symbol):
         if ticker_symbol == "LJP3.L":
             st.subheader(f"🔍 Débogage Yahoo Data pour {ticker_symbol}")
             st.write(f"Raw info.get('currentPrice'): {info.get('currentPrice')}")
+            st.write(f"Raw info.get('regularMarketPrice'): {info.get('regularMarketPrice')}") # NOUVELLE LIGNE DE DÉBOGAGE
             st.write(f"Raw info.get('fiftyTwoWeekHigh'): {info.get('fiftyTwoWeekHigh')}")
             st.write(f"Raw info.get('currency'): {info.get('currency')}")
             st.write(f"Full info dict pour {ticker_symbol}:")
@@ -97,7 +98,8 @@ def fetch_yahoo_data(ticker_symbol):
         # --- FIN DÉBOGAGE ---
 
         data['shortName'] = info.get('shortName') or info.get('longName') or ticker_symbol
-        data['currentPrice'] = info.get('currentPrice')
+        # Tente de récupérer 'currentPrice' en premier, sinon utilise 'regularMarketPrice'
+        data['currentPrice'] = info.get('currentPrice') or info.get('regularMarketPrice')
         data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
 
         currency_yahoo = info.get('currency')
@@ -169,11 +171,15 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Justification": "Pas de données historiques disponibles."
             }
 
-        # Handle MultiIndex columns (e.g., when downloading data for multiple tickers or certain markets)
+        # Gère les colonnes MultiIndex (par exemple, lors du téléchargement de données pour plusieurs tickers)
         if isinstance(data.columns, pd.MultiIndex):
-            if ('Close', ticker_symbol) in data.columns: # Check if specific ticker's Close exists
+            if ('Close', ticker_symbol) in data.columns: # Vérifie si 'Close' du ticker spécifique existe
                 close_series = data['Close'][ticker_symbol]
-            else: # Fallback if specific ticker's close not found in multiindex
+            elif 'Close' in data.columns: # Fallback si 'Close' n'est pas un sous-niveau du ticker
+                 # C'est une situation rare pour un seul ticker, mais gérons-la.
+                 # Si 'Close' est un MultiIndex mais sans le nom du ticker, nous prenons la première colonne 'Close'
+                 close_series = data['Close'].iloc[:, 0] if isinstance(data['Close'], pd.DataFrame) else data['Close']
+            else:
                  return {
                     "Last Price": np.nan,
                     "Momentum (%)": np.nan,
@@ -182,9 +188,9 @@ def fetch_momentum_data(ticker_symbol, months=12):
                     "Action": "Vérifier Ticker",
                     "Justification": "Colonne 'Close' spécifique au ticker non trouvée dans le MultiIndex."
                 }
-        elif 'Close' in data.columns: # Standard single-level columns
+        elif 'Close' in data.columns: # Colonnes simples standards
             close_series = data['Close']
-        else: # 'Close' column not found at all
+        else: # Colonne 'Close' pas trouvée du tout
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
@@ -194,7 +200,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Justification": "Colonne 'Close' non trouvée dans les données historiques."
             }
             
-        # Now, check if the extracted close_series is empty
+        # Maintenant, vérifie si la close_series extraite est vide
         if close_series.empty:
             return {
                 "Last Price": np.nan,
@@ -216,7 +222,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
             pass # Ignorer les erreurs si info n'est pas dispo ici, car on a déjà un fetch_yahoo_data dédié
 
         if is_gbp_pence_for_momentum:
-            # Apply correction directly to the close_series
+            # Applique la correction directement à la close_series
             close_series = close_series / 100.0
 
         # Créer un DataFrame pour les calculs de momentum avec la colonne 'Close' valide
