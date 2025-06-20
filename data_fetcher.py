@@ -138,7 +138,7 @@ def fetch_yahoo_data(ticker_symbol):
     data['is_gbp_pence'] = is_gbp_pence
     return data
 
-@st.cache_data(ttl=3600) # Cache pour 1 heure
+@st.cache_data(ttl=60) # Cache pour 1 minute
 def fetch_momentum_data(ticker_symbol, months=12):
     """
     Calcule le momentum (taux de changement) et le Z-score pour un ticker sur X mois.
