@@ -89,8 +89,6 @@ def afficher_portefeuille():
         unique_tickers_for_momentum = df[ticker_col].dropna().unique() # S'assurer d'utiliser la bonne liste
         momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers_for_momentum}
         
-        # 'Last Price' is the column you want to remove from display, but still used in momentum calculation.
-        # So we keep the calculation here, but remove it from the display lists further down.
         df["Last Price"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Last Price", np.nan))
         df["Momentum (%)"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Z-Score", np.nan))
@@ -110,7 +108,7 @@ def afficher_portefeuille():
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Last Price", 2), # 'Last Price' is kept for internal use but not displayed
+        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Last Price", 2), 
         ("Momentum (%)", 2), ("Z-Score", 2)
     ]:
         if col_name in df.columns:
@@ -145,7 +143,7 @@ def afficher_portefeuille():
         "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        # REMOVED: "Last Price_fmt", # <--- This line was removed
+        # "Last Price_fmt", # <--- Removed this column from display
         "Momentum (%)_fmt", "Z-Score_fmt",
         "Signal", "Action", "Justification"
     ]
@@ -154,7 +152,7 @@ def afficher_portefeuille():
         "Quantité", "Prix d'Acquisition", "Valeur",
         "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
         "Valeur H52", "Objectif LT", "Valeur LT",
-        # REMOVED: "Dernier Prix", # <--- This line was removed
+        # "Dernier Prix", # <--- Removed this label from display
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -181,6 +179,7 @@ def afficher_portefeuille():
     if "sort_direction" not in st.session_state:
         st.session_state.sort_direction = "asc"
 
+    # Logique de tri
     if st.session_state.sort_column:
         sort_col_label = st.session_state.sort_column
         if sort_col_label in df_disp.columns:
@@ -189,17 +188,23 @@ def afficher_portefeuille():
                 idx = existing_labels.index(sort_col_label)
                 original_col_name = existing_cols_in_df[idx]
                 if original_col_name.endswith("_fmt"):
-                    original_col_name = original_col_name[:-4]
+                    original_col_name = original_col_name[:-4] # Get original numeric column name
             except ValueError:
                 pass
 
+            # Try to convert to numeric for sorting if it's a numeric column
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                    df_disp = df_disp.sort_values(
-                        by=sort_col_label,
-                        ascending=(st.session_state.sort_direction == "asc"),
-                        key=lambda x: pd.to_numeric(x.astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf'))
-                    )
+                df_disp = df_disp.sort_values(
+                    by=sort_col_label,
+                    ascending=(st.session_state.sort_direction == "asc"),
+                    # Use a robust key for sorting formatted numeric strings
+                    key=lambda x: pd.to_numeric(
+                        x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
+                        errors='coerce'
+                    ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
+                )
             else:
+                # Fallback to string sort for non-numeric or other issues
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
@@ -211,6 +216,52 @@ def afficher_portefeuille():
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
 
+    # Génération du CSS pour les largeurs de colonnes et alignements
+    # Ceci est la section la plus délicate. Nous allons la construire de manière plus sûre.
+    css_col_widths = ""
+    left_align_cols_indices = [] # Columns that should be left-aligned
+    width_100px_cols_indices = [] # Columns that should have 100px width
+    width_specific_cols = {
+        "Ticker": "80px",
+        "Nom": "200px",
+        "Catégorie": "100px",
+        "Devise": "60px",
+        "Signal": "100px",
+        "Action": "150px",
+        "Justification": "200px",
+    }
+
+    # Identify indices for styling
+    for i, label in enumerate(df_disp.columns):
+        if label in ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]:
+            left_align_cols_indices.append(i + 1) # CSS nth-child is 1-based
+
+        if label not in width_specific_cols:
+            # All other columns get 100px width unless specified
+            if label not in ["Ticker", "Nom", "Catégorie", "Devise", "Signal", "Action", "Justification"]: # Exclude already defined widths
+                width_100px_cols_indices.append(i + 1)
+        
+        # Add specific width styles
+        if label in width_specific_cols:
+            css_col_widths += f".portfolio-table th:nth-child({i + 1}), .portfolio-table td:nth-child({i + 1}) {{ width: {width_specific_cols[label]}; }}\n"
+
+
+    # Generate left-align CSS
+    if left_align_cols_indices:
+        # Sort to make sure the :not() selectors are ordered
+        left_align_selectors = [f"td:nth-child({idx})" for idx in sorted(left_align_cols_indices)]
+        css_col_widths += f".portfolio-table {', '.join(left_align_selectors)} {{ text-align: left; white-space: normal; }}\n"
+
+    # Generate default 100px width CSS for remaining numeric/value columns
+    if width_100px_cols_indices:
+        # Exclude those already styled for left-align
+        excluded_left_align_selectors = [f":not(:nth-child({idx}))" for idx in left_align_cols_indices]
+        width_100px_selectors = [f"th:nth-child({idx})" for idx in width_100px_cols_indices]
+        width_100px_selectors_td = [f"td:nth-child({idx})" for idx in width_100px_cols_indices]
+
+        # Combine selectors for 100px width
+        css_col_widths += f".portfolio-table {', '.join(width_100px_selectors + width_100px_selectors_td)} {{ width: 100px; }}\n"
+    
     html_code = f"""
     <style>
       .scroll-wrapper {{
@@ -223,7 +274,7 @@ def afficher_portefeuille():
         position: relative;
       }}
       .portfolio-table {{
-        min-width: 2200px;
+        min-width: 2200px; /* Adjust as needed based on actual columns displayed */
         border-collapse: collapse;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       }}
@@ -246,29 +297,7 @@ def afficher_portefeuille():
         font-size: 11px;
         white-space: nowrap;
       }}
-      .portfolio-table td:nth-child(1),
-      .portfolio-table td:nth-child(2),
-      .portfolio-table td:nth-child(3),
-      .portfolio-table td:nth-child(15), {/* Adjusted index */}
-      .portfolio-table td:nth-child(16), {/* Adjusted index */}
-      .portfolio-table td:nth-child(17) {/* Adjusted index */} {{
-        text-align: left;
-        white-space: normal;
-      }}
-      { (lambda : '' if 'Ticker' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Ticker") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Ticker") + 1}) {{ width: 80px; }}')() }
-      { (lambda : '' if 'Nom' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Nom") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Nom") + 1}) {{ width: 200px; }}')() }
-      { (lambda : '' if 'Catégorie' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Catégorie") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Catégorie") + 1}) {{ width: 100px; }}')() }
-      { (lambda : '' if 'Devise' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Devise") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Devise") + 1}) {{ width: 60px; }}')() }
-
-      .portfolio-table th:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(15)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)), {/* Adjusted index */}
-      .portfolio-table td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(15)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)) {{ {/* Adjusted index */}
-        width: 100px;
-      }}
-
-      { (lambda : '' if 'Signal' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Signal") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Signal") + 1}) {{ width: 100px; }}')() }
-      { (lambda : '' if 'Action' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Action") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Action") + 1}) {{ width: 150px; }}')() }
-      { (lambda : '' if 'Justification' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Justification") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Justification") + 1}) {{ width: 200px; }}')() }
-
+      {css_col_widths} /* Insert dynamically generated CSS here */
 
       .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
       .total-row td {{
