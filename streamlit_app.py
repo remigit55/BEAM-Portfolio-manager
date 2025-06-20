@@ -135,7 +135,6 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
-        st.header("✨ Synthèse du Portefeuille") # Keep this header for the tab title
         afficher_synthese_globale(
             st.session_state.total_valeur,
             st.session_state.total_actuelle,
@@ -145,7 +144,6 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]:
-        st.header("📈 Vue détaillée du Portefeuille") # Keep this header for the tab title
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour voir votre portefeuille.") # Changed to st.warning
         else:
@@ -158,28 +156,24 @@ def main():
 
     # Onglet : Performance
     with onglets[2]:
-        st.header("📊 Analyse de Performance") # Keep this header for the tab title
         if 'afficher_performance' in locals():
             afficher_performance()
         # Removed else: st.info(...)
 
     # Onglet : OD Comptables
     with onglets[3]:
-        st.header("🧾 Opérations Diverses Comptables") # Keep this header for the tab title
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
         # Removed else: st.info(...)
 
     # Onglet : Transactions
     with onglets[4]:
-        st.header("📜 Historique des Transactions") # Keep this header for the tab title
         if 'afficher_transactions' in locals():
             afficher_transactions()
         # Removed else: st.info(...)
 
     # Onglet : Taux de change
     with onglets[5]:
-        st.header("💱 Taux de Change Actuels") # Keep this header for the tab title
         # Removed st.info(f"Les taux sont affichés par rapport à la devise...")
         
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
@@ -199,12 +193,10 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]:
-        st.header("⚙️ Paramètres de l'Application") # Keep this header for the tab title
         afficher_parametres_globaux()
 
 
     st.markdown("---")
-    # Removed st.info("💡 Importez un fichier CSV ou Excel...")
     
 if __name__ == "__main__":
     main()
