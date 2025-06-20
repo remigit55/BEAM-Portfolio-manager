@@ -202,7 +202,6 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]:
-        st.header("⚙️ Paramètres de l'Application")
         # Appel de la fonction de paramètres qui gère l'importation et la devise
         if 'afficher_parametres_globaux' in locals():
             afficher_parametres_globaux()
