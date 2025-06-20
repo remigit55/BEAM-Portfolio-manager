@@ -64,7 +64,7 @@ def display_performance_history():
         lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
         axis=1
     )
-
+    st.markdown("<br>", unsafe_allow_html=True) 
     # Display data in a table
     st.subheader("Données Historiques")
     # Get the currency for formatting from the first row of the filtered data
@@ -80,6 +80,7 @@ def display_performance_history():
         "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" # Format percentage with 2 decimals
     }), use_container_width=True)
 
+    st.markdown("<br>", unsafe_allow_html=True) 
     # Display charts
     st.subheader("Tendances des Valeurs du Portefeuille")
 
@@ -102,6 +103,7 @@ def display_performance_history():
     fig_values.update_layout(hovermode="x unified") # Shows all values for a given date on hover
     st.plotly_chart(fig_values, use_container_width=True)
 
+    st.markdown("<br>", unsafe_allow_html=True) 
     st.subheader("Tendance du Gain/Perte")
     fig_gain_loss = px.line(
         filtered_df,
