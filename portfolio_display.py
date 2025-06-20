@@ -2,378 +2,275 @@
 
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
-import numpy as np # Pour gérer np.nan
+import yfinance as yf
+from datetime import datetime, timedelta
 
-# Import des fonctions depuis les nouveaux modules
-from utils import safe_escape, format_fr
-from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
+# Importations nécessaires pour le calcul de l'élan (momentum)
+import numpy as np
+from scipy.stats import linregress
+
+
+# --- Fonctions utilitaires ---
+
+@st.cache_data(ttl=3600) # Cache pour 1 heure
+def get_ticker_name(ticker_symbol):
+    """Récupère le nom complet du ticker."""
+    if ticker_symbol in st.session_state.ticker_names_cache:
+        return st.session_state.ticker_names_cache[ticker_symbol]
+    
+    try:
+        ticker_info = yf.Ticker(ticker_symbol).info
+        name = ticker_info.get('longName') or ticker_info.get('shortName') or ticker_symbol
+        st.session_state.ticker_names_cache[ticker_symbol] = name
+        return name
+    except Exception:
+        st.session_state.ticker_names_cache[ticker_symbol] = ticker_symbol # En cas d'erreur, utilise le symbole
+        return ticker_symbol
+
+def get_exchange_rate(devise_source, devise_cible, fx_rates):
+    """Récupère le taux de change ou retourne 1 si les devises sont identiques."""
+    if devise_source == devise_cible:
+        return 1.0
+    
+    taux = fx_rates.get(f"{devise_source}{devise_cible}", None)
+    if taux is None:
+        # Tenter le taux inverse si disponible (ex: USD/EUR au lieu de EUR/USD)
+        taux_inverse = fx_rates.get(f"{devise_cible}{devise_source}", None)
+        if taux_inverse:
+            return 1 / taux_inverse
+        st.warning(f"Taux de change {devise_source}/{devise_cible} non trouvé. Utilisation de 1:1 pour {devise_source}.")
+        return 1.0 # Fallback si le taux n'est pas trouvé
+    return taux
+
+
+@st.cache_data(ttl=60) # Cache pour 1 minute
+def get_historical_price(ticker, date):
+    """Récupère le prix de clôture d'un ticker à une date donnée."""
+    try:
+        # Ajuster la date pour s'assurer que nous obtenons un prix valide (jour de bourse)
+        data = yf.download(ticker, start=date, end=date + timedelta(days=5), progress=False, show_errors=False)
+        if not data.empty:
+            return data['Close'].iloc[0]
+        
+        # Si pas de données à la date exacte, essayer le jour ouvré précédent
+        for i in range(1, 5): # Essayer jusqu'à 4 jours avant
+            prev_date = date - timedelta(days=i)
+            data = yf.download(ticker, start=prev_date, end=prev_date + timedelta(days=1), progress=False, show_errors=False)
+            if not data.empty:
+                return data['Close'].iloc[0]
+
+        return None # Aucun prix trouvé dans la période
+    except Exception:
+        return None
+
+# --- Fonctions d'affichage principales ---
 
 def afficher_portefeuille():
-    """
-    Affiche le portefeuille de l'utilisateur, gère les calculs et l'affichage.
-    Récupère les données externes via des fonctions dédiées.
-    Retourne les totaux convertis pour la synthèse.
-    """
-    if "df" not in st.session_state or st.session_state.df is None:
-        st.warning("Aucune donnée de portefeuille n’a encore été importée.")
-        return None, None, None, None # Retourne None pour les totaux si pas de données
+    """Affiche le portefeuille détaillé."""
+    df = st.session_state.df.copy() # Travailler sur une copie
 
-    df = st.session_state.df.copy()
+    # S'assurer que les colonnes nécessaires existent
+    required_columns = ["Quantité", "Acquisition", "Devise", "Ticker"]
+    for col in required_columns:
+        if col not in df.columns:
+            st.error(f"La colonne '{col}' est manquante dans votre fichier. Veuillez vérifier le format.")
+            return pd.DataFrame(), 0, 0, 0, 0 # Retourne des valeurs par défaut pour éviter des erreurs
 
-    # Harmoniser le nom de la colonne pour l’objectif long terme
-    if "LT" in df.columns and "Objectif_LT" not in df.columns:
-        df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
+    # Convertir 'Acquisition' en numérique
+    df['Acquisition'] = pd.to_numeric(df['Acquisition'], errors='coerce')
 
-    # Récupérer la devise cible de la session
-    devise_cible = st.session_state.get("devise_cible", "EUR")
+    # Initialisation des colonnes de prix actuels
+    df['Prix Actuel (Original)'] = None
+    df['Prix Actuel (Cible)'] = None
 
-    # Logique d'actualisation des taux de change (gérée par le cache dans data_fetcher)
-    fx_rates = fetch_fx_rates(devise_cible)
+    # Récupérer les prix actuels des tickers
+    tickers_to_fetch = df['Ticker'].dropna().unique()
+    current_prices = {}
 
-    # Normalisation numérique
-    for col in ["Quantité", "Acquisition"]:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    # Calcul de la valeur d'acquisition
-    if all(c in df.columns for c in ["Quantité", "Acquisition"]):
-        df["Valeur"] = df["Quantité"] * df["Acquisition"]
-    else:
-        df["Valeur"] = np.nan
-
-    # Ajout de la colonne Catégorie depuis la colonne F du CSV (index 5)
-    if len(df.columns) > 5:
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
-    else:
-        df["Catégorie"] = ""
-
-    # Récupération de shortName, Current Price et 52 Week High via Yahoo Finance
-    ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
-    
-    if ticker_col and not df[ticker_col].dropna().empty:
-        unique_tickers = df[ticker_col].dropna().unique()
-        yahoo_data_dict = {t: fetch_yahoo_data(t) for t in unique_tickers}
-        
-        df["shortName"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
-        df["currentPrice"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("currentPrice", np.nan))
-        df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
-    else:
-        df["shortName"] = ""
-        df["currentPrice"] = np.nan
-        df["fiftyTwoWeekHigh"] = np.nan
-
-    # Calcul des colonnes Valeur H52 et Valeur Actuelle
-    df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
-    df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
-
-    # Conversion Objectif_LT et calcul de Valeur_LT
-    if "Objectif_LT" not in df.columns:
-        df["Objectif_LT"] = np.nan
-    else:
-        df["Objectif_LT"] = (
-            df["Objectif_LT"]
-              .astype(str)
-              .str.replace(" ", "", regex=False)
-              .str.replace(",", ".", regex=False)
-        )
-        df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
-    df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
-
-    # Momentum Analysis
-    if ticker_col and not df[ticker_col].dropna().empty:
-        if "momentum_results" not in st.session_state:
-            st.session_state.momentum_results = {}
-            
-        unique_tickers_for_momentum = df[ticker_col].dropna().unique() # S'assurer d'utiliser la bonne liste
-        momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers_for_momentum}
-        
-        df["Last Price"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Last Price", np.nan))
-        df["Momentum (%)"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Momentum (%)", np.nan))
-        df["Z-Score"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Signal", ""))
-        df["Action"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Action", ""))
-        df["Justification"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Justification", ""))
-    else:
-        df["Last Price"] = np.nan
-        df["Momentum (%)"] = np.nan
-        df["Z-Score"] = np.nan
-        df["Signal"] = ""
-        df["Action"] = ""
-        df["Justification"] = ""
-
-
-    # Formatage des colonnes numériques pour l'affichage
-    for col_name, dec_places in [
-        ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4),
-        ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Last Price", 2),
-        ("Momentum (%)", 2), ("Z-Score", 2)
-    ]:
-        if col_name in df.columns:
-            df[f"{col_name}_fmt"] = df[col_name].map(lambda x: format_fr(x, dec_places))
-
-
-    # Conversion en devise cible
-    def convertir(val, source_devise):
-        if pd.isnull(val) or pd.isnull(source_devise):
-            return np.nan
-        source_devise = str(source_devise).upper() # Assurer que c'est une chaîne
-        if source_devise == devise_cible:
-            return val
-        taux = fx_rates.get(source_devise)
-        return val * taux if taux else np.nan
-
-    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper()
-
-    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
-    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
-    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
-
-    total_valeur = df["Valeur_conv"].sum()
-    total_actuelle = df["Valeur_Actuelle_conv"].sum()
-    total_h52 = df["Valeur_H52_conv"].sum()
-    total_lt = df["Valeur_LT_conv"].sum()
-
-    # Préparer colonnes pour affichage
-    cols = [
-        ticker_col, "shortName", "Catégorie", "Devise",
-        "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
-        "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
-        "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        "Last Price_fmt", "Momentum (%)_fmt", "Z-Score_fmt",
-        "Signal", "Action", "Justification"
-    ]
-    labels = [
-        "Ticker", "Nom", "Catégorie", "Devise",
-        "Quantité", "Prix d'Acquisition", "Valeur",
-        "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
-        "Valeur H52", "Objectif LT", "Valeur LT",
-        "Dernier Prix", "Momentum (%)", "Z-Score",
-        "Signal", "Action", "Justification"
-    ]
-
-    existing_cols_in_df = []
-    existing_labels = []
-    for i, col_name in enumerate(cols):
-        if col_name == ticker_col and ticker_col is not None:
-            existing_cols_in_df.append(ticker_col)
-            existing_labels.append(labels[i])
-        elif col_name in df.columns:
-            existing_cols_in_df.append(col_name)
-            existing_labels.append(labels[i])
-    
-    if not existing_cols_in_df:
-        st.warning("Aucune colonne de données valide à afficher.")
-        return total_valeur, total_actuelle, total_h52, total_lt # Retourne les totaux même s'il n'y a rien à afficher
-
-    df_disp = df[existing_cols_in_df].copy()
-    df_disp.columns = existing_labels
-
-    if "sort_column" not in st.session_state:
-        st.session_state.sort_column = None
-    if "sort_direction" not in st.session_state:
-        st.session_state.sort_direction = "asc"
-
-    if st.session_state.sort_column:
-        sort_col_label = st.session_state.sort_column
-        if sort_col_label in df_disp.columns:
-            original_col_name = None
-            try:
-                idx = existing_labels.index(sort_col_label)
-                original_col_name = existing_cols_in_df[idx]
-                if original_col_name.endswith("_fmt"):
-                    original_col_name = original_col_name[:-4]
-            except ValueError:
-                pass
-
-            if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                 df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: pd.to_numeric(x.astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf'))
-                )
+    for ticker in tickers_to_fetch:
+        try:
+            # Récupérer les données de YFinance pour le dernier prix
+            ticker_data = yf.Ticker(ticker)
+            hist = ticker_data.history(period="1d", interval="1d")
+            if not hist.empty:
+                current_price = hist['Close'].iloc[0]
+                current_prices[ticker] = current_price
             else:
-                df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: x.astype(str).str.lower()
-                )
+                current_prices[ticker] = None # Pas de prix trouvé
+        except Exception:
+            current_prices[ticker] = None # En cas d'erreur de récupération
 
-    total_valeur_str = format_fr(total_valeur, 2)
-    total_actuelle_str = format_fr(total_actuelle, 2)
-    total_h52_str = format_fr(total_h52, 2)
-    total_lt_str = format_fr(total_lt, 2)
+    # Appliquer les prix actuels au DataFrame
+    df['Prix Actuel (Original)'] = df['Ticker'].map(current_prices)
 
-    html_code = f"""
-    <style>
-      .scroll-wrapper {{
-        overflow-x: auto !important;
-        overflow-y: auto;
-        max-height: 500px;
-        max-width: none !important;
-        width: auto;
-        display: block;
-        position: relative;
-      }}
-      .portfolio-table {{
-        min-width: 2200px;
-        border-collapse: collapse;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }}
-      .portfolio-table th {{
-        background: #363636;
-        color: white;
-        padding: 8px;
-        text-align: center;
-        border: none;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        font-size: 12px;
-        box-sizing: border-box;
-      }}
-      .portfolio-table td {{
-        padding: 6px;
-        text-align: right;
-        border: none;
-        font-size: 11px;
-        white-space: nowrap;
-      }}
-      .portfolio-table td:nth-child(1),
-      .portfolio-table td:nth-child(2),
-      .portfolio-table td:nth-child(3),
-      .portfolio-table td:nth-child(16),
-      .portfolio-table td:nth-child(17),
-      .portfolio-table td:nth-child(18) {{
-        text-align: left;
-        white-space: normal;
-      }}
-      { (lambda : '' if 'Ticker' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Ticker") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Ticker") + 1}) {{ width: 80px; }}')() }
-      { (lambda : '' if 'Nom' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Nom") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Nom") + 1}) {{ width: 200px; }}')() }
-      { (lambda : '' if 'Catégorie' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Catégorie") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Catégorie") + 1}) {{ width: 100px; }}')() }
-      { (lambda : '' if 'Devise' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Devise") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Devise") + 1}) {{ width: 60px; }}')() }
+    # Convertir les prix dans la devise cible
+    df['Prix Actuel (Cible)'] = df.apply(
+        lambda row: row['Prix Actuel (Original)'] * get_exchange_rate(row['Devise'], st.session_state.devise_cible, st.session_state.fx_rates)
+        if pd.notna(row['Prix Actuel (Original)']) else None,
+        axis=1
+    )
 
-      .portfolio-table th:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)),
-      .portfolio-table td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)) {{
-        width: 100px;
-      }}
+    # Calcul des valeurs
+    df['Valeur à l\'acquisition'] = df['Quantité'] * df['Acquisition']
+    df['Valeur actuelle'] = df['Quantité'] * df['Prix Actuel (Cible)']
 
-      { (lambda : '' if 'Signal' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Signal") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Signal") + 1}) {{ width: 100px; }}')() }
-      { (lambda : '' if 'Action' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Action") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Action") + 1}) {{ width: 150px; }}')() }
-      { (lambda : '' if 'Justification' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Justification") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Justification") + 1}) {{ width: 200px; }}')() }
+    # Calcul des plus ou moins-values latentes
+    df['Plus/Moins-value Latente'] = df['Valeur actuelle'] - df['Valeur à l\'acquisition']
+    df['% Plus/Moins-value'] = (df['Plus/Moins-value Latente'] / df['Valeur à l\'acquisition']) * 100
+    df['% Plus/Moins-value'] = df['% Plus/Moins-value'].replace([np.inf, -np.inf], np.nan) # Gérer les divisions par zéro
 
+    # Renommer les colonnes pour l'affichage
+    df['Nom de l\'actif'] = df['Ticker'].apply(get_ticker_name)
 
-      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
-      .total-row td {{
-        background: #A49B6D;
-        color: white;
-        font-weight: bold;
-      }}
-    </style>
-    <div class="scroll-wrapper">
-      <table class="portfolio-table">
-        <thead><tr>
-    """
+    # Colonnes à afficher dans le portefeuille
+    # Supprimons 'Prix Actuel (Original)' car 'Dernier Prix' n'est plus utile dans l'interface finale
+    # La colonne 'Dernier Prix' n'est pas directement créée, elle était implicitement l'original price.
+    # L'important est de s'assurer qu'elle n'est pas dans la sélection finale.
 
-    for lbl in df_disp.columns:
-        html_code += f'<th>{safe_escape(lbl)}</th>'
+    display_cols = [
+        'Nom de l\'actif',
+        'Ticker',
+        'Quantité',
+        'Devise',
+        'Acquisition',
+        'Valeur à l\'acquisition',
+        'Prix Actuel (Cible)', # Renommé pour la clarté
+        'Valeur actuelle',
+        'Plus/Moins-value Latente',
+        '% Plus/Moins-value'
+    ]
 
-    html_code += """
-        </tr></thead>
-        <tbody>
-    """
+    df_display = df[display_cols].copy()
 
-    for _, row in df_disp.iterrows():
-        html_code += "<tr>"
-        for lbl in df_disp.columns:
-            val = row[lbl]
-            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-            html_code += f"<td>{val_str}</td>"
-        html_code += "</tr>"
-
-    num_cols_displayed = len(df_disp.columns)
-    total_row_cells = [""] * num_cols_displayed
-    
-    total_cols_mapping = {
-        "Valeur": total_valeur_str,
-        "Valeur Actuelle": total_actuelle_str,
-        "Valeur H52": total_h52_str,
-        "Valeur LT": total_lt_str
+    # Formatter les colonnes numériques pour l'affichage
+    format_mapping = {
+        'Acquisition': '{:,.2f} {}'.format,
+        'Valeur à l\'acquisition': '{:,.2f} {}'.format,
+        'Prix Actuel (Cible)': '{:,.2f} {}'.format,
+        'Valeur actuelle': '{:,.2f} {}'.format,
+        'Plus/Moins-value Latente': '{:,.2f} {}'.format,
+        '% Plus/Moins-value': '{:,.2f} %'.format
     }
 
-    for display_label, total_value_str in total_cols_mapping.items():
-        if display_label in df_disp.columns:
-            idx = list(df_disp.columns).index(display_label)
-            total_row_cells[idx] = safe_escape(total_value_str)
-
-    total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
-
-    html_code += "<tr class='total-row'>"
-    for cell_content in total_row_cells:
-        html_code += f"<td>{cell_content}</td>"
-    html_code += "</tr>"
+    # Appliquer le formatage avec la devise cible
+    devise_symbole = st.session_state.get('devise_cible', 'EUR') # Symbole par défaut
+    for col, formatter in format_mapping.items():
+        if col != '% Plus/Moins-value':
+             # Utiliser la devise cible pour le formatage monétaire
+            df_display[col] = df_display[col].apply(lambda x: formatter(x, devise_symbole) if pd.notna(x) else "N/A")
+        else:
+            df_display[col] = df_display[col].apply(lambda x: formatter(x) if pd.notna(x) else "N/A")
 
 
-    html_code += """
-        </tbody>
-      </table>
-    </div>
-    """
+    # Calcul des totaux pour la synthèse globale
+    total_valeur_acquisition = df['Valeur à l\'acquisition'].sum()
+    total_valeur_actuelle = df['Valeur actuelle'].sum()
+    total_pm_latente = df['Plus/Moins-value Latente'].sum()
+    
+    # Calcul du % total de Plus/Moins-value
+    total_percent_pm = (total_pm_latente / total_valeur_acquisition) * 100 if total_valeur_acquisition != 0 else 0
 
-    components.html(html_code, height=600, scrolling=True)
+    st.subheader(f"Portefeuille en {st.session_state.devise_cible}")
 
-    # La fonction retourne maintenant les totaux
-    return total_valeur, total_actuelle, total_h52, total_lt
+    # Fonction de tri
+    def sort_dataframe(df_to_sort, column, direction):
+        if column not in df_to_sort.columns:
+            return df_to_sort # Retourne l'original si la colonne n'existe pas
 
-# --- NOUVELLE FONCTION POUR AFFICHER LA SYNTHÈSE GLOBALE ---
+        # Gestion des colonnes numériques pour le tri (en retirant les symboles)
+        if '€' in df_to_sort[column].astype(str).iloc[0] or '$' in df_to_sort[column].astype(str).iloc[0] or '%' in df_to_sort[column].astype(str).iloc[0] or devise_symbole in df_to_sort[column].astype(str).iloc[0]:
+            temp_col = df_to_sort[column].astype(str).str.replace(r'[^\d.,-]+', '', regex=True).str.replace(',', '.', regex=False).astype(float, errors='ignore')
+            if pd.api.types.is_numeric_dtype(temp_col):
+                return df_to_sort.iloc[temp_col.sort_values(ascending=(direction == "asc")).index]
+        
+        return df_to_sort.sort_values(by=column, ascending=(direction == "asc"))
+
+
+    # Tri interactif
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1:
+        sort_by = st.selectbox("Trier par", options=df_display.columns.tolist(), index=0, key="sort_by_portfolio")
+    with col2:
+        sort_direction = st.radio("Direction", options=["Ascendant", "Descendant"], key="sort_direction_portfolio", horizontal=True)
+
+    if sort_by:
+        # Appliquer le tri sur le DataFrame original pour conserver les types numériques
+        df_sorted_raw = df.copy()
+        
+        # Mapping des colonnes formatées vers les colonnes brutes pour le tri
+        raw_col_map = {
+            'Nom de l\'actif': 'Nom de l\'actif',
+            'Ticker': 'Ticker',
+            'Quantité': 'Quantité',
+            'Devise': 'Devise',
+            'Acquisition': 'Acquisition',
+            'Valeur à l\'acquisition': 'Valeur à l\'acquisition',
+            'Prix Actuel (Cible)': 'Prix Actuel (Cible)',
+            'Valeur actuelle': 'Valeur actuelle',
+            'Plus/Moins-value Latente': 'Plus/Moins-value Latente',
+            '% Plus/Moins-value': '% Plus/Moins-value'
+        }
+        
+        col_for_sorting = raw_col_map.get(sort_by, sort_by)
+
+        df_sorted_raw = sort_dataframe(df_sorted_raw, col_for_sorting, sort_direction.lower().replace('ant', ''))
+        
+        # Après le tri du DataFrame brut, réappliquer le formatage pour l'affichage
+        # S'assurer que l'ordre des colonnes est conservé pour l'affichage
+        df_display_sorted = df_sorted_raw[display_cols].copy()
+        for col, formatter in format_mapping.items():
+            if col != '% Plus/Moins-value':
+                df_display_sorted[col] = df_display_sorted[col].apply(lambda x: formatter(x, devise_symbole) if pd.notna(x) else "N/A")
+            else:
+                df_display_sorted[col] = df_display_sorted[col].apply(lambda x: formatter(x) if pd.notna(x) else "N/A")
+        
+        st.dataframe(df_display_sorted, use_container_width=True, hide_index=True)
+    else:
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+    # Retourner les totaux pour la synthèse globale
+    return total_valeur_acquisition, total_valeur_actuelle, total_pm_latente, total_percent_pm
+
+
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
-    """
-    Affiche la section de synthèse globale du portefeuille.
-    Prend les totaux calculés en arguments.
-    """
-    st.subheader("Synthèse Globale du Portefeuille")
-
-    devise_cible = st.session_state.get("devise_cible", "EUR")
-
-    # Vérifiez si les totaux sont valides avant d'afficher
-    if total_valeur is None: # Si afficher_portefeuille a retourné None
-        st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
-        return
+    """Affiche la synthèse globale du portefeuille."""
+    devise_symbole = st.session_state.get('devise_cible', 'EUR') # Récupère la devise cible
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
-            label=f"**Valeur d'Acquisition ({devise_cible})**",
-            value=f"{format_fr(total_valeur, 2)} {devise_cible}"
+            label="Valeur à l'acquisition",
+            value=f"{total_valeur:,.2f} {devise_symbole}" if total_valeur is not None else "N/A",
+            delta=None
         )
     with col2:
-        st.metric(
-            label=f"**Valeur Actuelle ({devise_cible})**",
-            value=f"{format_fr(total_actuelle, 2)} {devise_cible}"
-        )
-    
-    if total_valeur != 0 and pd.notna(total_valeur) and pd.notna(total_actuelle):
-        gain_perte_abs = total_actuelle - total_valeur
-        pourcentage_gain_perte = (gain_perte_abs / total_valeur) * 100
-        with col3:
+        if total_actuelle is not None and total_valeur is not None:
+            delta_valeur = total_actuelle - total_valeur
+            delta_pourcentage = (delta_valeur / total_valeur) * 100 if total_valeur != 0 else 0
             st.metric(
-                label="**Gain/Perte Total**",
-                value=f"{format_fr(gain_perte_abs, 2)} {devise_cible}",
-                delta=f"{format_fr(pourcentage_gain_perte, 2)}%"
+                label="Valeur Actuelle",
+                value=f"{total_actuelle:,.2f} {devise_symbole}" if total_actuelle is not None else "N/A",
+                delta=f"{delta_valeur:,.2f} {devise_symbole} ({delta_pourcentage:,.2f} %)" if total_valeur != 0 else "0.00 (0.00 %)",
+                delta_color="normal" # "inverse" si vous voulez que le rouge soit positif
             )
-    else:
-        with col3:
-            st.metric(
-                label="**Gain/Perte Total**",
-                value=f"N/A {devise_cible}"
+        else:
+             st.metric(
+                label="Valeur Actuelle",
+                value="N/A",
+                delta=None
             )
-    
+    with col3:
+        # st.metric(
+        #     label="Plus/Moins-value Latente (52 semaines)",
+        #     value=f"{total_h52:,.2f} {devise_symbole}" if total_h52 is not None else "N/A"
+        # )
+        st.markdown("##### Performance 52 sem.")
+        st.markdown("*(À implémenter)*")
     with col4:
-        st.metric(
-            label=f"**Objectif Long Terme ({devise_cible})**",
-            value=f"{format_fr(total_lt, 2)} {devise_cible}"
-        )
+        # st.metric(
+        #     label="Plus/Moins-value Latente (Long terme)",
+        #     value=f"{total_lt:,.2f} {devise_symbole}" if total_lt is not None else "N/A"
+        # )
+        st.markdown("##### Performance Long Terme")
+        st.markdown("*(À implémenter)*")
