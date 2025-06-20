@@ -6,6 +6,7 @@ from datetime import datetime
 import requests
 import json
 import streamlit as st
+import builtins  # Pour garantir l’accès à str natif même s’il a été écrasé ailleurs
 
 # Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
@@ -14,7 +15,7 @@ def fetch_stock_history(Ticker, start_date, end_date):
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
     """
     try:
-        if not isinstance(Ticker, str):
+        if not isinstance(Ticker, builtins.str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {type(Ticker)})")
             return pd.Series(dtype='float64')
         
@@ -27,7 +28,6 @@ def fetch_stock_history(Ticker, start_date, end_date):
             return data['Close'].rename(Ticker)
 
     except Exception as e:
-        import builtins
         if isinstance(e, TypeError) and "'str' object is not callable" in builtins.str(e):
             st.error("⚠️ Erreur critique : la fonction native `str()` a été écrasée. Vérifiez votre code (évitez `str = ...`).")
         else:
@@ -59,11 +59,12 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
         if rates_series:
             return pd.Series(rates_series).rename(f"{base_currency}/{target_currency}")
     except requests.exceptions.RequestException as e:
-        st.error(f"Erreur HTTP pour les taux de change {base_currency}/{target_currency} : {e}")
+        st.error(f"Erreur HTTP pour les taux de change {base_currency}/{target_currency} : {builtins.str(e)}")
     except json.JSONDecodeError as e:
-        st.error(f"Erreur JSON pour les taux de change {base_currency}/{target_currency} : {e}")
+        st.error(f"Erreur JSON pour les taux de change {base_currency}/{target_currency} : {builtins.str(e)}")
     
     return pd.Series(dtype='float64')
+
 
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
     """
