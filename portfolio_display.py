@@ -120,16 +120,21 @@ def afficher_portefeuille():
         if source_devise == devise_cible:
             return val # Pas de conversion nécessaire
 
-        taux = fx_rates.get(source_devise)
+        raw_taux = fx_rates.get(source_devise)
         
-        # Vérifiez explicitement si le taux est None ou NaN
-        if taux is None or pd.isna(taux): 
-            #st.warning(f"Taux de change pour {source_devise}/{devise_cible} non trouvé. Utilisation de 1:1 pour {source_devise}.")
+        # Convertir raw_taux en un float pour une vérification robuste avec pd.isna
+        # Si raw_taux est None, float(None) donnera un TypeError, donc un bloc try-except est nécessaire.
+        try:
+            taux_scalar = float(raw_taux)
+        except (TypeError, ValueError):
+            taux_scalar = np.nan # Si ce n'est pas convertible en float, considérez-le comme NaN
+
+        # Vérifiez explicitement si le taux est None ou NaN après la tentative de conversion
+        if pd.isna(taux_scalar): 
+            # st.warning(f"Taux de change pour {source_devise}/{devise_cible} non trouvé. Utilisation de 1:1 pour {source_devise}.")
             return val # Retourne la valeur non convertie si le taux est manquant
         
-        # Si taux est 0, ou une valeur numérique valide (même 0.0), effectuez la multiplication
-        # La multiplication avec 0 est valide et doit se produire si le taux est 0.
-        return val * taux
+        return val * taux_scalar
     # --- FIN DE LA CORRECTION DE LA FONCTION convertir ---
 
 
