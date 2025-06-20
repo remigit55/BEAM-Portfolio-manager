@@ -13,7 +13,7 @@ from performance import afficher_performance
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change, actualiser_taux_change
-from parametres import afficher_parametres_globaux # La nouvelle fonction qui gère tous les paramètres
+from parametres import afficher_parametres_globaux # La fonction qui gère tous les paramètres globaux
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -100,8 +100,6 @@ for key, default in {
 
 
 # --- LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE ---
-# Cette logique doit être déclenchée si la devise cible change ou si le fichier est mis à jour
-# ou si le temps d'actualisation est dépassé.
 current_time = datetime.datetime.now()
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
@@ -137,8 +135,7 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
-        # Les totaux seront mis à jour par l'appel dans l'onglet "Portefeuille"
-        # On passe ici les valeurs de session state
+        st.header("✨ Synthèse du Portefeuille") # Keep this header for the tab title
         afficher_synthese_globale(
             st.session_state.total_valeur,
             st.session_state.total_actuelle,
@@ -148,11 +145,10 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]:
+        st.header("📈 Vue détaillée du Portefeuille") # Keep this header for the tab title
         if st.session_state.df is None:
-            st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour voir votre portefeuille.")
+            st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour voir votre portefeuille.") # Changed to st.warning
         else:
-            # Appel de la fonction d'affichage du portefeuille et récupération des totaux
-            # Ces totaux seront ensuite stockés dans st.session_state pour l'onglet Synthèse
             total_valeur, total_actuelle, total_h52, total_lt = afficher_portefeuille()
             st.session_state.total_valeur = total_valeur
             st.session_state.total_actuelle = total_actuelle
@@ -162,28 +158,29 @@ def main():
 
     # Onglet : Performance
     with onglets[2]:
+        st.header("📊 Analyse de Performance") # Keep this header for the tab title
         if 'afficher_performance' in locals():
             afficher_performance()
-        else:
-            st.info("Module de performance non trouvé ou fonction non implémentée.")
+        # Removed else: st.info(...)
 
     # Onglet : OD Comptables
     with onglets[3]:
+        st.header("🧾 Opérations Diverses Comptables") # Keep this header for the tab title
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
-        else:
-            st.info("Module des OD Comptables non trouvé ou fonction non implémentée.")
+        # Removed else: st.info(...)
 
     # Onglet : Transactions
     with onglets[4]:
+        st.header("📜 Historique des Transactions") # Keep this header for the tab title
         if 'afficher_transactions' in locals():
             afficher_transactions()
-        else:
-            st.info("Module des transactions non trouvé ou fonction non implémentée.")
+        # Removed else: st.info(...)
 
     # Onglet : Taux de change
     with onglets[5]:
-        st.info(f"Les taux sont affichés par rapport à la devise de référence sélectionnée dans l'onglet 'Paramètres' : **{st.session_state.get('devise_cible', 'EUR')}**.")
+        st.header("💱 Taux de Change Actuels") # Keep this header for the tab title
+        # Removed st.info(f"Les taux sont affichés par rapport à la devise...")
         
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
@@ -202,14 +199,12 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]:
-        # Appel de la fonction de paramètres qui gère l'importation et la devise
-        if 'afficher_parametres_globaux' in locals():
-            afficher_parametres_globaux()
-        else:
-            st.info("Module des paramètres non trouvé ou fonction non implémentée.")
+        st.header("⚙️ Paramètres de l'Application") # Keep this header for the tab title
+        afficher_parametres_globaux()
 
 
     st.markdown("---")
+    # Removed st.info("💡 Importez un fichier CSV ou Excel...")
     
 if __name__ == "__main__":
     main()
