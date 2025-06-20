@@ -1,398 +1,189 @@
-# portfolio_display.py
-
 import streamlit as st
+import yfinance as yf
 import pandas as pd
-import streamlit.components.v1 as components
-import numpy as np
+import matplotlib.pyplot as plt
+import numpy as np # Assurez-vous d'importer numpy si ce n'est pas déjà fait
 
-# Import des fonctions depuis les nouveaux modules
-from utils import safe_escape, format_fr
-from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
+# Votre fonction portfolio_display existante (exemple)
+def portfolio_display():
+    st.title("Mon Portefeuille d'Investissement")
 
-def afficher_portefeuille():
-    """
-    Affiche le portefeuille de l'utilisateur, gère les calculs et l'affichage.
-    Récupère les données externes via des fonctions dédiées.
-    Retourne les totaux convertis pour la synthèse.
-    """
-    if "df" not in st.session_state or st.session_state.df is None:
-        st.warning("Aucune donnée de portefeuille n’a encore été importée.")
-        return None, None, None, None
+    # --- Votre code existant pour le tableau du portefeuille ---
+    # Exemple de données de portefeuille (à remplacer par vos vraies données si ce n'est pas déjà fait)
+    # Assurez-vous que cette partie existe déjà et génère `df_portefeuille`
+    portfolio_data = {
+        'Ticker': ['MSFT', 'AAPL', 'GOOGL', 'AMZN'],
+        'Quantité': [10, 15, 5, 8],
+        'Prix Achat': [300, 150, 120, 100],
+        'Prix Actuel': [320, 160, 130, 110]
+    }
+    df_portefeuille = pd.DataFrame(portfolio_data)
+    # Calculer la valeur actuelle et les plus/moins values
+    df_portefeuille['Valeur Actuelle'] = df_portefeuille['Quantité'] * df_portefeuille['Prix Actuel']
+    df_portefeuille['Plus/Moins Value'] = (df_portefeuille['Prix Actuel'] - df_portefeuille['Prix Achat']) * df_portefeuille['Quantité']
 
-    df = st.session_state.df.copy()
+    st.header("Résumé du Portefeuille")
+    st.dataframe(df_portefeuille) # C'est votre tableau principal
 
-    if "LT" in df.columns and "Objectif_LT" not in df.columns:
-        df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
+    # --- DÉBUT DE L'INTÉGRATION DU CODE D'ANALYSE DE MOMENTUM ---
 
-    devise_cible = st.session_state.get("devise_cible", "EUR")
+    st.header("Analyse de Momentum des Actifs du Portefeuille")
 
-    fx_rates = fetch_fx_rates(devise_cible)
-
-    for col in ["Quantité", "Acquisition"]:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-    if all(c in df.columns for c in ["Quantité", "Acquisition"]):
-        df["Valeur"] = df["Quantité"] * df["Acquisition"]
-    else:
-        df["Valeur"] = np.nan
-
-    if len(df.columns) > 5:
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
-    else:
-        df["Catégorie"] = ""
-
-    ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
-    
-    if "ticker_data_cache" not in st.session_state:
-        st.session_state.ticker_data_cache = {}
-
-    if ticker_col and not df[ticker_col].dropna().empty:
-        unique_tickers = df[ticker_col].dropna().unique()
-        for ticker in unique_tickers:
-            if ticker not in st.session_state.ticker_data_cache:
-                st.session_state.ticker_data_cache[ticker] = fetch_yahoo_data(ticker)
-        
-        df["shortName"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
-        df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("currentPrice", np.nan))
-        df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
-    else:
-        df["shortName"] = ""
-        df["currentPrice"] = np.nan
-        df["fiftyTwoWeekHigh"] = np.nan
-
-    df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
-    df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
-
-    if "Objectif_LT" not in df.columns:
-        df["Objectif_LT"] = np.nan
-    else:
-        df["Objectif_LT"] = (
-            df["Objectif_LT"]
-              .astype(str)
-              .str.replace(" ", "", regex=False)
-              .str.replace(",", ".", regex=False)
-        )
-        df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
-    df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
-
-    if "momentum_results_cache" not in st.session_state:
-        st.session_state.momentum_results_cache = {}
-            
-    if ticker_col and not df[ticker_col].dropna().empty:
-        unique_tickers_for_momentum = df[ticker_col].dropna().unique()
-        for ticker in unique_tickers_for_momentum:
-            if ticker not in st.session_state.momentum_results_cache:
-                st.session_state.momentum_results_cache[ticker] = fetch_momentum_data(ticker)
-        
-        df["Last Price"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Last Price", np.nan))
-        df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
-        df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Signal", ""))
-        df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
-        df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
-    else:
-        df["Last Price"] = np.nan
-        df["Momentum (%)"] = np.nan
-        df["Z-Score"] = np.nan
-        df["Signal"] = ""
-        df["Action"] = ""
-        df["Justification"] = ""
-
-
-    for col_name, dec_places in [
-        ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4),
-        ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4), ("Valeur_LT", 2), 
-        ("Momentum (%)", 2), ("Z-Score", 2)
-    ]:
-        if col_name in df.columns:
-            df[f"{col_name}_fmt"] = df[col_name].map(lambda x: format_fr(x, dec_places))
-    
-    # --- DÉBUT DE LA CORRECTION DE LA FONCTION convertir ---
-    def convertir(val, source_devise):
-        if pd.isnull(val):
-            return np.nan # Si la valeur est NaN, retournez NaN directement
-
-        source_devise = str(source_devise).upper() # Assurer que c'est une chaîne
-        
-        if source_devise == devise_cible:
-            return val # Pas de conversion nécessaire
-
-        raw_taux = fx_rates.get(source_devise)
-        
-        # Convertir raw_taux en un float pour une vérification robuste avec pd.isna
-        # Si raw_taux est None, float(None) donnera un TypeError, donc un bloc try-except est nécessaire.
-        try:
-            taux_scalar = float(raw_taux)
-        except (TypeError, ValueError):
-            taux_scalar = np.nan # Si ce n'est pas convertible en float, considérez-le comme NaN
-
-        # Vérifiez explicitement si le taux est None ou NaN après la tentative de conversion
-        if pd.isna(taux_scalar): 
-            # st.warning(f"Taux de change pour {source_devise}/{devise_cible} non trouvé. Utilisation de 1:1 pour {source_devise}.")
-            return val # Retourne la valeur non convertie si le taux est manquant
-        
-        return val * taux_scalar
-    # --- FIN DE LA CORRECTION DE LA FONCTION convertir ---
-
-
-    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper()
-
-    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
-    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
-    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
-
-    total_valeur = df["Valeur_conv"].sum()
-    total_actuelle = df["Valeur_Actuelle_conv"].sum()
-    total_h52 = df["Valeur_H52_conv"].sum()
-    total_lt = df["Valeur_LT_conv"].sum()
-
-    cols = [
-        ticker_col, "shortName", "Catégorie", "Devise",
-        "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
-        "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
-        "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        "Momentum (%)_fmt", "Z-Score_fmt",
-        "Signal", "Action", "Justification"
-    ]
-    labels = [
-        "Ticker", "Nom", "Catégorie", "Devise",
-        "Quantité", "Prix d'Acquisition", "Valeur",
-        "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
-        "Valeur H52", "Objectif LT", "Valeur LT",
-        "Momentum (%)", "Z-Score",
-        "Signal", "Action", "Justification"
+    # Utilisons la liste de tickers que vous avez fournie pour ce test
+    tickers_to_analyze = [
+        "GLDG", "COP", "TTE", "CVX", "LJP3.L", "APGO.V", "FVL.V", "RVG.V", "SSV.V", "MUX",
+        "SLVR.V", "LNG", "CCJ", "PBR", "HCC", "BTU", "CBR.V", "NIO", "EL", "UEC", "NFGC",
+        "WNS", "FUTU", "AUMB.V", "YUMC", "TLK", "HSTR.V", "HDB", "RDY", "F34.SI", "PSLV",
+        "AGX.V", "BEKE", "TCOM", "IBN", "PDD", "BABA", "JD", "LTOD.IL", "1157.HK", "BIDU",
+        "INFY", "BCM.V", "Y92.SI"
     ]
 
-    existing_cols_in_df = []
-    existing_labels = []
-    for i, col_name in enumerate(cols):
-        if col_name == ticker_col and ticker_col is not None and ticker_col in df.columns:
-            existing_cols_in_df.append(ticker_col)
-            existing_labels.append(labels[i])
-        elif col_name.endswith("_fmt"):
-            base_col_name = col_name[:-4]
-            if base_col_name in df.columns:
-                existing_cols_in_df.append(col_name)
-                existing_labels.append(labels[i])
-        elif col_name in df.columns:
-             existing_cols_in_df.append(col_name)
-             existing_labels.append(labels[i])
+    results = {}
+    period = "5y"
+    interval = "1wk"
+
+    # Utilisez st.spinner pour montrer que le calcul est en cours
+    with st.spinner("Calcul du momentum en cours... Cela peut prendre un certain temps pour de nombreux tickers."):
+        for ticker in tickers_to_analyze:
+            # Utilisez st.expander pour chaque ticker pour organiser les graphiques
+            with st.expander(f"Détails du Momentum pour **{ticker}**"):
+                try:
+                    data = yf.download(ticker, period=period, interval=interval, auto_adjust=True, progress=False)
+                    
+                    if data.empty:
+                        st.warning(f"**Aucune donnée historique trouvée** pour {ticker} pour la période/intervalle spécifié(e).")
+                        continue
+
+                    # Gestion du MultiIndex comme dans votre exemple original
+                    if isinstance(data.columns, pd.MultiIndex):
+                        # Assurez-vous que la colonne spécifique au ticker existe
+                        if ('Close', ticker) in data.columns:
+                            close = data['Close'][ticker]
+                        else:
+                            st.error(f"**Erreur :** La colonne 'Close' pour le ticker {ticker} n'a pas été trouvée dans le MultiIndex des données téléchargées.")
+                            continue
+                    else:
+                        if 'Close' in data.columns:
+                            close = data['Close']
+                        else:
+                            st.error(f"**Erreur :** La colonne 'Close' n'a pas été trouvée dans les données de {ticker}.")
+                            continue
+
+                    # Vérification si la série 'close' est vide après extraction
+                    if close.empty:
+                        st.warning(f"La série de prix 'Close' est **vide** pour {ticker}.")
+                        continue
+
+                    # Assurez-vous que 'close' est une Series et non un DataFrame d'une seule colonne (cas rares)
+                    if isinstance(close, pd.DataFrame) and len(close.columns) == 1:
+                        close = close.iloc[:, 0] # Convertir en Series
+
+                    df_momentum = pd.DataFrame({'Close': close})
+
+                    # Vérification si suffisamment de données sont disponibles après le nettoyage
+                    # Minimum 39 pour MA_39, mais le Z-Score a besoin de 10 points de momentum,
+                    # donc la taille totale doit être au moins 39 + 10 - 1 = 48 semaines pour un Z-score stable.
+                    # Pour un calcul minimal, on garde 39.
+                    if len(df_momentum) < 39: 
+                        st.warning(f"**Données insuffisantes** pour {ticker} pour calculer le momentum (moins de 39 semaines).")
+                        continue
+                    
+                    df_momentum['MA_39'] = df_momentum['Close'].rolling(window=39, min_periods=1).mean() # min_periods pour permettre calcul début
+                    df_momentum['Momentum'] = (df_momentum['Close'] / df_momentum['MA_39']) - 1
+                    
+                    # Gestion des cas où std est zéro pour éviter division par zéro ou NaN
+                    momentum_std_10 = df_momentum['Momentum'].rolling(10, min_periods=1).std()
+                    momentum_mean_10 = df_momentum['Momentum'].rolling(10, min_periods=1).mean()
+
+                    df_momentum['Z_Momentum'] = (df_momentum['Momentum'] - momentum_mean_10) / momentum_std_10
+                    df_momentum['Z_Momentum'] = df_momentum['Z_Momentum'].replace([np.inf, -np.inf], np.nan) # Gérer infinis si std est 0
+
+                    # Vérification pour s'assurer qu'il y a des données après les calculs
+                    if df_momentum.empty or df_momentum['Z_Momentum'].isnull().all():
+                        st.warning(f"Momentum ou Z-Score non calculable pour {ticker} (données insuffisantes ou erreurs de calcul après MA/Momentum).")
+                        continue
+
+                    latest = df_momentum.iloc[-1]
+                    z = latest['Z_Momentum']
+                    m = latest['Momentum'] * 100
+
+                    signal = "Neutre"
+                    action = "Maintenir"
+                    reason = "Pas de signal exploitable." # Valeur par défaut
+
+                    if pd.notna(z): # Vérifier que Z-score n'est pas NaN
+                        if z > 2:
+                            signal = "🔥 Surchauffe"
+                            action = "Alléger / Prendre profits"
+                            reason = "Momentum extrême, risque de retournement"
+                        elif z > 1.5:
+                            signal = "↗ Fort"
+                            action = "Surveiller"
+                            reason = "Momentum soutenu, proche de surchauffe"
+                        elif z > 0.5:
+                            signal = "↗ Haussier"
+                            action = "Conserver / Renforcer"
+                            reason = "Momentum sain"
+                        elif z > -0.5:
+                            signal = "➖ Neutre"
+                            action = "Ne rien faire"
+                            reason = "Pas de signal exploitable"
+                        elif z > -1.5:
+                            signal = "↘ Faible"
+                            action = "Surveiller / Réduire si confirmé"
+                            reason = "Dynamique en affaiblissement"
+                        else: # z <= -1.5
+                            signal = "🧊 Survendu"
+                            action = "Acheter / Renforcer (si signal technique)"
+                            reason = "Purge excessive, possible bas de cycle"
+                    else:
+                        reason = "Z-Score non calculable (données insuffisantes ou volatilité nulle)."
+
+
+                    results[ticker] = {
+                        "Last Price": round(latest['Close'], 2) if pd.notna(latest['Close']) else np.nan,
+                        "Momentum (%)": round(m, 2) if pd.notna(m) else np.nan,
+                        "Z-Score": round(z, 2) if pd.notna(z) else np.nan,
+                        "Signal": signal,
+                        "Action": action,
+                        "Justification": reason
+                    }
+
+                    # Graphique Streamlit
+                    fig, ax = plt.subplots(figsize=(12, 4)) # Crée une figure et un axe
+                    ax.plot(df_momentum.index, df_momentum['Z_Momentum'], label=f'{ticker} - Z Momentum')
+                    ax.axhline(0, color='gray', linestyle='--')
+                    ax.axhline(2, color='red', linestyle='--', label='Surchauffe (+2σ)')
+                    ax.axhline(-2, color='green', linestyle='--', label='Survendu (-2σ)')
+                    ax.set_title(f'Oscillateur de Momentum - {ticker}')
+                    ax.legend()
+                    ax.grid(True)
+                    st.pyplot(fig) # Affiche la figure Matplotlib dans Streamlit
+                    plt.close(fig) # Ferme la figure pour libérer la mémoire
+
+                except Exception as e:
+                    st.error(f"**Erreur inattendue** lors du calcul du momentum pour {ticker}: {e}")
+                    results[ticker] = {
+                        "Last Price": np.nan,
+                        "Momentum (%)": np.nan,
+                        "Z-Score": np.nan,
+                        "Signal": "Erreur",
+                        "Action": "N/A",
+                        "Justification": f"Erreur de calcul: {e}."
+                    }
     
-    if not existing_cols_in_df:
-        st.warning("Aucune colonne de données valide à afficher.")
-        return total_valeur, total_actuelle, total_h52, total_lt
-
-    df_disp = df[existing_cols_in_df].copy()
-    df_disp.columns = existing_labels
-
-    if "sort_column" not in st.session_state:
-        st.session_state.sort_column = None
-    if "sort_direction" not in st.session_state:
-        st.session_state.sort_direction = "asc"
-
-    if st.session_state.sort_column:
-        sort_col_label = st.session_state.sort_column
-        if sort_col_label in df_disp.columns:
-            original_col_name = None
-            try:
-                idx = existing_labels.index(sort_col_label)
-                original_col_name = existing_cols_in_df[idx]
-                if original_col_name.endswith("_fmt"):
-                    original_col_name = original_col_name[:-4] 
-            except ValueError:
-                pass
-
-            if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: pd.to_numeric(
-                        x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
-                        errors='coerce'
-                    ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
-                )
-            else:
-                df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: x.astype(str).str.lower()
-                )
-    
-    total_valeur_str = format_fr(total_valeur, 2)
-    total_actuelle_str = format_fr(total_actuelle, 2)
-    total_h52_str = format_fr(total_h52, 2)
-    total_lt_str = format_fr(total_lt, 2)
-
-    css_col_widths = ""
-    width_specific_cols = {
-        "Ticker": "80px",
-        "Nom": "200px",
-        "Catégorie": "100px",
-        "Devise": "60px",
-        "Signal": "100px",
-        "Action": "150px",
-        "Justification": "200px",
-    }
-    
-    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]
-    left_align_selectors = []
-
-    for i, label in enumerate(df_disp.columns):
-        col_idx = i + 1
-        
-        if label in width_specific_cols:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: {width_specific_cols[label]}; }}\n"
-        else:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}\n"
-        
-        if label in left_aligned_labels:
-            left_align_selectors.append(f"td:nth-child({col_idx})")
-
-    if left_align_selectors:
-        css_col_widths += f".portfolio-table {', '.join(left_align_selectors)} {{ text-align: left; white-space: normal; }}\n"
-
-
-    html_code = f"""
-    <style>
-      .scroll-wrapper {{
-        overflow-x: auto !important;
-        overflow-y: auto;
-        max-height: 500px;
-        max-width: none !important;
-        width: auto;
-        display: block;
-        position: relative;
-      }}
-      .portfolio-table {{
-        min-width: 2200px;
-        border-collapse: collapse;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }}
-      .portfolio-table th {{
-        background: #363636;
-        color: white;
-        padding: 8px;
-        text-align: center;
-        border: none;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        font-size: 12px;
-        box-sizing: border-box;
-      }}
-      .portfolio-table td {{
-        padding: 6px;
-        text-align: right;
-        border: none;
-        font-size: 11px;
-        white-space: nowrap;
-      }}
-      {css_col_widths}
-
-      .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
-      .total-row td {{
-        background: #A49B6D;
-        color: white;
-        font-weight: bold;
-      }}
-    </style>
-    <div class="scroll-wrapper">
-      <table class="portfolio-table">
-        <thead><tr>
-    """
-
-    for lbl in df_disp.columns:
-        html_code += f'<th>{safe_escape(lbl)}</th>'
-
-    html_code += """
-        </tr></thead>
-        <tbody>
-    """
-
-    for _, row in df_disp.iterrows():
-        html_code += "<tr>"
-        for lbl in df_disp.columns:
-            val = row[lbl]
-            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-            html_code += f"<td>{val_str}</td>"
-        html_code += "</tr>"
-
-    num_cols_displayed = len(df_disp.columns)
-    total_row_cells = [""] * num_cols_displayed
-    
-    total_cols_mapping = {
-        "Valeur": total_valeur_str,
-        "Valeur Actuelle": total_actuelle_str,
-        "Valeur H52": total_h52_str,
-        "Valeur LT": total_lt_str
-    }
-
-    for display_label, total_value_str in total_cols_mapping.items():
-        if display_label in df_disp.columns:
-            idx = list(df_disp.columns).index(display_label)
-            total_row_cells[idx] = safe_escape(total_value_str)
-
-    total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
-
-    html_code += "<tr class='total-row'>"
-    for cell_content in total_row_cells:
-        html_code += f"<td>{cell_content}</td>"
-    html_code += "</tr>"
-
-
-    html_code += """
-        </tbody>
-      </table>
-    </div>
-    """
-
-    components.html(html_code, height=600, scrolling=True)
-
-    return total_valeur, total_actuelle, total_h52, total_lt
-
-def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
-
-    devise_cible = st.session_state.get("devise_cible", "EUR")
-
-    if total_valeur is None:
-        st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
-        return
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric(
-            label=f"**Valeur d'Acquisition ({devise_cible})**",
-            value=f"{format_fr(total_valeur, 2)} {devise_cible}"
-        )
-    with col2:
-        st.metric(
-            label=f"**Valeur Actuelle ({devise_cible})**",
-            value=f"{format_fr(total_actuelle, 2)} {devise_cible}"
-        )
-    
-    if total_valeur != 0 and pd.notna(total_valeur) and pd.notna(total_actuelle):
-        gain_perte_abs = total_actuelle - total_valeur
-        pourcentage_gain_perte = (gain_perte_abs / total_valeur) * 100
-        with col3:
-            st.metric(
-                label="**Gain/Perte Total**",
-                value=f"{format_fr(gain_perte_abs, 2)} {devise_cible}",
-                delta=f"{format_fr(pourcentage_gain_perte, 2)}%"
-            )
+    # Résumé global des résultats de momentum
+    if results: # N'afficher que si des résultats ont été collectés
+        results_df = pd.DataFrame(results).T
+        results_df = results_df.sort_values(by="Z-Score", ascending=False)
+        st.subheader("Synthèse de l'Analyse de Momentum")
+        st.dataframe(results_df)
     else:
-        with col3:
-            st.metric(
-                label="**Gain/Perte Total**",
-                value=f"N/A {devise_cible}"
-            )
-    
-    with col4:
-        st.metric(
-            label=f"**Objectif Long Terme ({devise_cible})**",
-            value=f"{format_fr(total_lt, 2)} {devise_cible}"
-        )
+        st.info("Aucun résultat de momentum disponible pour les tickers spécifiés après traitement.")
+
+# --- FIN DE L'INTÉGRATION DU CODE D'ANALYSE DE MOMENTUM ---
+
+# Appel de la fonction pour exécuter le code dans votre application Streamlit
+# Si portfolio_display est déjà appelée dans votre script principal (par ex. app.py),
+# assurez-vous qu'elle est appelée ici ou là-bas.
+# portfolio_display() # Décommentez si vous exécutez ce fichier directement et que cette fonction n'est pas appelée ailleurs.
