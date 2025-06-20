@@ -25,9 +25,16 @@ def fetch_stock_history(Ticker, start_date, end_date):
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
             return data['Close'].rename(Ticker)
+
     except Exception as e:
-        st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {e}")
+        import builtins
+        if isinstance(e, TypeError) and "'str' object is not callable" in builtins.str(e):
+            st.error("⚠️ Erreur critique : la fonction native `str()` a été écrasée. Vérifiez votre code (évitez `str = ...`).")
+        else:
+            st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {builtins.str(e)}")
+
     return pd.Series(dtype='float64')
+
 
 # Cache pour les taux de change historiques (valable 24h)
 @st.cache_data(ttl=86400)
