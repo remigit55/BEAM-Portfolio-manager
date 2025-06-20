@@ -1,11 +1,11 @@
-pandas
-streamlit
+pandas==2.2.2
+streamlit==1.36.0
 openpyxl
 forex-python
 gdown
 gspread
 oauth2client
-yfinance
+yfinance==0.2.38
 requests
 tenacity
 pillow
