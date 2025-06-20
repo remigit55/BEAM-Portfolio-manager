@@ -23,9 +23,18 @@ def display_performance_history():
         st.info("Aucune donnée historique de portefeuille n'a été enregistrée. Chargez un portefeuille et utilisez l'application pour commencer à construire l'historique.")
         return
 
-    # Determine min/max dates from the journal for the date picker
+    from datetime import date
+
+    # 👉 Ajout temporaire d’un ancien snapshot si un seul est disponible
+    if len(portfolio_journal) == 1:
+        ancien_snapshot = portfolio_journal[0].copy()
+        ancien_snapshot["date"] = portfolio_journal[0]["date"] - timedelta(days=7)
+        portfolio_journal.insert(0, ancien_snapshot)
+    
+    # Ensuite on peut calculer les bornes normalement
     min_journal_date = min(s['date'] for s in portfolio_journal)
     max_journal_date = max(s['date'] for s in portfolio_journal)
+
     
     today = datetime.now().date()
     
