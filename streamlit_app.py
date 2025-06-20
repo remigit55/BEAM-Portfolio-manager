@@ -2,28 +2,24 @@
 
 import streamlit as st
 import pandas as pd
-import datetime
-import requests
+import datetime # Pour gérer last_update_time
 from PIL import Image
 import base64
 from io import BytesIO
-import time # NOUVEAU : Nécessaire pour time.sleep
 
-# NOUVEAU : Importe toutes les fonctions du module taux_change.py
-# Assurez-vous que taux_change.py est dans le même dossier
-from taux_change import (
-    actualiser_taux_change,
-    afficher_tableau_taux_change # C'est la fonction principale pour l'affichage de la table
-    # Vous pouvez importer d'autres fonctions si vous les utilisez directement ici
-    # format_fr,
-    # get_yfinance_ticker_info,
-    # obtenir_taux_yfinance
-)
+# Importation des modules fonctionnels
+# Pas besoin d'importer requests, time, html, components, yfinance ici.
+# Ils sont gérés dans les modules spécifiques.
+from portfolio_display import afficher_portefeuille # Votre fonction principale d'affichage du portefeuille
+# from performance import afficher_performance # Gardez ces lignes si ces modules existent
+# from transactions import afficher_transactions
+# from od_comptables import afficher_od_comptables
+# from parametres import afficher_parametres
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
-# Thème personnalisé (RESTAURÉ À VOTRE VERSION ORIGINALE)
+# Thème personnalisé (Votre code original)
 PRIMARY_COLOR = "#363636"
 SECONDARY_COLOR = "#E8E8E8"
 ACCENT_COLOR = "#A49B6D"
@@ -73,109 +69,98 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialisation des variables de session (AJOUT de last_update_time)
+# Initialisation des variables de session (ajout de last_devise_cible pour la gestion des taux)
 for key, default in {
     "df": None,
-    "fx_rates": {},
+    "fx_rates": {}, # Les taux de change seront gérés par data_fetcher
     "devise_cible": "EUR",
-    "ticker_names_cache": {},
+    "ticker_names_cache": {}, # Le cache est maintenant dans data_fetcher via st.session_state
     "sort_column": None,
     "sort_direction": "asc",
-    "momentum_results": {},
-    "last_update_time": datetime.datetime.min # NOUVEAU : Pour l'actualisation automatique des taux
+    "momentum_results": {}, # Les résultats momentum sont aussi gérés par data_fetcher
+    "last_devise_cible": "EUR", # Pour détecter le changement de devise cible
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
-# Importation des modules fonctionnels (gardés tels quels)
-from portefeuille import afficher_portefeuille
-from performance import afficher_performance
-from transactions import afficher_transactions
-# from taux_change import afficher_taux_change # CETTE LIGNE EST MAINTENANT GÉRÉE PAR NOTRE LOGIQUE DIRECTEMENT
-from parametres import afficher_parametres
-from od_comptables import afficher_od_comptables
+# --- Structure de l'application principale ---
+def main():
+    # Sidebar pour l'importation de fichiers et les paramètres
+    with st.sidebar:
+        st.header("Importation de Données")
+        uploaded_file = st.file_uploader("📥 Choisissez un fichier CSV", type=["csv", "xlsx"]) # Ajout de xlsx si vous traitez les deux
+        if uploaded_file is not None:
+            # Utilisez un ID de fichier pour détecter un nouveau fichier et éviter de recharger inutilement
+            if "uploaded_file_id" not in st.session_state or st.session_state.uploaded_file_id != uploaded_file.file_id:
+                try:
+                    if uploaded_file.name.endswith('.csv'):
+                        df_uploaded = pd.read_csv(uploaded_file)
+                    elif uploaded_file.name.endswith('.xlsx'):
+                        df_uploaded = pd.read_excel(uploaded_file)
+                    
+                    st.session_state.df = df_uploaded
+                    st.session_state.uploaded_file_id = uploaded_file.file_id # Enregistre l'ID du fichier
+                    st.success("Fichier importé avec succès !")
+                    
+                    # Réinitialiser le tri et les caches de données liées au portefeuille après un nouvel import
+                    st.session_state.sort_column = None
+                    st.session_state.sort_direction = "asc"
+                    st.session_state.ticker_names_cache = {} # Vider le cache des noms de tickers
+                    # st.session_state.momentum_results = {} # Vider le cache des résultats de momentum
+                    
+                    # Forcer un effacement du cache pour les fonctions data_fetcher
+                    # Cela va invalider le cache pour fetch_yahoo_data et fetch_momentum_data
+                    # quand un nouveau fichier est uploadé, assurant que de nouvelles données
+                    # seront téléchargées pour les tickers du nouveau fichier.
+                    # Pas besoin d'appeler explicitement clear_cache pour fetch_fx_rates car sa base est gérée par devise_cible.
+                    st.cache_data.clear() # Efface tous les caches de type cache_data
+                    st.cache_resource.clear() # Efface tous les caches de type cache_resource (si vous en utilisez)
 
-# --- LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE ---
-# Cette logique doit être exécutée à chaque re-run de l'application
-# pour gérer l'actualisation à la connexion, au chargement de fichier, etc.
+                    st.rerun() # Recharger pour appliquer les changements
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la lecture du fichier : {e}")
+                    st.session_state.df = None
+            else:
+                st.info("Fichier déjà chargé.") # Message si le même fichier est re-sélectionné
+        elif st.session_state.df is None:
+            st.info("Veuillez importer un fichier pour voir les données du portefeuille.")
 
-current_time = datetime.datetime.now()
-# Actualisation initiale ou si le fichier Excel a changé ou toutes les 60 secondes (basé sur ttl du cache)
-# La condition `st.session_state.last_update_time == datetime.datetime.min` force un premier run
-# La condition `uploaded_file_id` détecte si un nouveau fichier a été chargé
-# La condition de temps assure une actualisation régulière si l'app est active,
-# mais c'est surtout le `ttl` de `st.cache_resource` dans `taux_change.py` qui gérera la fraîcheur.
-if (st.session_state.last_update_time == datetime.datetime.min) or \
-   (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
-   ((current_time - st.session_state.last_update_time).total_seconds() >= 60): # Ajout d'une condition basée sur le temps pour déclencher l'actualisation
+        st.header("💱 Paramètres de Devise")
+        selected_devise = st.selectbox(
+            "Devise cible pour l'affichage",
+            ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"],
+            index=["EUR", "USD", "GBP", "JPY", "CAD", "CHF"].index(st.session_state.get("devise_cible", "EUR")),
+            key="devise_selector" # Ajout d'une clé pour assurer l'unicité
+        )
+        if selected_devise != st.session_state.get("devise_cible", "EUR"):
+            st.session_state.devise_cible = selected_devise
+            # Pas besoin de rerun ici, le changement de devise_cible sera pris en compte
+            # au prochain run de `afficher_portefeuille` via `fetch_fx_rates`.
+            # Si vous voulez un rechargement immédiat, ajoutez st.rerun()
+            st.rerun() 
+            
 
-    with st.spinner("Mise à jour des taux de change..."):
-        devise_cible_for_update = st.session_state.devise_cible
-        devises_uniques = []
-        if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
-            devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
-        
-        st.session_state.fx_rates = actualiser_taux_change(devise_cible_for_update, devises_uniques)
-        st.session_state.last_update_time = datetime.datetime.now()
-        # Stocke l'ID du fichier traité pour éviter de recharger inutilement
-        if st.session_state.get("uploaded_file_id") is not None:
-             st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
-        
-        # Ce message s'affichera brièvement au-dessus du contenu si l'actualisation auto se déclenche
-        # st.success(f"Taux de change actualisés pour {devise_cible_for_update} (auto).")
+    # Onglets horizontaux
+    onglets = st.tabs([
+        "Portefeuille",
+        # "Performance",
+        # "OD Comptables",
+        # "Transactions",
+        # "Taux de change",
+        # "Paramètres"
+    ])
 
-# --- FIN LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE ---
+    # Onglet : Portefeuille
+    with onglets[0]:
+        afficher_portefeuille() # La fonction gère désormais tout en interne
 
+    # Ajoutez ici les autres onglets et leurs fonctions
+    # with onglets[1]:
+    #     afficher_performance()
+    # etc.
 
-# Onglets horizontaux
-onglets = st.tabs([
-    "Portefeuille",
-    "Performance",
-    "OD Comptables",
-    "Transactions",
-    "Taux de change", # Cet onglet affichera les taux
-    "Paramètres"
-])
+    st.markdown("---")
+    st.info("💡 Importez un fichier CSV ou Excel pour visualiser et analyser votre portefeuille. Assurez-vous que les colonnes 'Quantité', 'Acquisition', 'Devise' et 'Ticker' (ou 'Tickers') sont présentes pour des calculs optimaux.")
 
-# Onglet : Portefeuille
-with onglets[0]:
-    # Passez les taux de change à afficher_portefeuille si nécessaire pour les calculs
-    afficher_portefeuille(fx_rates=st.session_state.fx_rates, devise_cible=st.session_state.devise_cible)
-
-# Onglet : Performance
-with onglets[1]:
-    afficher_performance()
-
-# Onglet : OD Comptables
-with onglets[2]:
-    afficher_od_comptables()
-
-# Onglet : Transactions
-with onglets[3]:
-    afficher_transactions()
-
-# Onglet : Taux de change
-with onglets[4]:
-    st.header("💱 Taux de Change Actuels")
-
-    # Bouton d'actualisation manuelle pour cet onglet
-    if st.button("Actualiser les taux (manuel)"):
-        with st.spinner("Mise à jour manuelle des taux de change..."):
-            devise_cible_for_manual_update = st.session_state.devise_cible
-            devises_uniques = []
-            if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
-                devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
-            st.session_state.fx_rates = actualiser_taux_change(devise_cible_for_manual_update, devises_uniques)
-            st.session_state.last_update_time = datetime.datetime.now()
-            st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update} (manuel).")
-            st.rerun() # Recharger toute l'application pour que les changements soient pris en compte
-
-    # Affiche le tableau des taux de change en utilisant les données de session
-    afficher_tableau_taux_change(st.session_state.devise_cible, st.session_state.fx_rates)
-
-# Onglet : Paramètres
-with onglets[5]:
-    afficher_parametres()
-
-st.markdown("---")
-st.info("💡 Importez un fichier Excel pour visualiser et analyser votre portefeuille. Assurez-vous que les colonnes 'Quantité', 'Acquisition', 'Devise' et 'Ticker' (ou 'Tickers') sont présentes pour des calculs optimaux.")
+if __name__ == "__main__":
+    main()
