@@ -23,6 +23,11 @@ def fetch_stock_history(Ticker, start_date, end_date):
         st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {e}")
     return pd.Series(dtype='float64')
 
+    if data.empty:
+        st.error(f"Aucune donnée historique trouvée pour {ticker} entre {start_date.date()} et {end_date.date()}.")
+    return
+
+
 @st.cache_data(ttl=3600*24) # Cache for 24 hours (FX rates don't change as frequently intraday)
 def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_date):
     """
