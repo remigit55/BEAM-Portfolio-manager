@@ -36,7 +36,7 @@ def fetch_fx_rates(target_currency="EUR"):
                     current_rate = temp_val
             
             # Si le taux original est toujours NaN, essayer le ticker inverse
-            if pd.isna(current_rate): # Cette vérification est maintenant sûre car current_rate est toujours scalaire ou NaN
+            if pd.isna(current_rate): 
                 st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essai de l'inverse.")
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" 
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
@@ -58,7 +58,7 @@ def fetch_fx_rates(target_currency="EUR"):
             if pd.notna(current_rate):
                 fx_rates[currency] = current_rate
             else:
-                fx_rates[currency] = None # Définir explicitement à None si le taux n'a pas pu être obtenu
+                fx_rates[currency] = None 
 
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
@@ -122,8 +122,10 @@ def fetch_momentum_data(ticker_symbol, months=12):
 
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
-        # Vérifier si les données sont vides ou si la colonne 'Close' est manquante
-        if data.empty or 'Close' not in data.columns:
+        # --- NOUVELLE LOGIQUE ICI pour gérer le MultiIndex ---
+        close_series = pd.Series([]) # Initialise une Series vide
+        
+        if data.empty:
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
@@ -132,9 +134,34 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Action": "Vérifier Ticker",
                 "Justification": "Pas de données historiques disponibles."
             }
+
+        # Handle MultiIndex columns (e.g., when downloading data for multiple tickers or certain markets)
+        if isinstance(data.columns, pd.MultiIndex):
+            if ('Close', ticker_symbol) in data.columns: # Check if specific ticker's Close exists
+                close_series = data['Close'][ticker_symbol]
+            else: # Fallback if specific ticker's close not found in multiindex
+                 return {
+                    "Last Price": np.nan,
+                    "Momentum (%)": np.nan,
+                    "Z-Score": np.nan,
+                    "Signal": "Erreur",
+                    "Action": "Vérifier Ticker",
+                    "Justification": "Colonne 'Close' spécifique au ticker non trouvée dans le MultiIndex."
+                }
+        elif 'Close' in data.columns: # Standard single-level columns
+            close_series = data['Close']
+        else: # 'Close' column not found at all
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Manquant",
+                "Action": "Vérifier Ticker",
+                "Justification": "Colonne 'Close' non trouvée dans les données historiques."
+            }
         
-        # Vérification explicite : si la colonne 'Close' existe mais est vide
-        if data['Close'].empty:
+        # Now, check if the extracted close_series is empty
+        if close_series.empty:
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
@@ -143,7 +170,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Action": "Vérifier Ticker",
                 "Justification": "La colonne 'Close' ne contient pas de données pour la période demandée."
             }
-
 
         # Détection GBp et correction des prix si nécessaire
         is_gbp_pence_for_momentum = False
@@ -156,12 +182,11 @@ def fetch_momentum_data(ticker_symbol, months=12):
             pass 
 
         if is_gbp_pence_for_momentum:
-            for col in ['Close', 'Open', 'High', 'Low']:
-                if col in data.columns:
-                    data[col] = data[col] / 100.0
+            # Apply correction directly to the close_series
+            close_series = close_series / 100.0
 
-        # Créer un DataFrame pour les calculs de momentum avec une colonne 'Close' valide
-        df = pd.DataFrame({'Close': data['Close']}).copy()
+        # Créer un DataFrame pour les calculs de momentum avec la colonne 'Close' valide
+        df = pd.DataFrame({'Close': close_series}).copy()
         
         # Vérifier si suffisamment de données sont disponibles après le nettoyage
         if len(df) < 39: 
