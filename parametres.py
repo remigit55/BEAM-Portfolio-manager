@@ -36,7 +36,7 @@ def afficher_parametres_globaux():
     st.markdown("#### Sources de Données et Importation")
 
     # Section 2.1: Importation de Fichier Local
-    st.markdown("##### 📥 Importer un fichier CSV ou Excel")
+    st.markdown("##### Importer un fichier CSV ou Excel")
     uploaded_file = st.file_uploader("Choisissez un fichier", type=["csv", "xlsx"], key="file_uploader_settings")
     if uploaded_file is not None:
         if "uploaded_file_id" not in st.session_state or st.session_state.uploaded_file_id != uploaded_file.file_id:
@@ -67,7 +67,7 @@ def afficher_parametres_globaux():
                 st.session_state.df = None
         
     # Section 2.2: Chargement depuis Google Sheets URL
-    st.markdown("##### 🔗 Charger depuis Google Sheets (URL)")
+    st.markdown("##### Charger depuis Google Sheets (URL)")
     csv_url = "https://docs.google.com/sheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
     st.markdown(f"L'application charge les données du portefeuille depuis cette source par défaut : [Google Sheets CSV]({csv_url})")
 
