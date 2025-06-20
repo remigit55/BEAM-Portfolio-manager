@@ -6,11 +6,14 @@ from datetime import datetime, timedelta
 
 # Import the historical data manager
 from historical_data_manager import load_historical_data
+# Import the format_fr function from utils
+from utils import format_fr # Make sure utils.py contains this function
 
 def display_performance_history():
     """
     Displays the portfolio's historical performance with a date filter.
     """
+    st.header("📊 Historique des Performances du Portefeuille")
     st.subheader("Historique des Totaux Quotidiens")
 
     df_history = load_historical_data()
@@ -28,14 +31,14 @@ def display_performance_history():
     col_start, col_end = st.columns(2)
     with col_start:
         start_date = st.date_input(
-            "Date de début", 
+            "Date de début",
             value=default_start_date,
             min_value=df_history["Date"].min().date(),
             max_value=today
         )
     with col_end:
         end_date = st.date_input(
-            "Date de fin", 
+            "Date de fin",
             value=default_end_date,
             min_value=df_history["Date"].min().date(),
             max_value=today
@@ -48,14 +51,14 @@ def display_performance_history():
 
     # Filter data based on selected date range
     filtered_df = df_history[(df_history["Date"].dt.date >= start_date) & (df_history["Date"].dt.date <= end_date)].copy()
-    
+
     if filtered_df.empty:
         st.warning("Aucune donnée disponible pour la plage de dates sélectionnée.")
         return
 
     # Calculate Daily Gain/Loss
     filtered_df["Gain/Perte Absolu"] = filtered_df["Valeur Actuelle"] - filtered_df["Valeur Acquisition"]
-    
+
     # Handle division by zero for percentage calculation
     filtered_df["Gain/Perte (%)"] = filtered_df.apply(
         lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
@@ -67,13 +70,14 @@ def display_performance_history():
     # Get the currency for formatting from the first row of the filtered data
     display_currency = filtered_df['Devise'].iloc[0] if not filtered_df.empty else 'EUR'
 
+    # Apply French number formatting using format_fr from utils.py
     st.dataframe(filtered_df.set_index("Date").style.format({
-        "Valeur Acquisition": lambda x: f"{x:,.2f} {display_currency}",
-        "Valeur Actuelle": lambda x: f"{x:,.2f} {display_currency}",
-        "Valeur H52": lambda x: f"{x:,.2f} {display_currency}",
-        "Valeur LT": lambda x: f"{x:,.2f} {display_currency}",
-        "Gain/Perte Absolu": lambda x: f"{x:,.2f} {display_currency}",
-        "Gain/Perte (%)": "{:,.2f} %".format
+        "Valeur Acquisition": lambda x: f"{format_fr(x, 2)} {display_currency}",
+        "Valeur Actuelle": lambda x: f"{format_fr(x, 2)} {display_currency}",
+        "Valeur H52": lambda x: f"{format_fr(x, 2)} {display_currency}",
+        "Valeur LT": lambda x: f"{format_fr(x, 2)} {display_currency}",
+        "Gain/Perte Absolu": lambda x: f"{format_fr(x, 2)} {display_currency}",
+        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" # Format percentage with 2 decimals
     }), use_container_width=True)
 
     # Display charts
@@ -81,9 +85,9 @@ def display_performance_history():
 
     # Long-form data for Plotly
     df_melted = filtered_df.melt(
-        id_vars=["Date", "Devise"], 
+        id_vars=["Date", "Devise"],
         value_vars=["Valeur Acquisition", "Valeur Actuelle", "Valeur H52", "Valeur LT"],
-        var_name="Type de Valeur", 
+        var_name="Type de Valeur",
         value_name="Montant"
     )
 
