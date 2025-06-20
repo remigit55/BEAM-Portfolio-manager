@@ -13,3 +13,4 @@ forex-python
 scipy
 numpy
 matplotlib
+plotly
