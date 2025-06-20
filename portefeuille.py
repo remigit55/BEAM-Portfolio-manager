@@ -4,7 +4,7 @@ import requests
 import time
 import html
 import streamlit.components.v1 as components
-# import yfinance as yf
+import yfinance as yf
 
 def safe_escape(text):
     """Escape HTML characters safely."""
