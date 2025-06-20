@@ -5,7 +5,6 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-from scipy.stats import linregress
 
 # Cache pour 1 heure (3600 secondes)
 @st.cache_data(ttl=3600)
@@ -25,13 +24,13 @@ def fetch_fx_rates(target_currency="EUR"):
         ticker_symbol = f"{currency}{target_currency}=X" 
         try:
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
-            if not data.empty:
+            if not data.empty and 'Close' in data.columns and pd.notna(data['Close'].iloc[-1]):
                 fx_rates[currency] = data['Close'].iloc[-1]
             else:
                 st.warning(f"Impossible de récupérer le taux pour {ticker_symbol}. Essaie l'inverse.")
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" 
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
-                if not data_inverse.empty:
+                if not data_inverse.empty and 'Close' in data_inverse.columns and pd.notna(data_inverse['Close'].iloc[-1]):
                     fx_rates[currency] = 1 / data_inverse['Close'].iloc[-1]
                 else:
                     st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance.")
@@ -53,7 +52,7 @@ def fetch_yahoo_data(ticker_symbol):
     Retourne aussi un indicateur si le prix est en pence (GBp) et doit être divisé par 100.
     """
     data = {}
-    is_gbp_pence = False # Nouvel indicateur
+    is_gbp_pence = False 
 
     try:
         ticker = yf.Ticker(ticker_symbol)
@@ -63,7 +62,6 @@ def fetch_yahoo_data(ticker_symbol):
         data['currentPrice'] = info.get('currentPrice')
         data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
 
-        # --- Logique de détection GBp ---
         currency_yahoo = info.get('currency')
         if currency_yahoo == 'GBp': 
             is_gbp_pence = True
@@ -94,24 +92,20 @@ def fetch_momentum_data(ticker_symbol, months=12):
     """
     try:
         end_date = datetime.now()
-        # Utilisez 5 ans de données pour la moyenne mobile de 39 semaines (environ 9 mois)
-        # et le rolling Z-score de 10 semaines (environ 2.5 mois)
-        # Il faut suffisamment de données pour que les fenêtres de rolling se remplissent.
-        # 5 ans est plus que suffisant pour 39 semaines.
-        start_date = end_date - timedelta(days=5 * 365) # Utilisez 5 ans pour les calculs robustes
+        start_date = end_date - timedelta(days=5 * 365) # 5 ans pour calculs robustes
 
-        # Assurez-vous d'avoir l'intervalle correct pour les calculs de momentum basés sur les semaines
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
-        # Vérifier si les données sont vides ou si la colonne 'Close' est manquante
-        if data.empty or 'Close' not in data.columns:
+        # *** Point de correction principal ici ***
+        # Vérifier si les données sont valides et contiennent une colonne 'Close' avec des valeurs
+        if data.empty or 'Close' not in data.columns or data['Close'].empty:
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
                 "Z-Score": np.nan,
                 "Signal": "Manquant",
                 "Action": "Vérifier Ticker",
-                "Justification": "Pas de données historiques disponibles."
+                "Justification": "Pas de données historiques disponibles ou colonne 'Close' vide."
             }
 
         # Détection GBp et correction des prix si nécessaire
@@ -127,13 +121,25 @@ def fetch_momentum_data(ticker_symbol, months=12):
         if is_gbp_pence_for_momentum:
             for col in ['Close', 'Open', 'High', 'Low']:
                 if col in data.columns:
-                    data[col] = data[col] / 100.0 # Use 100.0 for float division
+                    data[col] = data[col] / 100.0
 
-        # Créer un DataFrame pour les calculs de momentum
+        # Créer un DataFrame pour les calculs de momentum avec une colonne 'Close' valide
+        # S'assurer que data['Close'] est bien une Series avec un index valide
+        if not isinstance(data['Close'], pd.Series) or data['Close'].empty:
+             return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Erreur",
+                "Action": "Vérifier Ticker",
+                "Justification": "Structure de données 'Close' inattendue."
+            }
+        
         df = pd.DataFrame({'Close': data['Close']}).copy()
         
         # Vérifier si suffisamment de données sont disponibles après le nettoyage
-        if len(df) < 39: # Nombre minimum de points de données pour MA_39
+        # La fenêtre minimale est 39 pour MA_39, mais 10 pour le Z-Score, donc 39 est le plus restrictif.
+        if len(df) < 39: 
             last_price = df['Close'].iloc[-1] if not df['Close'].empty else np.nan
             return {
                 "Last Price": last_price,
@@ -145,24 +151,30 @@ def fetch_momentum_data(ticker_symbol, months=12):
             }
 
         # Calcul des indicateurs de momentum
-        df['MA_39'] = df['Close'].rolling(window=39, min_periods=1).mean() # min_periods pour éviter les NaN au début
+        df['MA_39'] = df['Close'].rolling(window=39, min_periods=1).mean()
         df['Momentum'] = (df['Close'] / df['MA_39']) - 1
         
-        # Calcul du Z-Score. min_periods=1 pour rolling.mean() et rolling.std()
         df['Momentum_Mean_10'] = df['Momentum'].rolling(window=10, min_periods=1).mean()
         df['Momentum_Std_10'] = df['Momentum'].rolling(window=10, min_periods=1).std()
 
-        # Handle division by zero or NaN std deviation for Z-Score
-        # Utiliser .replace([np.inf, -np.inf], np.nan) pour gérer les infinis qui peuvent venir de std=0
         df['Z_Momentum'] = (df['Momentum'] - df['Momentum_Mean_10']) / df['Momentum_Std_10']
-        df['Z_Momentum'] = df['Z_Momentum'].replace([np.inf, -np.inf], np.nan) # Remplacez inf/-inf par NaN
+        df['Z_Momentum'] = df['Z_Momentum'].replace([np.inf, -np.inf], np.nan)
 
         # Récupérer la dernière ligne pour les valeurs finales
+        # S'assurer que 'latest' est bien une Series non vide avant d'y accéder
+        if df.empty:
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Erreur",
+                "Action": "Vérifier Ticker",
+                "Justification": "DataFrame vide après calculs."
+            }
+
         latest = df.iloc[-1]
 
         # Extraire les valeurs finales, en s'assurant qu'elles sont scalaires et non NaN
-        # Utilisez .item() pour convertir une Series de taille 1 en scalaire, si nécessaire.
-        # Mais .iloc[-1] sur une colonne devrait déjà donner un scalaire.
         latest_price = latest['Close'] if pd.notna(latest['Close']) else np.nan
         m = (latest['Momentum'] * 100.0) if pd.notna(latest['Momentum']) else np.nan
         z = latest['Z_Momentum'] if pd.notna(latest['Z_Momentum']) else np.nan
@@ -171,8 +183,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
         action = "Maintenir"
         justification = ""
 
-        # Logique de signalisation basée sur le Z-Score
-        if pd.notna(z): # S'assurer que z est un nombre avant les comparaisons
+        if pd.notna(z):
             if z > 2:
                 signal = "🔥 Surchauffe"
                 action = "Alléger / Prendre profits"
@@ -200,7 +211,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
         else:
             justification = "Z-Score non calculable."
 
-        # Ajouter le momentum et le Z-Score à la justification si disponibles
         if pd.notna(m):
             justification += f" Momentum: {m:.2f}%."
         if pd.notna(z):
@@ -217,13 +227,12 @@ def fetch_momentum_data(ticker_symbol, months=12):
         }
 
     except Exception as e:
-        # Il est utile de logguer l'erreur pour le débogage en production, mais pas st.error qui pollue l'UI
-        # st.error(f"Erreur lors du calcul du momentum pour {ticker_symbol}: {e}") 
+        # st.error(f"Erreur lors du calcul du momentum pour {ticker_symbol}: {e}")
         return {
             "Last Price": np.nan,
             "Momentum (%)": np.nan,
             "Z-Score": np.nan,
             "Signal": "Erreur",
             "Action": "N/A",
-            "Justification": f"Erreur de calcul: {e}"
+            "Justification": f"Erreur de calcul: {e}."
         }
