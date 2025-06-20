@@ -17,7 +17,6 @@ def fetch_stock_history(Ticker, start_date, end_date):
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
             # Using 'Close' as discussed, which is correct
-            st.error(f"Aucune donnée historique trouvée pour {ticker} entre {start_date.date()} et {end_date.date()}.")
             return data['Close'].rename(Ticker)
     except Exception as e:
         # The error message comes from here, but the root cause is the `str` object not callable
