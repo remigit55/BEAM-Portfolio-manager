@@ -1,5 +1,4 @@
 # historical_performance_calculator.py
-
 import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
@@ -16,11 +15,6 @@ def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, hist
     daily_portfolio_value_acquisition = 0.0
     daily_portfolio_value_current = 0.0
 
-    # ### NOUVEAU LOG POUR DÉBUG
-    print(f"DEBUG calculate_daily_portfolio_value pour la date: {date}")
-    print(f"DEBUG Ticker du snapshot: {df_snapshot['Ticker'].tolist()}")
-    # ### FIN LOG
-
     for _, row in df_snapshot.iterrows():
         ticker = row.get("Ticker")
         quantity = row.get("Quantité", 0)
@@ -35,93 +29,93 @@ def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, hist
         if ticker and ticker in historical_prices and current_date_str in historical_prices[ticker].index:
             current_price = historical_prices[ticker].loc[current_date_str]
         
-        # ### MODIFICATION : Si le prix courant n'est pas disponible, utilisez le prix d'acquisition.
-        if pd.isna(current_price) or current_price == 0: # Ajout de current_price == 0 pour éviter division par zéro ou valeur nulle
-             print(f"DEBUG Pas de prix historique pour {ticker} à {current_date_str}. Utilisation du prix d'acquisition {acquisition_price} comme prix actuel.")
-             current_price = acquisition_price
+        if pd.isna(current_price): # If no specific price, use acquisition price for current value (conservative)
+             current_price = acquisition_price # Or skip this asset if you prefer
              
-        # Get historical FX rate for conversion to target_currency (for current value)
-        fx_rate_to_target = 1.0 # ### MODIFICATION : Valeur par défaut
+        # Get historical FX rate for conversion
+        fx_rate = 1.0
         if source_currency != target_currency:
-            # Check for direct rate in historical_fx
-            if source_currency in historical_fx and current_date_str in historical_fx[source_currency].index:
-                temp_rate = historical_fx[source_currency].loc[current_date_str]
-                if pd.notna(temp_rate) and temp_rate != 0: # ### MODIFICATION : Vérifier que le taux n'est pas NaN ou 0
-                    fx_rate_to_target = temp_rate
-                    print(f"DEBUG Taux {source_currency}/{target_currency} trouvé pour {current_date_str}: {fx_rate_to_target}") # LOG
-                else:
-                    print(f"DEBUG Taux {source_currency}/{target_currency} est NaN/zéro pour {current_date_str}. Défaut à 1.0 (valeur actuelle).") # LOG
+            fx_key = f"{source_currency}/{target_currency}"
+            if fx_key in historical_fx and current_date_str in historical_fx[fx_key].index:
+                fx_rate = historical_fx[fx_key].loc[current_date_str]
             else:
-                print(f"DEBUG Taux {source_currency}/{target_currency} non trouvé dans historical_fx pour {current_date_str}. Défaut à 1.0 (valeur actuelle).") # LOG
+                # Fallback: if FX rate not found, treat as 1:1 conversion (warn user if this happens often)
+                # st.warning(f"FX rate for {fx_key} not found for {current_date_str}. Using 1:1 conversion.")
+                fx_rate = 1.0 
 
-        # Calculate historical acquisition value and current value in their original currency
-        asset_acquisition_value_original_currency = quantity * acquisition_price
-        asset_current_value_original_currency = quantity * current_price
+        # Calculate values in source currency
+        value_acquisition_source_curr = quantity * acquisition_price
+        value_current_source_curr = quantity * current_price
 
-        # Convert acquisition value to target currency - Need acquisition currency to target currency FX rate
-        acquisition_currency = source_currency 
-
-        fx_rate_from_acquisition_currency = 1.0 # ### MODIFICATION : Valeur par défaut
-        if acquisition_currency != target_currency:
-            if acquisition_currency in historical_fx and current_date_str in historical_fx[acquisition_currency].index:
-                temp_rate = historical_fx[acquisition_currency].loc[current_date_str]
-                if pd.notna(temp_rate) and temp_rate != 0: # ### MODIFICATION : Vérifier que le taux n'est pas NaN ou 0
-                    fx_rate_from_acquisition_currency = temp_rate
-                    print(f"DEBUG Taux {acquisition_currency}/{target_currency} trouvé pour {current_date_str}: {fx_rate_from_acquisition_currency}") # LOG
-                else:
-                    print(f"DEBUG Taux {acquisition_currency}/{target_currency} est NaN/zéro pour {current_date_str}. Défaut à 1.0 (valeur d'acquisition).") # LOG
-            else:
-                print(f"DEBUG Taux {acquisition_currency}/{target_currency} non trouvé dans historical_fx pour {current_date_str}. Défaut à 1.0 (valeur d'acquisition).") # LOG
-
-        daily_portfolio_value_acquisition += asset_acquisition_value_original_currency * fx_rate_from_acquisition_currency
-        daily_portfolio_value_current += asset_current_value_original_currency * fx_rate_to_target
-        
-        # ### NOUVELLE LIGNE DE DÉBUG POUR CHAQUE ACTIF
-        print(f"DEBUG {ticker}: Quantité={quantity}, Prix Acq={acquisition_price}, Prix Actuel={current_price}, Devise Source={source_currency}")
-        print(f"  -> Taux FX vers cible (actuel)={fx_rate_to_target}, Taux FX vers cible (acq)={fx_rate_from_acquisition_currency}")
-        print(f"  -> Valeur Acq après FX={asset_acquisition_value_original_currency * fx_rate_from_acquisition_currency}, Valeur Actuelle après FX={asset_current_value_original_currency * fx_rate_to_target}")
-        # ### FIN LOG
-        
-    # ### NOUVELLE LIGNE DE DÉBUG POUR LES TOTAUX JOURNALIERS
-    print(f"DEBUG Total Acq pour {date}: {daily_portfolio_value_acquisition}, Total Actuel pour {date}: {daily_portfolio_value_current}")
-    # ### FIN LOG
+        # Convert to target currency
+        daily_portfolio_value_acquisition += value_acquisition_source_curr * fx_rate
+        daily_portfolio_value_current += value_current_source_curr * fx_rate
 
     return daily_portfolio_value_acquisition, daily_portfolio_value_current
 
 
-def reconstruct_historical_performance(portfolio_journal, historical_prices, historical_fx, target_currency, start_date, end_date):
-    # ... (le reste de cette fonction reste inchangé)
-    # Assurez-vous que cette fonction reçoit bien historical_fx, même s'il est vide ou partiel
-    # Le comportement de fallback est géré dans calculate_daily_portfolio_value
+def reconstruct_historical_performance(start_date, end_date, target_currency, portfolio_journal):
+    """
+    Reconstruit l'historique de la valeur du portefeuille sur une plage de dates.
+    """
+    if not portfolio_journal:
+        return pd.DataFrame()
+
+    # Get all unique tickers and currencies from the entire journal
+    all_tickers = set()
+    all_currencies = set()
+    for snapshot in portfolio_journal:
+        df_snap = snapshot['portfolio_data']
+        if 'Ticker' in df_snap.columns:
+            all_tickers.update(df_snap['Ticker'].dropna().unique())
+        if 'Devise' in df_snap.columns:
+            all_currencies.update(df_snap['Devise'].dropna().unique())
     
+    # Import here to avoid circular dependencies if historical_data_fetcher needs calculator later
+    from historical_data_fetcher import get_all_historical_data
+    
+    # Fetch all necessary historical data once
+    historical_prices, historical_fx = get_all_historical_data(
+        list(all_tickers), list(all_currencies), start_date, end_date, target_currency
+    )
+
+    # Prepare a date range for the reconstruction
+    # Only consider dates where we have a snapshot or an active portfolio state
+    relevant_dates = sorted(list(set([s['date'] for s in portfolio_journal] + 
+                                     [d.date() for d in pd.bdate_range(start_date, end_date)])))
+    
+    # Filter dates to be within the requested range
+    relevant_dates = [d for d in relevant_dates if start_date <= d <= end_date]
+
+    # Initialize results
     historical_data = []
     
-    # Ensure end_date includes today for performance display, but actual data might be until yesterday
-    # If using date.today(), it will cause issues, better use max_journal_date for logical end
-    today_date_obj = datetime.now().date()
+    # Find the earliest snapshot that is before or on the start_date
+    current_snapshot_index = -1
+    for i, snapshot in enumerate(portfolio_journal):
+        if snapshot['date'] <= start_date:
+            current_snapshot_index = i
+        else:
+            break
     
-    # Generate business days range
-    # Ensure start_date and end_date for bdate_range are date objects
-    dates_range = pd.bdate_range(start_date, end_date) # Should be date objects
-    
-    # ### NOUVEAU LOG POUR DÉBUG
-    print(f"DEBUG Dates à reconstruire: {dates_range.tolist()}")
-    # ### FIN LOG
-    
-    current_snapshot_index = 0
-    # Initialize current_portfolio_state with the first snapshot or empty if journal is empty
-    current_portfolio_state = portfolio_journal[0] if portfolio_journal else {'date': date.min, 'portfolio_data': pd.DataFrame(), 'target_currency': target_currency}
-    
-    for date_as_date in dates_range:
-        # Update portfolio state if a new snapshot is available for this date or before
+    if current_snapshot_index == -1: # No snapshot before or on start_date
+        # Try to find the first snapshot available
+        if portfolio_journal:
+            current_snapshot_index = 0
+        else:
+            return pd.DataFrame() # No data at all
+
+    current_portfolio_state = portfolio_journal[current_snapshot_index]
+
+    # Iterate through each business day in the desired range
+    for single_date in pd.bdate_range(start_date, end_date):
+        date_as_date = single_date.date()
+
+        # Update the portfolio state if a new snapshot is available for this date or before
         while current_snapshot_index + 1 < len(portfolio_journal) and \
               portfolio_journal[current_snapshot_index + 1]['date'] <= date_as_date:
             current_snapshot_index += 1
             current_portfolio_state = portfolio_journal[current_snapshot_index]
-            
-        # ### NOUVEAU LOG POUR DÉBUG
-        print(f"DEBUG État du portefeuille pour {date_as_date}: Snapshot du {current_portfolio_state['date']}")
-        # ### FIN LOG
 
         # Calculate values for the current date using the current_portfolio_state
         daily_acquisition, daily_current = calculate_daily_portfolio_value(
@@ -136,11 +130,8 @@ def reconstruct_historical_performance(portfolio_journal, historical_prices, his
                 "Valeur Actuelle": daily_current,
                 "Devise": target_currency # Store the target currency used for this day
             })
-        else:
-            print(f"DEBUG Données NaN pour {date_as_date}, saut de l'ajout à l'historique.") # LOG
     
     if not historical_data:
-        print("DEBUG historical_data est vide. Retourne DataFrame vide.") # LOG
         return pd.DataFrame()
 
     df_reconstructed = pd.DataFrame(historical_data)
@@ -149,10 +140,4 @@ def reconstruct_historical_performance(portfolio_journal, historical_prices, his
         lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
         axis=1
     )
-    
-    # ### NOUVEAU LOG POUR DÉBUG
-    print(f"DEBUG df_reconstructed head:\n{df_reconstructed.head()}")
-    print(f"DEBUG df_reconstructed tail:\n{df_reconstructed.tail()}")
-    # ### FIN LOG
-
     return df_reconstructed
