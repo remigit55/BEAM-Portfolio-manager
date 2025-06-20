@@ -262,26 +262,6 @@ def main():
         # et mettre à jour st.session_state.df, st.session_state.uploaded_file_id et st.session_state.devise_cible
         afficher_parametres_globaux() 
 
-# streamlit_app.py
-import streamlit as st
-from test_download import test_yfinance
-from portefeuille import afficher_portefeuille
-
-st.title("Portfolio Manager")
-
-# Interface pour tester yfinance
-if st.button("Tester yfinance"):
-    result = test_yfinance()
-    st.write("Résultat du test yfinance:", result)
-
-# Afficher le portefeuille
-afficher_portefeuille()
-
-    
-
-
-    
-
     st.markdown("---")
     
 if __name__ == "__main__":
