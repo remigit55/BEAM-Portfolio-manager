@@ -17,26 +17,24 @@ def fetch_fx_rates(target_currency="EUR"):
     fx_rates = {}
     currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"] # Ajoutez ou retirez des devises
 
-    # Si la devise cible n'est pas EUR, nous aurons besoin des taux vers EUR d'abord.
-    # Pour simplifier, on part du principe que toutes les paires sont directes si elles existent sur Yahoo.
-
     for currency in currencies_to_fetch:
         if currency == target_currency:
             fx_rates[currency] = 1.0
             continue
 
-        # Essayer directement la paire vers la devise cible
         ticker_symbol = f"{currency}{target_currency}=X" # Ex: USDEUR=X
         try:
             # Période très courte pour juste le dernier prix
-            data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False, show_errors=False)
+            # SUPPRESSION DE 'show_errors=False' ICI
+            data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
             if not data.empty:
                 fx_rates[currency] = data['Close'].iloc[-1]
             else:
                 st.warning(f"Impossible de récupérer le taux pour {ticker_symbol}. Essaie l'inverse.")
                 # Tenter l'inverse
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" # Ex: EURUSD=X
-                data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False, show_errors=False)
+                # SUPPRESSION DE 'show_errors=False' ICI
+                data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
                 if not data_inverse.empty:
                     fx_rates[currency] = 1 / data_inverse['Close'].iloc[-1]
                 else:
@@ -46,12 +44,7 @@ def fetch_fx_rates(target_currency="EUR"):
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
             fx_rates[currency] = None # Marquer comme non trouvé
             
-    # S'assurer que le taux pour la devise cible vers elle-même est 1.0
     fx_rates[target_currency] = 1.0 
-    
-    # Gérer les devises du portefeuille si elles ne sont pas dans les devises à chercher
-    # Cette logique est mieux gérée dans portfolio_display si un taux spécifique manque
-    # ici, on se concentre sur les paires usuelles.
 
     return fx_rates
 
@@ -88,7 +81,8 @@ def fetch_momentum_data(ticker_symbol, months=12):
         end_date = datetime.now()
         start_date = end_date - timedelta(days=months * 30) # Environ X mois
 
-        data = yf.download(ticker_symbol, start=start_date, end=end_date, progress=False, show_errors=False)
+        # SUPPRESSION DE 'show_errors=False' ICI
+        data = yf.download(ticker_symbol, start=start_date, end=end_date, progress=False)
 
         if data.empty:
             return {
@@ -126,21 +120,20 @@ def fetch_momentum_data(ticker_symbol, months=12):
         action = "Maintenir"
         justification = ""
 
-        # Logique de signal basée sur le momentum et z-score
         if pd.notna(momentum_percent):
-            if momentum_percent > 10: # Seuil de momentum positif
+            if momentum_percent > 10:
                 signal = "Fort positif"
                 justification = f"Momentum > 10% ({momentum_percent:.2f}%)."
-                if pd.notna(z_score) and z_score > 1.5: # Z-score élevé = sur-performance récente
+                if pd.notna(z_score) and z_score > 1.5:
                     action = "Acheter"
                     justification += " Fortes performances récentes (Z-score élevé)."
                 else:
                     action = "Conserver"
                     justification += " Performances stables."
-            elif momentum_percent < -10: # Seuil de momentum négatif
+            elif momentum_percent < -10:
                 signal = "Fort négatif"
                 justification = f"Momentum < -10% ({momentum_percent:.2f}%)."
-                if pd.notna(z_score) and z_score < -1.5: # Z-score faible = sous-performance récente
+                if pd.notna(z_score) and z_score < -1.5:
                     action = "Vendre"
                     justification += " Fortes baisses récentes (Z-score faible)."
                 else:
