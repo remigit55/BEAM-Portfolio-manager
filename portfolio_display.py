@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
-import numpy as np # Pour gérer np.nan
+import numpy as np
 
 # Import des fonctions depuis les nouveaux modules
 from utils import safe_escape, format_fr
@@ -81,20 +81,26 @@ def afficher_portefeuille():
         df["Objectif_LT"] = pd.to_numeric(df["Objectif_LT"], errors="coerce")
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
-    # Momentum Analysis
-    if ticker_col and not df[ticker_col].dropna().empty:
-        if "momentum_results" not in st.session_state:
-            st.session_state.momentum_results = {}
+    # --- CORRECTION ICI : Gestion du Momentum ---
+    # S'assurer que le dictionnaire momentum_results est toujours initialisé
+    if "momentum_results" not in st.session_state:
+        st.session_state.momentum_results = {}
             
-        unique_tickers_for_momentum = df[ticker_col].dropna().unique() # S'assurer d'utiliser la bonne liste
-        momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers_for_momentum}
+    if ticker_col and not df[ticker_col].dropna().empty:
+        unique_tickers_for_momentum = df[ticker_col].dropna().unique()
+        # Fetch momentum data for all unique tickers. This ensures it's always fresh or cached.
+        # It's better to iterate through tickers and call fetch_momentum_data directly here,
+        # as fetch_momentum_data itself handles its internal caching.
+        for ticker in unique_tickers_for_momentum:
+            if ticker not in st.session_state.momentum_results: # Fetch only if not already in session state cache
+                st.session_state.momentum_results[ticker] = fetch_momentum_data(ticker)
         
-        df["Last Price"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Last Price", np.nan))
-        df["Momentum (%)"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Momentum (%)", np.nan))
-        df["Z-Score"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Signal", ""))
-        df["Action"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Action", ""))
-        df["Justification"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Justification", ""))
+        df["Last Price"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Last Price", np.nan))
+        df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Momentum (%)", np.nan))
+        df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Z-Score", np.nan))
+        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Signal", ""))
+        df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Action", ""))
+        df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results.get(t, {}).get("Justification", ""))
     else:
         df["Last Price"] = np.nan
         df["Momentum (%)"] = np.nan
@@ -132,6 +138,7 @@ def afficher_portefeuille():
     df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"]), axis=1)
     df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"]), axis=1)
 
+    # --- CORRECTION ICI : Calcul des totaux après conversion ---
     total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
     total_h52 = df["Valeur_H52_conv"].sum()
@@ -143,7 +150,7 @@ def afficher_portefeuille():
         "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        # "Last Price_fmt", # <--- Removed this column from display
+        # "Last Price_fmt", # This line remains commented out as per your request to remove it
         "Momentum (%)_fmt", "Z-Score_fmt",
         "Signal", "Action", "Justification"
     ]
@@ -152,7 +159,7 @@ def afficher_portefeuille():
         "Quantité", "Prix d'Acquisition", "Valeur",
         "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
         "Valeur H52", "Objectif LT", "Valeur LT",
-        # "Dernier Prix", # <--- Removed this label from display
+        # "Dernier Prix", # This line remains commented out as per your request to remove it
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -160,16 +167,22 @@ def afficher_portefeuille():
     existing_cols_in_df = []
     existing_labels = []
     for i, col_name in enumerate(cols):
-        if col_name == ticker_col and ticker_col is not None:
+        # Vérifier que ticker_col est bien inclus s'il existe
+        if col_name == ticker_col and ticker_col is not None and ticker_col in df.columns:
             existing_cols_in_df.append(ticker_col)
             existing_labels.append(labels[i])
+        # Ajouter les colonnes formatées si elles existent dans le DataFrame
         elif col_name in df.columns:
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
+        # Si c'est une colonne non formatée (Signal, Action, Justification) et qu'elle existe dans df
+        elif not col_name.endswith("_fmt") and col_name in df.columns:
+             existing_cols_in_df.append(col_name)
+             existing_labels.append(labels[i])
     
     if not existing_cols_in_df:
         st.warning("Aucune colonne de données valide à afficher.")
-        return total_valeur, total_actuelle, total_h52, total_lt # Retourne les totaux même s'il n'y a rien à afficher
+        return total_valeur, total_actuelle, total_h52, total_lt
 
     df_disp = df[existing_cols_in_df].copy()
     df_disp.columns = existing_labels
@@ -188,23 +201,20 @@ def afficher_portefeuille():
                 idx = existing_labels.index(sort_col_label)
                 original_col_name = existing_cols_in_df[idx]
                 if original_col_name.endswith("_fmt"):
-                    original_col_name = original_col_name[:-4] # Get original numeric column name
+                    original_col_name = original_col_name[:-4] 
             except ValueError:
                 pass
 
-            # Try to convert to numeric for sorting if it's a numeric column
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
-                    # Use a robust key for sorting formatted numeric strings
                     key=lambda x: pd.to_numeric(
                         x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
                         errors='coerce'
                     ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
                 )
             else:
-                # Fallback to string sort for non-numeric or other issues
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
@@ -217,10 +227,9 @@ def afficher_portefeuille():
     total_lt_str = format_fr(total_lt, 2)
 
     # Génération du CSS pour les largeurs de colonnes et alignements
-    # Ceci est la section la plus délicate. Nous allons la construire de manière plus sûre.
     css_col_widths = ""
-    left_align_cols_indices = [] # Columns that should be left-aligned
-    width_100px_cols_indices = [] # Columns that should have 100px width
+    left_align_cols_indices = []
+    width_100px_cols_indices = []
     width_specific_cols = {
         "Ticker": "80px",
         "Nom": "200px",
@@ -231,37 +240,36 @@ def afficher_portefeuille():
         "Justification": "200px",
     }
 
-    # Identify indices for styling
     for i, label in enumerate(df_disp.columns):
         if label in ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]:
-            left_align_cols_indices.append(i + 1) # CSS nth-child is 1-based
+            left_align_cols_indices.append(i + 1)
 
-        if label not in width_specific_cols:
-            # All other columns get 100px width unless specified
-            if label not in ["Ticker", "Nom", "Catégorie", "Devise", "Signal", "Action", "Justification"]: # Exclude already defined widths
-                width_100px_cols_indices.append(i + 1)
-        
-        # Add specific width styles
         if label in width_specific_cols:
             css_col_widths += f".portfolio-table th:nth-child({i + 1}), .portfolio-table td:nth-child({i + 1}) {{ width: {width_specific_cols[label]}; }}\n"
+        else: # Default width for other columns not specifically styled
+            width_100px_cols_indices.append(i + 1)
+            
 
-
-    # Generate left-align CSS
     if left_align_cols_indices:
-        # Sort to make sure the :not() selectors are ordered
         left_align_selectors = [f"td:nth-child({idx})" for idx in sorted(left_align_cols_indices)]
         css_col_widths += f".portfolio-table {', '.join(left_align_selectors)} {{ text-align: left; white-space: normal; }}\n"
 
-    # Generate default 100px width CSS for remaining numeric/value columns
+    # Default width for remaining numeric/value columns. 
+    # This might need fine-tuning of min-width if too many columns are added
     if width_100px_cols_indices:
-        # Exclude those already styled for left-align
-        excluded_left_align_selectors = [f":not(:nth-child({idx}))" for idx in left_align_cols_indices]
-        width_100px_selectors = [f"th:nth-child({idx})" for idx in width_100px_cols_indices]
-        width_100px_selectors_td = [f"td:nth-child({idx})" for idx in width_100px_cols_indices]
+        # Exclude those already styled for specific widths.
+        # This part requires a more direct check against specific width list, not against left-align.
+        # A simpler way is to just apply the 100px default to all non-specific-width columns.
+        default_width_selectors = []
+        for i, label in enumerate(df_disp.columns):
+            if label not in width_specific_cols:
+                default_width_selectors.append(f"th:nth-child({i + 1})")
+                default_width_selectors.append(f"td:nth-child({i + 1})")
+        
+        if default_width_selectors:
+            css_col_widths += f".portfolio-table {', '.join(default_width_selectors)} {{ width: 100px; }}\n"
 
-        # Combine selectors for 100px width
-        css_col_widths += f".portfolio-table {', '.join(width_100px_selectors + width_100px_selectors_td)} {{ width: 100px; }}\n"
-    
+
     html_code = f"""
     <style>
       .scroll-wrapper {{
