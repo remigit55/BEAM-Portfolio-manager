@@ -6,8 +6,8 @@ import numpy as np
 import io
 import matplotlib.pyplot as plt
 
-# Cache pour 1 heure (3600 secondes)
-@st.cache_data(ttl=3600)
+# Cache pour 1 minute (60 secondes)
+@st.cache_data(ttl=60)
 def fetch_fx_rates(target_currency="EUR"):
     """
     Récupère les taux de change actuels par rapport à une devise cible.
