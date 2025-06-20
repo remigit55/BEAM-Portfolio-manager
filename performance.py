@@ -4,42 +4,48 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 
-# Import the historical data manager
-from historical_data_manager import load_historical_data
-# Import the format_fr function from utils
+# Import the new modules
+from portfolio_journal import load_portfolio_journal
+from historical_performance_calculator import reconstruct_historical_performance
 from utils import format_fr # Make sure utils.py contains this function
 
 def display_performance_history():
     """
-    Displays the portfolio's historical performance with a date filter.
+    Displays the portfolio's historical performance with a date filter,
+    recalculating values using historical data.
     """
-    st.subheader("Historique des Totaux Quotidiens")
+    st.subheader("Reconstruction des Totaux Quotidiens")
 
-    df_history = load_historical_data()
+    # Load the portfolio journal
+    portfolio_journal = load_portfolio_journal()
 
-    if df_history.empty:
-        st.info("Aucune donnée historique de performance disponible pour le moment. Chargez un portefeuille pour commencer à enregistrer l'historique.")
+    if not portfolio_journal:
+        st.info("Aucune donnée historique de portefeuille n'a été enregistrée. Chargez un portefeuille et utilisez l'application pour commencer à construire l'historique.")
         return
 
-    # Date range filter
+    # Determine min/max dates from the journal for the date picker
+    min_journal_date = min(s['date'] for s in portfolio_journal)
+    max_journal_date = max(s['date'] for s in portfolio_journal)
+    
     today = datetime.now().date()
-    # Default end date is today, default start date is 30 days ago
-    default_start_date = df_history["Date"].min().date() if not df_history.empty else today - timedelta(days=30)
-    default_end_date = df_history["Date"].max().date() if not df_history.empty else today
+    
+    # Default end date is today or last journal entry, default start date is 6 months ago or min journal date
+    default_end_date = min(today, max_journal_date)
+    default_start_date = max(min_journal_date, default_end_date - timedelta(days=180)) # Last 6 months
 
     col_start, col_end = st.columns(2)
     with col_start:
         start_date = st.date_input(
-            "Date de début",
+            "Date de début", 
             value=default_start_date,
-            min_value=df_history["Date"].min().date(),
-            max_value=today
+            min_value=min_journal_date,
+            max_value=default_end_date # Can't start after end
         )
     with col_end:
         end_date = st.date_input(
-            "Date de fin",
+            "Date de fin", 
             value=default_end_date,
-            min_value=df_history["Date"].min().date(),
+            min_value=start_date, # Must be after start
             max_value=today
         )
 
@@ -48,46 +54,36 @@ def display_performance_history():
         st.error("La date de début ne peut pas être postérieure à la date de fin.")
         return
 
-    # Filter data based on selected date range
-    filtered_df = df_history[(df_history["Date"].dt.date >= start_date) & (df_history["Date"].dt.date <= end_date)].copy()
+    target_currency = st.session_state.get("devise_cible", "EUR")
 
-    if filtered_df.empty:
-        st.warning("Aucune donnée disponible pour la plage de dates sélectionnée.")
+    with st.spinner("Reconstruction de l'historique des performances... Cela peut prendre un certain temps."):
+        df_reconstructed = reconstruct_historical_performance(
+            start_date, end_date, target_currency, portfolio_journal
+        )
+
+    if df_reconstructed.empty:
+        st.warning("Aucune donnée disponible pour la plage de dates sélectionnée ou impossible de reconstruire l'historique.")
         return
 
-    # Calculate Daily Gain/Loss
-    filtered_df["Gain/Perte Absolu"] = filtered_df["Valeur Actuelle"] - filtered_df["Valeur Acquisition"]
-
-    # Handle division by zero for percentage calculation
-    filtered_df["Gain/Perte (%)"] = filtered_df.apply(
-        lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
-        axis=1
-    )
-    st.markdown("<br>", unsafe_allow_html=True) 
     # Display data in a table
-    st.subheader("Données Historiques")
-    # Get the currency for formatting from the first row of the filtered data
-    display_currency = filtered_df['Devise'].iloc[0] if not filtered_df.empty else 'EUR'
+    st.subheader("Données Historiques Reconstruites")
+    display_currency = df_reconstructed['Devise'].iloc[0] if not df_reconstructed.empty else 'EUR'
 
-    # Apply French number formatting using format_fr from utils.py
-    st.dataframe(filtered_df.set_index("Date").style.format({
+    st.dataframe(df_reconstructed.set_index("Date").style.format({
         "Valeur Acquisition": lambda x: f"{format_fr(x, 2)} {display_currency}",
         "Valeur Actuelle": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Valeur H52": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Valeur LT": lambda x: f"{format_fr(x, 2)} {display_currency}",
         "Gain/Perte Absolu": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" # Format percentage with 2 decimals
+        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %"
     }), use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True) 
     # Display charts
     st.subheader("Tendances des Valeurs du Portefeuille")
 
     # Long-form data for Plotly
-    df_melted = filtered_df.melt(
-        id_vars=["Date", "Devise"],
-        value_vars=["Valeur Acquisition", "Valeur Actuelle", "Valeur H52", "Valeur LT"],
-        var_name="Type de Valeur",
+    df_melted = df_reconstructed.melt(
+        id_vars=["Date", "Devise"], 
+        value_vars=["Valeur Acquisition", "Valeur Actuelle"],
+        var_name="Type de Valeur", 
         value_name="Montant"
     )
 
@@ -99,13 +95,12 @@ def display_performance_history():
         title="Évolution des Valeurs du Portefeuille",
         labels={"Montant": f"Montant ({display_currency})", "Date": "Date"}
     )
-    fig_values.update_layout(hovermode="x unified") # Shows all values for a given date on hover
+    fig_values.update_layout(hovermode="x unified")
     st.plotly_chart(fig_values, use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True) 
     st.subheader("Tendance du Gain/Perte")
     fig_gain_loss = px.line(
-        filtered_df,
+        df_reconstructed,
         x="Date",
         y="Gain/Perte Absolu",
         title="Évolution du Gain/Perte Absolu Quotidien",
@@ -115,7 +110,7 @@ def display_performance_history():
     st.plotly_chart(fig_gain_loss, use_container_width=True)
 
     fig_gain_loss_percent = px.line(
-        filtered_df,
+        df_reconstructed,
         x="Date",
         y="Gain/Perte (%)",
         title="Évolution du Gain/Perte Quotidien (%)",
