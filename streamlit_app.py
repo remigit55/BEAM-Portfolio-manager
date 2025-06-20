@@ -162,7 +162,6 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
-        st.header("✨ Synthèse du Portefeuille")
         afficher_synthese_globale(
             st.session_state.total_valeur,
             st.session_state.total_actuelle,
@@ -172,7 +171,6 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]:
-        st.header("📈 Vue détaillée du Portefeuille")
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.") # Message mis à jour
         else:
@@ -185,25 +183,21 @@ def main():
 
     # Onglet : Performance
     with onglets[2]:
-        st.header("📊 Analyse de Performance")
         if 'afficher_performance' in locals():
             afficher_performance()
         
     # Onglet : OD Comptables
     with onglets[3]:
-        st.header("🧾 Opérations Diverses Comptables")
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
         
     # Onglet : Transactions
     with onglets[4]:
-        st.header("📜 Historique des Transactions")
         if 'afficher_transactions' in locals():
             afficher_transactions()
         
     # Onglet : Taux de change
     with onglets[5]:
-        st.header("💱 Taux de Change Actuels")
         
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
@@ -222,7 +216,6 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]:
-        st.header("⚙️ Paramètres de l'Application")
         afficher_parametres_globaux()
 
 
