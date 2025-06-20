@@ -30,7 +30,6 @@ def fetch_fx_rates(target_currency="EUR"):
 
             # Step 2: Process downloaded data (original ticker)
             if not data.empty and 'Close' in data.columns and not data['Close'].empty:
-                # Ensure we get a scalar item, even if data['Close'] is a Series of length 1
                 temp_close = data['Close'].iloc[-1]
                 if pd.notna(temp_close):
                     current_rate = temp_close
@@ -119,6 +118,8 @@ def fetch_momentum_data(ticker_symbol, months=12):
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
         # Vérifier si les données sont valides et contiennent une colonne 'Close' avec des valeurs
+        # Modifié : Supprimez la vérification 'isinstance' car data['Close'] doit être une Series.
+        # Concentrez-vous sur 'empty'
         if data.empty or 'Close' not in data.columns or data['Close'].empty:
             return {
                 "Last Price": np.nan,
@@ -145,17 +146,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
                     data[col] = data[col] / 100.0
 
         # Créer un DataFrame pour les calculs de momentum avec une colonne 'Close' valide
-        # S'assurer que data['Close'] est bien une Series avec un index valide
-        if not isinstance(data['Close'], pd.Series) or data['Close'].empty:
-             return {
-                "Last Price": np.nan,
-                "Momentum (%)": np.nan,
-                "Z-Score": np.nan,
-                "Signal": "Erreur",
-                "Action": "Vérifier Ticker",
-                "Justification": "Structure de données 'Close' inattendue."
-            }
-        
+        # Cette ligne est maintenant plus sûre après la vérification 'data['Close'].empty' ci-dessus.
         df = pd.DataFrame({'Close': data['Close']}).copy()
         
         # Vérifier si suffisamment de données sont disponibles après le nettoyage
@@ -182,7 +173,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
         df['Z_Momentum'] = df['Z_Momentum'].replace([np.inf, -np.inf], np.nan)
 
         # Récupérer la dernière ligne pour les valeurs finales
-        # S'assurer que 'latest' est bien une Series non vide avant d'y accéder
         if df.empty:
             return {
                 "Last Price": np.nan,
