@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 
 # --- Configuration de la page Streamlit ---
 st.set_page_config(layout="wide", page_title="Mon Portefeuille FX")
-st.title("💱 Taux de Change du Portefeuille")
+st.title("Taux de Change du Portefeuille")
 
 # --- Fonctions utilitaires ---
 
