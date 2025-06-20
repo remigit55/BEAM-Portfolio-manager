@@ -17,16 +17,12 @@ def fetch_stock_history(Ticker, start_date, end_date):
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
             # Using 'Close' as discussed, which is correct
+            st.error(f"Aucune donnée historique trouvée pour {ticker} entre {start_date.date()} et {end_date.date()}.")
             return data['Close'].rename(Ticker)
     except Exception as e:
         # The error message comes from here, but the root cause is the `str` object not callable
         st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {e}")
     return pd.Series(dtype='float64')
-
-    if data.empty:
-        st.error(f"Aucune donnée historique trouvée pour {ticker} entre {start_date.date()} et {end_date.date()}.")
-    return
-
 
 @st.cache_data(ttl=3600*24) # Cache for 24 hours (FX rates don't change as frequently intraday)
 def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_date):
