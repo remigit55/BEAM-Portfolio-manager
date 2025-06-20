@@ -89,6 +89,8 @@ def afficher_portefeuille():
         unique_tickers_for_momentum = df[ticker_col].dropna().unique() # S'assurer d'utiliser la bonne liste
         momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers_for_momentum}
         
+        # 'Last Price' is the column you want to remove from display, but still used in momentum calculation.
+        # So we keep the calculation here, but remove it from the display lists further down.
         df["Last Price"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Last Price", np.nan))
         df["Momentum (%)"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Z-Score", np.nan))
@@ -108,7 +110,7 @@ def afficher_portefeuille():
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Last Price", 2),
+        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Last Price", 2), # 'Last Price' is kept for internal use but not displayed
         ("Momentum (%)", 2), ("Z-Score", 2)
     ]:
         if col_name in df.columns:
@@ -143,7 +145,8 @@ def afficher_portefeuille():
         "Quantité_fmt", "Acquisition_fmt", "Valeur_fmt",
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "fiftyTwoWeekHigh_fmt",
         "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        "Last Price_fmt", "Momentum (%)_fmt", "Z-Score_fmt",
+        # REMOVED: "Last Price_fmt", # <--- This line was removed
+        "Momentum (%)_fmt", "Z-Score_fmt",
         "Signal", "Action", "Justification"
     ]
     labels = [
@@ -151,7 +154,8 @@ def afficher_portefeuille():
         "Quantité", "Prix d'Acquisition", "Valeur",
         "Prix Actuel", "Valeur Actuelle", "Haut 52 Semaines",
         "Valeur H52", "Objectif LT", "Valeur LT",
-        "Dernier Prix", "Momentum (%)", "Z-Score",
+        # REMOVED: "Dernier Prix", # <--- This line was removed
+        "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
 
@@ -190,18 +194,18 @@ def afficher_portefeuille():
                 pass
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                 df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: pd.to_numeric(x.astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf'))
-                )
+                    df_disp = df_disp.sort_values(
+                        by=sort_col_label,
+                        ascending=(st.session_state.sort_direction == "asc"),
+                        key=lambda x: pd.to_numeric(x.astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf'))
+                    )
             else:
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: x.astype(str).str.lower()
                 )
-
+    
     total_valeur_str = format_fr(total_valeur, 2)
     total_actuelle_str = format_fr(total_actuelle, 2)
     total_h52_str = format_fr(total_h52, 2)
@@ -245,9 +249,9 @@ def afficher_portefeuille():
       .portfolio-table td:nth-child(1),
       .portfolio-table td:nth-child(2),
       .portfolio-table td:nth-child(3),
-      .portfolio-table td:nth-child(16),
-      .portfolio-table td:nth-child(17),
-      .portfolio-table td:nth-child(18) {{
+      .portfolio-table td:nth-child(15), {/* Adjusted index */}
+      .portfolio-table td:nth-child(16), {/* Adjusted index */}
+      .portfolio-table td:nth-child(17) {/* Adjusted index */} {{
         text-align: left;
         white-space: normal;
       }}
@@ -256,8 +260,8 @@ def afficher_portefeuille():
       { (lambda : '' if 'Catégorie' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Catégorie") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Catégorie") + 1}) {{ width: 100px; }}')() }
       { (lambda : '' if 'Devise' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Devise") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Devise") + 1}) {{ width: 60px; }}')() }
 
-      .portfolio-table th:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)),
-      .portfolio-table td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)) {{
+      .portfolio-table th:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(15)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)), {/* Adjusted index */}
+      .portfolio-table td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(15)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)) {{ {/* Adjusted index */}
         width: 100px;
       }}
 
