@@ -432,7 +432,8 @@ def afficher_portefeuille():
     component_value_raw = components.html(html_code, height=600, scrolling=True, key="portfolio_table_display")
 
     # Update session state if a message is received from JavaScript
-    if component_value_raw:
+    # Check if component_value_raw is a non-empty string before trying to parse
+    if isinstance(component_value_raw, str) and component_value_raw.strip(): # Added check
         try:
             # Parse the JSON string received from JavaScript
             component_value = json.loads(component_value_raw)
@@ -450,6 +451,8 @@ def afficher_portefeuille():
             st.error(f"Erreur lors de la lecture du message de tri depuis la table HTML : {e}. Message reçu: {component_value_raw}")
         except TypeError as e:
             st.error(f"Erreur de type lors du traitement du message de tri : {e}. Message reçu: {component_value_raw}")
+    # else: # Optional: For debugging, you could print what component_value_raw is when it's not a string or empty
+    #     st.warning(f"component_value_raw was not a string or was empty: {type(component_value_raw)} - {component_value_raw}")
 
 
     st.markdown("---")
