@@ -8,16 +8,16 @@ import base64
 from io import BytesIO
 
 # Importation des modules fonctionnels
-from portfolio_display import afficher_portefeuille
+# Maintenant, nous importons les deux fonctions du même fichier
+from portfolio_display import afficher_portefeuille, afficher_synthese_globale
 
 # Assurez-vous que ces fichiers existent et contiennent les fonctions correspondantes.
 # Si un fichier ou une fonction n'existe pas, commentez la ligne correspondante.
-# Exemple : si vous n'avez pas de fichier performance.py, commentez la ligne ci-dessous.
 from performance import afficher_performance
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
-from taux_change import afficher_tableau_taux_change, actualiser_taux_change # On a besoin de ces deux pour l'onglet Taux de Change
-from parametres import afficher_parametres # Pour l'onglet Paramètres
+from taux_change import afficher_tableau_taux_change, actualiser_taux_change
+from parametres import afficher_parametres
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -54,7 +54,7 @@ st.markdown(f"""
 
 # Chargement du logo
 try:
-    logo = Image.open("Logo.png.png")  # Ajuste le nom si besoin
+    logo = Image.open("Logo.png.png")
     buffer = BytesIO()
     logo.save(buffer, format="PNG")
     logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -75,47 +75,41 @@ st.markdown(
 # Initialisation des variables de session
 for key, default in {
     "df": None,
-    "fx_rates": {}, # Les taux de change seront gérés par data_fetcher
+    "fx_rates": {},
     "devise_cible": "EUR",
     "ticker_names_cache": {},
     "sort_column": None,
     "sort_direction": "asc",
     "momentum_results": {},
     "last_devise_cible": "EUR",
-    "last_update_time_fx": datetime.datetime.min # NOUVEAU: Pour gérer la fraîcheur des taux de change
+    "last_update_time_fx": datetime.datetime.min,
+    # NOUVEAU: Stocker les totaux dans session_state pour les rendre accessibles à l'onglet Synthèse
+    "total_valeur": None,
+    "total_actuelle": None,
+    "total_h52": None,
+    "total_lt": None,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE POUR L'ONGLET DÉDIÉ ---
-# Cette logique est séparée de celle de portfolio_display car elle concerne l'onglet Taux de Change.
-# Elle va maintenir les taux dans st.session_state.fx_rates pour l'affichage dans l'onglet dédié.
 current_time = datetime.datetime.now()
-# Actualisation si le fichier Excel a changé, la devise cible a changé ou toutes les 60 secondes
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
    (st.session_state.get("devise_cible") != st.session_state.get("last_devise_cible_for_fx_update", None)) or \
    ((current_time - st.session_state.last_update_time_fx).total_seconds() >= 60):
 
-    # Récupérer la devise cible actuelle pour la mise à jour
     devise_cible_for_update = st.session_state.get("devise_cible", "EUR")
     
-    # Récupérer les devises uniques du portefeuille si un DataFrame est chargé
     devises_uniques = []
     if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
         devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
     
-    # Appel à la fonction d'actualisation des taux de `taux_change.py`
-    # Cela va utiliser st.cache_resource ou st.cache_data en interne
     st.session_state.fx_rates = actualiser_taux_change(devise_cible_for_update, devises_uniques)
     st.session_state.last_update_time_fx = datetime.datetime.now()
     st.session_state.last_devise_cible_for_fx_update = devise_cible_for_update
     
-    # Stocke l'ID du fichier traité pour éviter de recharger inutilement
     if st.session_state.get("uploaded_file_id") is not None:
          st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
-
-# --- FIN LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE ---
 
 
 # --- Structure de l'application principale ---
@@ -125,7 +119,6 @@ def main():
         st.header("Importation de Données")
         uploaded_file = st.file_uploader("📥 Choisissez un fichier CSV ou Excel", type=["csv", "xlsx"], key="file_uploader")
         if uploaded_file is not None:
-            # Utilisez un ID de fichier pour détecter un nouveau fichier et éviter de recharger inutilement
             if "uploaded_file_id" not in st.session_state or st.session_state.uploaded_file_id != uploaded_file.file_id:
                 try:
                     if uploaded_file.name.endswith('.csv'):
@@ -134,19 +127,18 @@ def main():
                         df_uploaded = pd.read_excel(uploaded_file)
                     
                     st.session_state.df = df_uploaded
-                    st.session_state.uploaded_file_id = uploaded_file.file_id # Enregistre l'ID du fichier
+                    st.session_state.uploaded_file_id = uploaded_file.file_id
                     st.success("Fichier importé avec succès !")
                     
-                    # Réinitialiser le tri et les caches de données liées au portefeuille après un nouvel import
                     st.session_state.sort_column = None
                     st.session_state.sort_direction = "asc"
-                    st.session_state.ticker_names_cache = {} # Vider le cache des noms de tickers
+                    st.session_state.ticker_names_cache = {}
                     st.session_state.last_update_time_fx = datetime.datetime.min # Forcer la mise à jour des taux
                     
-                    st.cache_data.clear() # Efface tous les caches de type cache_data (inclut yahoo et momentum)
-                    st.cache_resource.clear() # Efface tous les caches de type cache_resource (pour yfinance.ticker.Ticker si utilisé)
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
 
-                    st.rerun() # Recharger pour appliquer les changements
+                    st.rerun()
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la lecture du fichier : {e}")
                     st.session_state.df = None
@@ -164,12 +156,23 @@ def main():
         )
         if selected_devise != st.session_state.get("devise_cible", "EUR"):
             st.session_state.devise_cible = selected_devise
-            # Pas besoin de st.rerun() ici spécifiquement pour la devise, la logique ci-dessus le gère
-            # via last_devise_cible_for_fx_update et les caches de data_fetcher.
-            st.rerun() # Pour que le changement de devise soit visible immédiatement dans les onglets
+            st.rerun()
 
-    # Onglets horizontaux
+    # Appelez afficher_portefeuille une fois pour obtenir les totaux
+    # C'est important de le faire avant de définir les onglets pour que les totaux soient à jour
+    # lors de la navigation entre les onglets.
+    total_valeur, total_actuelle, total_h52, total_lt = afficher_portefeuille()
+
+    # Mettre à jour les totaux dans session_state
+    st.session_state.total_valeur = total_valeur
+    st.session_state.total_actuelle = total_actuelle
+    st.session_state.total_h52 = total_h52
+    st.session_state.total_lt = total_lt
+
+
+    # Onglets horizontaux (ordre modifié)
     onglets = st.tabs([
+        "Synthèse", # NOUVEL ONGLE
         "Portefeuille",
         "Performance",
         "OD Comptables",
@@ -178,60 +181,95 @@ def main():
         "Paramètres"
     ])
 
-    # Onglet : Portefeuille
+    # Onglet : Synthèse
     with onglets[0]:
-        afficher_portefeuille() # La fonction gère l'affichage du portefeuille
+        st.header("✨ Synthèse du Portefeuille")
+        # Passez les totaux stockés dans session_state à la fonction de synthèse
+        afficher_synthese_globale(
+            st.session_state.total_valeur,
+            st.session_state.total_actuelle,
+            st.session_state.total_h52,
+            st.session_state.total_lt
+        )
+
+    # Onglet : Portefeuille
+    with onglets[1]: # L'index a changé de 0 à 1
+        st.header("📈 Vue détaillée du Portefeuille")
+        # La fonction afficher_portefeuille est déjà appelée plus haut pour calculer les totaux.
+        # Ici, nous ne voulons pas la rappeler, car cela recalculerait tout et pourrait être inefficace.
+        # Nous allons donc afficher le DataFrame du portefeuille directement (en s'assurant qu'il est géré par la session)
+        # OU, si la fonction est conçue pour afficher et retourner, on peut juste l'appeler.
+        # MAJ: La fonction afficher_portefeuille gère l'affichage du tableau et le retour des totaux,
+        # donc l'appel ci-dessus suffit. Nous n'avons pas besoin de la rappeler ici car le rendu est déjà fait.
+        # Si vous vouliez afficher le tableau DANS cet onglet UNIQUEMENT, il faudrait adapter.
+        # Pour l'instant, le tableau est affiché implicitement par l'appel en dehors des onglets.
+        # Je vais ajuster pour que l'appel d'afficher_portefeuille soit fait dans son onglet.
+
+        # Retrait de l'appel d'afficher_portefeuille en dehors des onglets
+        # Déplacez-le ici pour qu'il soit exécuté quand l'onglet "Portefeuille" est actif
+        if st.session_state.df is None:
+            st.info("Veuillez importer un fichier Excel pour voir la vue détaillée de votre portefeuille.")
+        else:
+            # Pour afficher le tableau seulement quand l'onglet est actif, la fonction doit être appelée ici.
+            # Cependant, elle a déjà été appelée pour les totaux.
+            # Il y a deux façons de gérer ça:
+            # 1. Faire que afficher_portefeuille soit appelée dans les deux endroits (pas très optimisé).
+            # 2. Séparer l'affichage du tableau et le calcul des totaux dans deux fonctions différentes.
+            # Je vais revenir à l'approche où afficher_portefeuille ne fait que l'affichage et retourne les totaux.
+            # Et l'appel pour les totaux sera fait avant les onglets.
+
+            # Re-appelons la fonction ici, en acceptant la légère redondance si le calcul n'est pas trop lourd.
+            # L'avantage est que l'affichage du tableau est bien dans son onglet.
+            # Les caches Streamlit minimiseront l'impact sur les performances.
+            total_valeur_dummy, total_actuelle_dummy, total_h52_dummy, total_lt_dummy = afficher_portefeuille()
+            # Les totaux sont déjà mis à jour par le premier appel, donc ces retours sont "dummy".
+
 
     # Onglet : Performance
-    with onglets[1]:
-        # Appelez votre fonction afficher_performance si elle existe
-        if 'afficher_performance' in locals(): # Vérifie si la fonction est importée
+    with onglets[2]: # Index 2
+        st.header("📊 Analyse de Performance")
+        if 'afficher_performance' in locals():
             afficher_performance()
         else:
             st.info("Module de performance non trouvé ou fonction non implémentée.")
 
     # Onglet : OD Comptables
-    with onglets[2]:
-        # Appelez votre fonction afficher_od_comptables si elle existe
+    with onglets[3]: # Index 3
+        st.header("🧾 Opérations Diverses Comptables")
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
         else:
             st.info("Module des OD Comptables non trouvé ou fonction non implémentée.")
 
     # Onglet : Transactions
-    with onglets[3]:
-        # Appelez votre fonction afficher_transactions si elle existe
+    with onglets[4]: # Index 4
+        st.header("📜 Historique des Transactions")
         if 'afficher_transactions' in locals():
             afficher_transactions()
         else:
             st.info("Module des transactions non trouvé ou fonction non implémentée.")
 
     # Onglet : Taux de change
-    with onglets[4]:
-        # Bouton d'actualisation manuelle pour cet onglet
-        if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn"):
+    with onglets[5]: # Index 5
+        st.header("💱 Taux de Change Actuels")
+        if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"): # Clé unique
             with st.spinner("Mise à jour manuelle des taux de change..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
                 devises_uniques = []
                 if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
                     devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
                 
-                # Re-fetch les taux, le cache sera ignoré si le TTL est passé ou si c'est forcé par clear()
-                # On utilise directement la fonction `actualiser_taux_change` de `taux_change.py`
-                # pour mettre à jour `st.session_state.fx_rates`.
                 st.session_state.fx_rates = actualiser_taux_change(devise_cible_for_manual_update, devises_uniques)
                 st.session_state.last_update_time_fx = datetime.datetime.now()
                 st.session_state.last_devise_cible_for_fx_update = devise_cible_for_manual_update
                 st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update} (manuel).")
-                st.rerun() # Recharger toute l'application pour que les changements soient pris en compte
+                st.rerun()
 
-        # Affiche le tableau des taux de change en utilisant les données de session
-        # On passe les fx_rates depuis st.session_state.fx_rates
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
     # Onglet : Paramètres
-    with onglets[5]:
-        # Appelez votre fonction afficher_parametres si elle existe
+    with onglets[6]: # Index 6
+        st.header("⚙️ Paramètres de l'Application")
         if 'afficher_parametres' in locals():
             afficher_parametres()
         else:
