@@ -3,6 +3,8 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+import io # Import pour plot_momentum_chart si utilisé
+import matplotlib.pyplot as plt # Import pour plot_momentum_chart si utilisé
 
 # Cache pour 1 heure (3600 secondes)
 @st.cache_data(ttl=3600)
@@ -12,14 +14,14 @@ def fetch_fx_rates(target_currency="EUR"):
     Utilise EUR comme devise de base par défaut pour les taux de change populaires.
     """
     fx_rates = {}
-    currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"] 
+    currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"]
 
     for currency in currencies_to_fetch:
         if currency == target_currency:
             fx_rates[currency] = 1.0
             continue
 
-        ticker_symbol = f"{currency}{target_currency}=X" 
+        ticker_symbol = f"{currency}{target_currency}=X"
         try:
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
             
@@ -36,9 +38,9 @@ def fetch_fx_rates(target_currency="EUR"):
                     current_rate = temp_val
             
             # Si le taux original est toujours NaN, essayer le ticker inverse
-            if pd.isna(current_rate): 
+            if pd.isna(current_rate):
                 st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essai de l'inverse.")
-                ticker_symbol_inverse = f"{target_currency}{currency}=X" 
+                ticker_symbol_inverse = f"{target_currency}{currency}=X"
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
 
                 if not data_inverse.empty and 'Close' in data_inverse.columns and not data_inverse['Close'].empty:
@@ -58,14 +60,14 @@ def fetch_fx_rates(target_currency="EUR"):
             if pd.notna(current_rate):
                 fx_rates[currency] = current_rate
             else:
-                fx_rates[currency] = None 
+                fx_rates[currency] = None
 
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
-            fx_rates[currency] = None 
+            fx_rates[currency] = None
             
     # S'assurer que la devise cible elle-même est 1.0
-    fx_rates[target_currency] = 1.0 
+    fx_rates[target_currency] = 1.0
 
     return fx_rates
 
@@ -78,20 +80,30 @@ def fetch_yahoo_data(ticker_symbol):
     Retourne aussi un indicateur si le prix est en pence (GBp) et doit être divisé par 100.
     """
     data = {}
-    is_gbp_pence = False 
+    is_gbp_pence = False
 
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
-        
+
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_yahoo_data ---
+        if ticker_symbol == "LJP3.L":
+            st.subheader(f"🔍 Débogage Yahoo Data pour {ticker_symbol}")
+            st.write(f"Raw info.get('currentPrice'): {info.get('currentPrice')}")
+            st.write(f"Raw info.get('fiftyTwoWeekHigh'): {info.get('fiftyTwoWeekHigh')}")
+            st.write(f"Raw info.get('currency'): {info.get('currency')}")
+            st.write(f"Full info dict pour {ticker_symbol}:")
+            st.json(info) # Utilisez st.json pour un affichage plus lisible des dictionnaires
+        # --- FIN DÉBOGAGE ---
+
         data['shortName'] = info.get('shortName') or info.get('longName') or ticker_symbol
         data['currentPrice'] = info.get('currentPrice')
         data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
 
         currency_yahoo = info.get('currency')
-        if currency_yahoo == 'GBp': 
+        if currency_yahoo == 'GBp':
             is_gbp_pence = True
-        elif currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L")): 
+        elif currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L")):
             is_gbp_pence = True
 
         if is_gbp_pence:
@@ -101,12 +113,16 @@ def fetch_yahoo_data(ticker_symbol):
                 data['fiftyTwoWeekHigh'] /= 100
 
     except Exception as e:
-        data['shortName'] = ticker_symbol 
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_yahoo_data - ERREUR ---
+        if ticker_symbol == "LJP3.L":
+            st.error(f"💥 Une erreur inattendue est survenue dans fetch_yahoo_data pour {ticker_symbol}: {e}")
+        # --- FIN DÉBOGAGE ---
+        data['shortName'] = ticker_symbol
         data['currentPrice'] = np.nan
         data['fiftyTwoWeekHigh'] = np.nan
-        is_gbp_pence = False 
+        is_gbp_pence = False
         
-    data['is_gbp_pence'] = is_gbp_pence 
+    data['is_gbp_pence'] = is_gbp_pence
     return data
 
 @st.cache_data(ttl=3600) # Cache pour 1 heure
@@ -120,9 +136,27 @@ def fetch_momentum_data(ticker_symbol, months=12):
         end_date = datetime.now()
         start_date = end_date - timedelta(days=5 * 365) # 5 ans pour calculs robustes
 
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - AVANT TÉLÉCHARGEMENT ---
+        if ticker_symbol == "LJP3.L":
+            st.subheader(f"🔍 Débogage Momentum Data pour {ticker_symbol}")
+            st.write(f"Tentative de téléchargement des données de {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}, interval='1wk'")
+        # --- FIN DÉBOGAGE ---
+
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
-        # --- NOUVELLE LOGIQUE ICI pour gérer le MultiIndex ---
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - APRÈS TÉLÉCHARGEMENT ---
+        if ticker_symbol == "LJP3.L":
+            st.write(f"yf.download() returned data.empty: {data.empty}")
+            if not data.empty:
+                st.write(f"Colonnes des données téléchargées: {data.columns.tolist()}")
+                st.write("5 premières lignes des données téléchargées:")
+                st.dataframe(data.head())
+                st.write("5 dernières lignes des données téléchargées:")
+                st.dataframe(data.tail())
+            else:
+                st.write("Aucune donnée téléchargée par yf.download.")
+        # --- FIN DÉBOGAGE ---
+
         close_series = pd.Series([]) # Initialise une Series vide
         
         if data.empty:
@@ -159,7 +193,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Action": "Vérifier Ticker",
                 "Justification": "Colonne 'Close' non trouvée dans les données historiques."
             }
-        
+            
         # Now, check if the extracted close_series is empty
         if close_series.empty:
             return {
@@ -179,7 +213,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
             if currency_yahoo == 'GBp' or (currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L"))):
                 is_gbp_pence_for_momentum = True
         except Exception:
-            pass 
+            pass # Ignorer les erreurs si info n'est pas dispo ici, car on a déjà un fetch_yahoo_data dédié
 
         if is_gbp_pence_for_momentum:
             # Apply correction directly to the close_series
@@ -188,8 +222,15 @@ def fetch_momentum_data(ticker_symbol, months=12):
         # Créer un DataFrame pour les calculs de momentum avec la colonne 'Close' valide
         df = pd.DataFrame({'Close': close_series}).copy()
         
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - APRÈS EXTRACTION CLOSE ---
+        if ticker_symbol == "LJP3.L":
+            st.write(f"close_series après extraction et correction pence (head):\n{close_series.head()}")
+            st.write(f"DataFrame (df) pour momentum (tail):\n{df.tail()}")
+            st.write(f"Longueur du DataFrame pour momentum: {len(df)}")
+        # --- FIN DÉBOGAGE ---
+
         # Vérifier si suffisamment de données sont disponibles après le nettoyage
-        if len(df) < 39: 
+        if len(df) < 39:
             last_price = df['Close'].iloc[-1] if not df['Close'].empty else np.nan
             return {
                 "Last Price": last_price,
@@ -265,6 +306,17 @@ def fetch_momentum_data(ticker_symbol, months=12):
         if pd.notna(z):
             justification += f" Z-Score: {z:.2f}."
 
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - RÉSULTATS FINAUX ---
+        if ticker_symbol == "LJP3.L":
+            st.write(f"Calculs finaux pour {ticker_symbol}:")
+            st.write(f"  Last Price: {latest_price}")
+            st.write(f"  Momentum (%): {m}")
+            st.write(f"  Z-Score: {z}")
+            st.write(f"  Signal: {signal}")
+            st.write(f"  Action: {action}")
+            st.write(f"  Justification: {justification}")
+        # --- FIN DÉBOGAGE ---
+
 
         return {
             "Last Price": latest_price,
@@ -276,6 +328,10 @@ def fetch_momentum_data(ticker_symbol, months=12):
         }
 
     except Exception as e:
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - ERREUR ---
+        if ticker_symbol == "LJP3.L":
+            st.error(f"💥 Une erreur inattendue est survenue dans fetch_momentum_data pour {ticker_symbol}: {e}")
+        # --- FIN DÉBOGAGE ---
         return {
             "Last Price": np.nan,
             "Momentum (%)": np.nan,
@@ -284,3 +340,56 @@ def fetch_momentum_data(ticker_symbol, months=12):
             "Action": "N/A",
             "Justification": f"Erreur de calcul: {e}."
         }
+
+
+# --- Fonction plot_momentum_chart (optionnelle si non utilisée pour le moment) ---
+def plot_momentum_chart(ticker, data_df):
+    """
+    Génère un graphique de prix et de momentum pour un ticker donné.
+    data_df doit contenir les colonnes 'Close', 'MA_39', 'Momentum', 'Z_Momentum'.
+    """
+    if data_df.empty:
+        st.write(f"Pas de données disponibles pour tracer le graphique de {ticker}.")
+        return None
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+
+    # Graphique des prix et MA
+    ax1.plot(data_df.index, data_df['Close'], label='Prix Clôture', color='blue')
+    ax1.plot(data_df.index, data_df['MA_39'], label='MA 39 semaines', color='red', linestyle='--')
+    ax1.set_title(f'Prix et Moyenne Mobile 39 semaines pour {ticker}')
+    ax1.set_ylabel('Prix')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Graphique du Momentum
+    ax2.plot(data_df.index, data_df['Momentum'] * 100, label='Momentum (%)', color='green')
+    ax2.axhline(0, color='gray', linestyle='--', linewidth=0.8) # Ligne zéro pour le momentum
+    ax2.set_title(f'Momentum et Z-Score pour {ticker}')
+    ax2.set_ylabel('Momentum (%)')
+    ax2.legend(loc='upper left')
+    ax2.grid(True)
+
+    # Ajouter le Z-Score sur l'axe secondaire
+    ax3 = ax2.twinx()
+    ax3.plot(data_df.index, data_df['Z_Momentum'], label='Z-Score Momentum', color='purple', linestyle=':')
+    ax3.set_ylabel('Z-Score')
+    ax3.legend(loc='upper right')
+    
+    # Lignes pour les seuils de Z-Score
+    ax3.axhline(2, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 2')
+    ax3.axhline(1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 1.5')
+    ax3.axhline(-1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score < -1.5')
+    ax3.axhline(-2, color='orange', linestyle=':', linewidth=0.8, label='Z-Score < -2')
+    
+    # Formatage de l'axe des dates
+    fig.autofmt_xdate()
+
+    plt.tight_layout()
+    
+    # Sauvegarder le graphique dans un buffer pour l'affichage Streamlit
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig) # Fermer la figure pour libérer la mémoire
+    buf.seek(0)
+    return buf
