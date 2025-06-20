@@ -183,7 +183,6 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
-        st.header("✨ Synthèse du Portefeuille")
         # Passez les totaux stockés dans session_state à la fonction de synthèse
         afficher_synthese_globale(
             st.session_state.total_valeur,
@@ -194,7 +193,6 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]: # L'index a changé de 0 à 1
-        st.header("📈 Vue détaillée du Portefeuille")
         # La fonction afficher_portefeuille est déjà appelée plus haut pour calculer les totaux.
         # Ici, nous ne voulons pas la rappeler, car cela recalculerait tout et pourrait être inefficace.
         # Nous allons donc afficher le DataFrame du portefeuille directement (en s'assurant qu'il est géré par la session)
@@ -227,7 +225,6 @@ def main():
 
     # Onglet : Performance
     with onglets[2]: # Index 2
-        st.header("📊 Analyse de Performance")
         if 'afficher_performance' in locals():
             afficher_performance()
         else:
@@ -235,7 +232,6 @@ def main():
 
     # Onglet : OD Comptables
     with onglets[3]: # Index 3
-        st.header("🧾 Opérations Diverses Comptables")
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
         else:
@@ -243,7 +239,6 @@ def main():
 
     # Onglet : Transactions
     with onglets[4]: # Index 4
-        st.header("📜 Historique des Transactions")
         if 'afficher_transactions' in locals():
             afficher_transactions()
         else:
@@ -251,7 +246,6 @@ def main():
 
     # Onglet : Taux de change
     with onglets[5]: # Index 5
-        st.header("💱 Taux de Change Actuels")
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"): # Clé unique
             with st.spinner("Mise à jour manuelle des taux de change..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
@@ -269,14 +263,12 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]: # Index 6
-        st.header("⚙️ Paramètres de l'Application")
         if 'afficher_parametres' in locals():
             afficher_parametres()
         else:
             st.info("Module des paramètres non trouvé ou fonction non implémentée.")
 
     st.markdown("---")
-    st.info("💡 Importez un fichier CSV ou Excel pour visualiser et analyser votre portefeuille. Assurez-vous que les colonnes 'Quantité', 'Acquisition', 'Devise' et 'Ticker' (ou 'Tickers') sont présentes pour des calculs optimaux.")
-
+   
 if __name__ == "__main__":
     main()
