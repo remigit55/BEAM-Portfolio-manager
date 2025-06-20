@@ -79,7 +79,7 @@ def fetch_yahoo_data(ticker_symbol):
     except Exception as e:
         data['shortName'] = ticker_symbol 
         data['currentPrice'] = np.nan
-        data['fiftyTwoWeekHigh'] = np.nan
+        data['fiftyTwoTwoWeekHigh'] = np.nan
         is_gbp_pence = False 
         
     data['is_gbp_pence'] = is_gbp_pence 
@@ -94,11 +94,15 @@ def fetch_momentum_data(ticker_symbol, months=12):
     """
     try:
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=months * 30) 
+        # Utilisez 5 ans de données pour la moyenne mobile de 39 semaines (environ 9 mois)
+        # et le rolling Z-score de 10 semaines (environ 2.5 mois)
+        # Il faut suffisamment de données pour que les fenêtres de rolling se remplissent.
+        # 5 ans est plus que suffisant pour 39 semaines.
+        start_date = end_date - timedelta(days=5 * 365) # Utilisez 5 ans pour les calculs robustes
 
-        data = yf.download(ticker_symbol, start=start_date, end=end_date, progress=False)
+        data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False) # Important: interval="1wk"
 
-        if data.empty:
+        if data.empty or 'Close' not in data.columns:
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
@@ -118,87 +122,87 @@ def fetch_momentum_data(ticker_symbol, months=12):
             pass 
 
         if is_gbp_pence_for_momentum:
-            data['Close'] /= 100
-            data['Open'] /= 100
-            data['High'] /= 100
-            data['Low'] /= 100
+            # Assurez-vous que les colonnes existent avant de diviser
+            for col in ['Close', 'Open', 'High', 'Low']:
+                if col in data.columns:
+                    data[col] = data[col] / 100
 
-        # Ensure these are scalar values
-        latest_price = data['Close'].iloc[-1] if not data['Close'].empty else np.nan
-        oldest_price = data['Close'].iloc[0] if not data['Close'].empty else np.nan
+        # Utilisez .copy() pour éviter SettingWithCopyWarning
+        df = pd.DataFrame({'Close': data['Close']}).copy()
         
-        # --- RE-CORRECTION ICI : Gérer explicitement les NaNs et zéro pour oldest_price ---
-        momentum_percent = np.nan
-        if pd.notna(latest_price) and pd.notna(oldest_price) and oldest_price != 0:
-            momentum_percent = ((latest_price - oldest_price) / oldest_price) * 100
+        # S'assurer qu'il y a suffisamment de données pour les rolling windows
+        if len(df) < 39: # Minimum number of data points for MA_39
+            return {
+                "Last Price": df['Close'].iloc[-1] if not df['Close'].empty else np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Insuffisant",
+                "Action": "Plus de données requises",
+                "Justification": "Pas assez de données pour calculer le momentum (moins de 39 semaines)."
+            }
 
-        returns = data['Close'].pct_change().dropna()
-        
-        z_score = np.nan
-        # --- RE-CORRECTION ICI : Gérer la longueur des retours et les valeurs scalaires ---
-        if len(returns) > 1: # Need at least 2 points to calculate a meaningful std dev.
-            mean_return = returns.mean()
-            std_return = returns.std()
-            
-            # Ensure std_return is a scalar and not NaN or zero
-            if pd.notna(std_return) and std_return != 0:
-                # Ensure returns.iloc[-1] is a scalar
-                last_return = returns.iloc[-1]
-                if pd.notna(last_return):
-                    z_score = (last_return - mean_return) / std_return
-            elif std_return == 0: # If std_return is 0, z_score is 0 (no volatility)
-                z_score = 0
-        elif len(returns) == 1: # If only one return, std dev is NaN, Z-score cannot be calculated meaningfully
-             z_score = np.nan 
-        else: # No returns at all
-            z_score = np.nan
-        
+        df['MA_39'] = df['Close'].rolling(window=39).mean()
+        df['Momentum'] = (df['Close'] / df['MA_39']) - 1
+        df['Z_Momentum'] = (df['Momentum'] - df['Momentum'].rolling(10).mean()) / df['Momentum'].rolling(10).std()
+
+        # Récupérer la dernière ligne
+        latest = df.iloc[-1]
+
+        # S'assurer que les valeurs sont scalaires (même si elles sont NaN)
+        z = latest['Z_Momentum'] if pd.notna(latest['Z_Momentum']) else np.nan
+        m = (latest['Momentum'] * 100) if pd.notna(latest['Momentum']) else np.nan
+        latest_price = latest['Close'] if pd.notna(latest['Close']) else np.nan
+
         signal = "Neutre"
         action = "Maintenir"
         justification = ""
 
-        # Use pd.notna for all checks involving potential NaN values
-        if pd.notna(momentum_percent):
-            if momentum_percent > 10: 
-                signal = "Fort positif"
-                justification = f"Momentum > 10% ({momentum_percent:.2f}%)."
-                if pd.notna(z_score) and z_score > 1.5: 
-                    action = "Acheter"
-                    justification += " Fortes performances récentes (Z-score élevé)."
-                else:
-                    action = "Conserver"
-                    justification += " Performances stables."
-            elif momentum_percent < -10: 
-                signal = "Fort négatif"
-                justification = f"Momentum < -10% ({momentum_percent:.2f}%)."
-                if pd.notna(z_score) and z_score < -1.5: 
-                    action = "Vendre"
-                    justification += " Fortes baisses récentes (Z-score faible)."
-                else:
-                    action = "Observer"
-                    justification += " Performances déclinantes."
-            else:
-                signal = "Neutre"
-                action = "Maintenir"
-                justification = f"Momentum modéré ({momentum_percent:.2f}%)."
+        if pd.notna(z): # N'évaluer que si z n'est pas NaN
+            if z > 2:
+                signal = "🔥 Surchauffe"
+                action = "Alléger / Prendre profits"
+                justification = "Momentum extrême, risque de retournement"
+            elif z > 1.5:
+                signal = "↗ Fort"
+                action = "Surveiller"
+                justification = "Momentum soutenu, proche de surchauffe"
+            elif z > 0.5:
+                signal = "↗ Haussier"
+                action = "Conserver / Renforcer"
+                justification = "Momentum sain"
+            elif z > -0.5:
+                signal = "➖ Neutre"
+                action = "Ne rien faire"
+                justification = "Pas de signal exploitable"
+            elif z > -1.5:
+                signal = "↘ Faible"
+                action = "Surveiller / Réduire si confirmé"
+                justification = "Dynamique en affaiblissement"
+            else: # z <= -1.5
+                signal = "🧊 Survendu"
+                action = "Acheter / Renforcer (si signal technique)"
+                justification = "Purge excessive, possible bas de cycle"
         else:
-            justification = "Momentum non calculable."
+            justification = "Z-Score non calculable."
 
-        if pd.notna(z_score):
-             justification += f" Z-Score: {z_score:.2f}."
+        if pd.notna(m):
+            justification += f" Momentum: {m:.2f}%."
+        
+        if pd.notna(z):
+            justification += f" Z-Score: {z:.2f}."
 
 
         return {
             "Last Price": latest_price,
-            "Momentum (%)": momentum_percent,
-            "Z-Score": z_score,
+            "Momentum (%)": m, # m est déjà en pourcentage et gère le NaN
+            "Z-Score": z,       # z gère déjà le NaN
             "Signal": signal,
             "Action": action,
             "Justification": justification
         }
 
     except Exception as e:
-        # st.error(f"Erreur lors du calcul du momentum pour {ticker_symbol}: {e}") # Désactiver pour éviter les spams dans l'app
+        # st.error(f"Erreur lors du calcul du momentum pour {ticker_symbol}: {e}")
         return {
             "Last Price": np.nan,
             "Momentum (%)": np.nan,
