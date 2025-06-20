@@ -8,6 +8,8 @@ from PIL import Image
 import base64
 from io import BytesIO
 import os # Nécessaire pour les opérations de fichiers
+import builtins
+str = builtins.str
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
