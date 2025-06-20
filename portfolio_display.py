@@ -355,7 +355,6 @@ def afficher_portefeuille():
     return total_valeur, total_actuelle, total_h52, total_lt
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
-    st.subheader("Synthèse Globale du Portefeuille")
 
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
