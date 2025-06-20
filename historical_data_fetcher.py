@@ -14,10 +14,9 @@ def fetch_stock_history(ticker, start_date, end_date):
     """
     try:
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
-    if not data.empty:
-        # C'est ici que la modification a été faite :
-        return data['Close'].rename(ticker) 
-        except Exception as e:
+        if not data.empty:
+            return data['Close'].rename(ticker)
+    except Exception as e:
         st.warning(f"Impossible de récupérer l'historique pour {ticker}: {e}")
     return pd.Series(dtype='float64')
 
