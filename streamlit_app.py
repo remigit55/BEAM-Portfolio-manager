@@ -180,12 +180,10 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[0]:
-        st.header("📈 Vue d'ensemble du Portefeuille")
         afficher_portefeuille() # La fonction gère l'affichage du portefeuille
 
     # Onglet : Performance
     with onglets[1]:
-        st.header("📊 Analyse de Performance")
         # Appelez votre fonction afficher_performance si elle existe
         if 'afficher_performance' in locals(): # Vérifie si la fonction est importée
             afficher_performance()
@@ -194,7 +192,6 @@ def main():
 
     # Onglet : OD Comptables
     with onglets[2]:
-        st.header("🧾 Opérations Diverses Comptables")
         # Appelez votre fonction afficher_od_comptables si elle existe
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
@@ -203,7 +200,6 @@ def main():
 
     # Onglet : Transactions
     with onglets[3]:
-        st.header("📜 Historique des Transactions")
         # Appelez votre fonction afficher_transactions si elle existe
         if 'afficher_transactions' in locals():
             afficher_transactions()
@@ -212,7 +208,6 @@ def main():
 
     # Onglet : Taux de change
     with onglets[4]:
-        st.header("💱 Taux de Change Actuels")
         # Bouton d'actualisation manuelle pour cet onglet
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
@@ -236,7 +231,6 @@ def main():
 
     # Onglet : Paramètres
     with onglets[5]:
-        st.header("⚙️ Paramètres de l'Application")
         # Appelez votre fonction afficher_parametres si elle existe
         if 'afficher_parametres' in locals():
             afficher_parametres()
