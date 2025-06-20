@@ -137,7 +137,6 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
-        st.header("✨ Synthèse du Portefeuille")
         # Les totaux seront mis à jour par l'appel dans l'onglet "Portefeuille"
         # On passe ici les valeurs de session state
         afficher_synthese_globale(
@@ -149,7 +148,6 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]:
-        st.header("📈 Vue détaillée du Portefeuille")
         if st.session_state.df is None:
             st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour voir votre portefeuille.")
         else:
@@ -164,7 +162,6 @@ def main():
 
     # Onglet : Performance
     with onglets[2]:
-        st.header("📊 Analyse de Performance")
         if 'afficher_performance' in locals():
             afficher_performance()
         else:
@@ -172,7 +169,6 @@ def main():
 
     # Onglet : OD Comptables
     with onglets[3]:
-        st.header("🧾 Opérations Diverses Comptables")
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
         else:
@@ -180,7 +176,6 @@ def main():
 
     # Onglet : Transactions
     with onglets[4]:
-        st.header("📜 Historique des Transactions")
         if 'afficher_transactions' in locals():
             afficher_transactions()
         else:
@@ -188,7 +183,6 @@ def main():
 
     # Onglet : Taux de change
     with onglets[5]:
-        st.header("💱 Taux de Change Actuels")
         st.info(f"Les taux sont affichés par rapport à la devise de référence sélectionnée dans l'onglet 'Paramètres' : **{st.session_state.get('devise_cible', 'EUR')}**.")
         
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
@@ -217,7 +211,6 @@ def main():
 
 
     st.markdown("---")
-    st.info("💡 Importez un fichier CSV ou Excel via l'onglet 'Paramètres' pour visualiser et analyser votre portefeuille. Assurez-vous que les colonnes 'Quantité', 'Acquisition', 'Devise' et 'Ticker' (ou 'Tickers') sont présentes pour des calculs optimaux.")
-
+    
 if __name__ == "__main__":
     main()
