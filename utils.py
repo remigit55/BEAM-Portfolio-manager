@@ -1,20 +1,27 @@
 # utils.py
 
-import html
 import pandas as pd
+import numpy as np
+from babel.numbers import format_decimal
 
 def safe_escape(text):
-    """Escape HTML characters safely."""
-    if hasattr(html, 'escape'):
-        return html.escape(str(text))
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#x27;")
-
-def format_fr(x, dec):
-    """
-    Formate un nombre en chaîne de caractères avec la virgule comme séparateur décimal
-    et l'espace comme séparateur de milliers (format français).
-    """
-    if pd.isnull(x):
+    """Escapes HTML special characters in a string."""
+    if text is None:
         return ""
-    s = f"{x:,.{dec}f}"
-    return s.replace(",", " ").replace(".", ",")
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#039;")
+
+def format_fr(number, decimal_places=2):
+    """
+    Formats a number to French locale (1 000,00) with specified decimal places.
+    Handles NaN values.
+    """
+    if pd.isna(number):
+        return "N/A" # Or an empty string, or '-' depending on preference
+    try:
+        # Use Babel for proper locale-aware formatting
+        return format_decimal(number, locale='fr_FR', format=f'#,##0.{ "0" * decimal_places if decimal_places > 0 else "" }')
+    except Exception:
+        # Fallback for non-numeric or other issues
+        return str(number)
+
+# You might have other utility functions here as well
