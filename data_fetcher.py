@@ -23,48 +23,44 @@ def fetch_fx_rates(target_currency="EUR"):
 
         ticker_symbol = f"{currency}{target_currency}=X" 
         try:
+            # Step 1: Download data
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
             
-            # --- CORRECTION ICI pour fetch_fx_rates ---
-            # S'assurer que data n'est pas vide ET contient la colonne 'Close' ET que la dernière valeur est valide
-            if not data.empty and 'Close' in data.columns:
-                last_close_price = data['Close'].iloc[-1] # Extrait la dernière valeur
-                if pd.notna(last_close_price): # Vérifie si la valeur est un nombre (non NaN)
-                    fx_rates[currency] = last_close_price
-                else:
-                    st.warning(f"La dernière valeur pour {ticker_symbol} est manquante. Essai de l'inverse.")
-                    # Tentative de l'inverse si la valeur est NaN
-                    ticker_symbol_inverse = f"{target_currency}{currency}=X" 
-                    data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
-                    if not data_inverse.empty and 'Close' in data_inverse.columns:
-                        last_close_price_inverse = data_inverse['Close'].iloc[-1]
-                        if pd.notna(last_close_price_inverse) and last_close_price_inverse != 0:
-                            fx_rates[currency] = 1 / last_close_price_inverse
-                        else:
-                            st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse aussi vide ou zéro).")
-                            fx_rates[currency] = None
-                    else:
-                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
-                        fx_rates[currency] = None
-            else:
-                st.warning(f"Données vides ou colonne 'Close' manquante pour {ticker_symbol}. Essai de l'inverse.")
-                # Tentative de l'inverse si les données originales sont vides ou sans 'Close'
+            current_rate = np.nan # Initialize as NaN
+
+            # Step 2: Process downloaded data (original ticker)
+            if not data.empty and 'Close' in data.columns and not data['Close'].empty:
+                # Ensure we get a scalar item, even if data['Close'] is a Series of length 1
+                temp_close = data['Close'].iloc[-1]
+                if pd.notna(temp_close):
+                    current_rate = temp_close
+            
+            # Step 3: If original rate is still NaN, try inverse ticker
+            if pd.isna(current_rate):
+                st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essaie l'inverse.")
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" 
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
-                if not data_inverse.empty and 'Close' in data_inverse.columns:
-                    last_close_price_inverse = data_inverse['Close'].iloc[-1]
-                    if pd.notna(last_close_price_inverse) and last_close_price_inverse != 0:
-                        fx_rates[currency] = 1 / last_close_price_inverse
+
+                if not data_inverse.empty and 'Close' in data_inverse.columns and not data_inverse['Close'].empty:
+                    temp_close_inverse = data_inverse['Close'].iloc[-1]
+                    if pd.notna(temp_close_inverse) and temp_close_inverse != 0:
+                        current_rate = 1 / temp_close_inverse
                     else:
-                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse aussi vide ou zéro).")
-                        fx_rates[currency] = None
+                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse vide, NaN ou zéro).")
                 else:
                     st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
-                    fx_rates[currency] = None
+            
+            # Step 4: Assign final rate or None if still not found
+            if pd.notna(current_rate):
+                fx_rates[currency] = current_rate
+            else:
+                fx_rates[currency] = None # Explicitly set to None if rate could not be obtained
+
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
             fx_rates[currency] = None 
             
+    # Ensure target_currency itself is 1.0
     fx_rates[target_currency] = 1.0 
 
     return fx_rates
