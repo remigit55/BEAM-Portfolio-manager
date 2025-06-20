@@ -9,7 +9,8 @@ import streamlit.components.v1 as components # Toujours nécessaire pour compone
 
 # --- Fonctions utilitaires ---
 
-@st.cache_data(ttl=60*15) # Cache les données pendant 15 minutes
+# CHANGEMENT ICI : Utilisation de st.cache_resource au lieu de st.cache_data
+@st.cache_resource(ttl=60*15) # Cache la ressource (l'objet Ticker) pendant 15 minutes
 def get_yfinance_ticker_info(ticker_symbol):
     """
     Récupère des informations de base pour un ticker yfinance.
@@ -18,11 +19,11 @@ def get_yfinance_ticker_info(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
         # Tente de récupérer une donnée simple pour valider le ticker
-        _ = ticker.info.get('regularMarketPrice')
+        # On peut appeler .info.get() pour s'assurer que l'objet est bien initialisé
+        _ = ticker.info.get('regularMarketPrice') 
         return ticker
     except Exception as e:
         # st.warning(f"Impossible de récupérer les informations pour le ticker {ticker_symbol} : {e}")
-        # On ne met pas de st.warning ici pour ne pas spammer les logs si un ticker n'existe pas
         return None
 
 def obtenir_taux_yfinance(devise_source, devise_cible):
