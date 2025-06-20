@@ -92,15 +92,40 @@ for key, default in {
     "total_actuelle": None,
     "total_h52": None,
     "total_lt": None,
-    "uploaded_file_id": None, # Pour suivre l'état du fichier chargé
+    "uploaded_file_id": None, # Pour suivre l'état du fichier chargé (pour le uploader)
     "_last_processed_file_id": None, # Pour suivre l'état du fichier traité
+    "url_data_loaded": False # Nouveau: pour marquer si les données URL ont été chargées
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
+# --- Chargement initial des données depuis Google Sheets URL si df est vide ---
+if st.session_state.df is None and not st.session_state.url_data_loaded:
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
+    try:
+        with st.spinner("Chargement initial du portefeuille depuis Google Sheets..."):
+            df_initial = pd.read_csv(csv_url)
+            st.session_state.df = df_initial
+            st.session_state.url_data_loaded = True # Marquer comme chargé
+            # Utiliser un ID spécifique pour le chargement URL pour éviter le conflit avec le file uploader
+            st.session_state.uploaded_file_id = "initial_url_load" 
+            st.session_state._last_processed_file_id = "initial_url_load"
+            st.success("Portefeuille chargé depuis Google Sheets.")
+            # Forcer une mise à jour des taux après le chargement initial
+            st.session_state.last_update_time_fx = datetime.datetime.min
+            st.rerun() # Recharger pour que les données soient disponibles pour les autres onglets
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
+        st.session_state.url_data_loaded = True # Marquer pour ne pas essayer de charger en boucle si échec
+
 
 # --- LOGIQUE D'ACTUALISATION DES TAUX DE CHANGE ---
 current_time = datetime.datetime.now()
+# Les taux sont actualisés si:
+# 1. C'est le premier chargement (datetime.min)
+# 2. Le fichier (uploaded_file_id ou URL) a changé
+# 3. La devise cible a changé
+# 4. Plus de 60 secondes se sont écoulées depuis la dernière mise à jour
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
    (st.session_state.get("devise_cible") != st.session_state.get("last_devise_cible_for_fx_update", None)) or \
@@ -112,10 +137,12 @@ if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
     if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
         devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
     
+    # Appel à la fonction d'actualisation des taux de `taux_change.py`
     st.session_state.fx_rates = actualiser_taux_change(devise_cible_to_use, devises_uniques)
     st.session_state.last_update_time_fx = datetime.datetime.now()
     st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
     
+    # Mettre à jour _last_processed_file_id uniquement si un fichier ou une URL a été chargé
     if st.session_state.get("uploaded_file_id") is not None:
          st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
 
@@ -135,6 +162,7 @@ def main():
 
     # Onglet : Synthèse
     with onglets[0]:
+        st.header("✨ Synthèse du Portefeuille")
         afficher_synthese_globale(
             st.session_state.total_valeur,
             st.session_state.total_actuelle,
@@ -144,8 +172,9 @@ def main():
 
     # Onglet : Portefeuille
     with onglets[1]:
+        st.header("📈 Vue détaillée du Portefeuille")
         if st.session_state.df is None:
-            st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour voir votre portefeuille.") # Changed to st.warning
+            st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.") # Message mis à jour
         else:
             total_valeur, total_actuelle, total_h52, total_lt = afficher_portefeuille()
             st.session_state.total_valeur = total_valeur
@@ -156,25 +185,25 @@ def main():
 
     # Onglet : Performance
     with onglets[2]:
+        st.header("📊 Analyse de Performance")
         if 'afficher_performance' in locals():
             afficher_performance()
-        # Removed else: st.info(...)
-
+        
     # Onglet : OD Comptables
     with onglets[3]:
+        st.header("🧾 Opérations Diverses Comptables")
         if 'afficher_od_comptables' in locals():
             afficher_od_comptables()
-        # Removed else: st.info(...)
-
+        
     # Onglet : Transactions
     with onglets[4]:
+        st.header("📜 Historique des Transactions")
         if 'afficher_transactions' in locals():
             afficher_transactions()
-        # Removed else: st.info(...)
-
+        
     # Onglet : Taux de change
     with onglets[5]:
-        # Removed st.info(f"Les taux sont affichés par rapport à la devise...")
+        st.header("💱 Taux de Change Actuels")
         
         if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
@@ -193,6 +222,7 @@ def main():
 
     # Onglet : Paramètres
     with onglets[6]:
+        st.header("⚙️ Paramètres de l'Application")
         afficher_parametres_globaux()
 
 
