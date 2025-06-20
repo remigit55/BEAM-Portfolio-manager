@@ -83,7 +83,17 @@ def fetch_yahoo_data(ticker_symbol):
     try:
         ticker = yf.Ticker(ticker_symbol)
         info = ticker.info
-        
+
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_yahoo_data ---
+        if ticker_symbol == "LJP3.L":
+            st.subheader(f"🔍 Débogage Yahoo Data pour {ticker_symbol}")
+            st.write(f"Raw info.get('currentPrice'): {info.get('currentPrice')}")
+            st.write(f"Raw info.get('fiftyTwoWeekHigh'): {info.get('fiftyTwoWeekHigh')}")
+            st.write(f"Raw info.get('currency'): {info.get('currency')}")
+            st.write(f"Full info dict pour {ticker_symbol}:")
+            st.json(info) # Utilisez st.json pour un affichage plus lisible des dictionnaires
+        # --- FIN DÉBOGAGE ---
+
         data['shortName'] = info.get('shortName') or info.get('longName') or ticker_symbol
         data['currentPrice'] = info.get('currentPrice')
         data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
@@ -120,7 +130,26 @@ def fetch_momentum_data(ticker_symbol, months=12):
         end_date = datetime.now()
         start_date = end_date - timedelta(days=5 * 365) # 5 ans pour calculs robustes
 
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - AVANT TÉLÉCHARGEMENT ---
+        if ticker_symbol == "LJP3.L":
+            st.subheader(f"🔍 Débogage Momentum Data pour {ticker_symbol}")
+            st.write(f"Tentative de téléchargement des données de {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}, interval='1wk'")
+        # --- FIN DÉBOGAGE ---
+
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
+
+        # --- DÉBOGAGE POUR LJP3.L DANS fetch_momentum_data - APRÈS TÉLÉCHARGEMENT ---
+        if ticker_symbol == "LJP3.L":
+            st.write(f"yf.download() returned data.empty: {data.empty}")
+            if not data.empty:
+                st.write(f"Colonnes des données téléchargées: {data.columns.tolist()}")
+                st.write("5 premières lignes des données téléchargées:")
+                st.dataframe(data.head())
+                st.write("5 dernières lignes des données téléchargées:")
+                st.dataframe(data.tail())
+            else:
+                st.write("Aucune donnée téléchargée par yf.download.")
+        # --- FIN DÉBOGAGE ---
 
         # --- NOUVELLE LOGIQUE ICI pour gérer le MultiIndex ---
         close_series = pd.Series([]) # Initialise une Series vide
