@@ -34,8 +34,6 @@ def fetch_fx_rates(target_currency="EUR"):
                 if not data_inverse.empty:
                     fx_rates[currency] = 1 / data_inverse['Close'].iloc[-1]
                 else:
-                    # Plus précis: si GBP n'est pas trouvé et EUR est cible, utiliser une source externe ou valeur par défaut
-                    # Pour l'instant, garder None
                     st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance.")
                     fx_rates[currency] = None 
         except Exception as e:
@@ -66,34 +64,25 @@ def fetch_yahoo_data(ticker_symbol):
         data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
 
         # --- Logique de détection GBp ---
-        # Méthode 1: Vérifier la devise reportée par Yahoo Finance (si disponible et fiable)
         currency_yahoo = info.get('currency')
-        if currency_yahoo == 'GBp': # Yahoo Finance peut parfois retourner 'GBp'
+        if currency_yahoo == 'GBp': 
             is_gbp_pence = True
-        elif currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L")): # Les tickers britanniques avec .L ou ^L sont souvent en pence
+        elif currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L")): 
             is_gbp_pence = True
-        # Méthode 2: Basé sur des tickers connus ou suffixe (si la méthode 1 n'est pas suffisante)
-        # Vous pouvez ajouter ici une liste de tickers spécifiques ou des règles plus fines
-        # Exemple: if ticker_symbol in ["VOD.L", "BP.L"]: is_gbp_pence = True
 
-        # Appliquer la correction si c'est en pence
         if is_gbp_pence:
             if data['currentPrice'] is not None and not np.isnan(data['currentPrice']):
                 data['currentPrice'] /= 100
             if data['fiftyTwoWeekHigh'] is not None and not np.isnan(data['fiftyTwoWeekHigh']):
                 data['fiftyTwoWeekHigh'] /= 100
-            # Note: Le 'Last Price' pour le momentum sera géré par fetch_momentum_data
-            # qui doit aussi avoir une logique similaire si elle est cotée en GBp.
-            # Pour l'instant, on se concentre sur currentPrice et fiftyTwoWeekHigh.
 
     except Exception as e:
-        # st.warning(f"Impossible de récupérer les données pour {ticker_symbol} via yfinance: {e}")
         data['shortName'] = ticker_symbol 
         data['currentPrice'] = np.nan
         data['fiftyTwoWeekHigh'] = np.nan
-        is_gbp_pence = False # Par défaut, pas en pence si erreur
+        is_gbp_pence = False 
         
-    data['is_gbp_pence'] = is_gbp_pence # Retourner l'indicateur
+    data['is_gbp_pence'] = is_gbp_pence 
     return data
 
 @st.cache_data(ttl=3600) # Cache pour 1 heure
@@ -119,16 +108,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
                 "Justification": "Pas de données historiques disponibles."
             }
 
-        # --- Logique de détection GBp pour les données historiques ---
-        # C'est plus délicat ici car yfinance ne donne pas la devise pour chaque point de données
-        # On doit se baser sur la devise principale récupérée via ticker.info ou le suffixe.
-        # Idéalement, cette information devrait être passée depuis fetch_yahoo_data
-        # Pour simplifier, on peut réutiliser une logique similaire ou faire un appel minimal.
-        
-        # Pour une approche plus robuste, on pourrait appeler fetch_yahoo_data pour obtenir 'is_gbp_pence'
-        # ou, encore mieux, passer cette information si elle est déjà calculée.
-        
-        # Pour l'exemple, on refait une détection simple basée sur le ticker (moins performant si déjà fait)
         is_gbp_pence_for_momentum = False
         try:
             ticker_info = yf.Ticker(ticker_symbol).info
@@ -136,32 +115,36 @@ def fetch_momentum_data(ticker_symbol, months=12):
             if currency_yahoo == 'GBp' or (currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L"))):
                 is_gbp_pence_for_momentum = True
         except Exception:
-            pass # Si on ne peut pas récupérer l'info, on ne corrige pas par défaut
+            pass 
 
         if is_gbp_pence_for_momentum:
             data['Close'] /= 100
             data['Open'] /= 100
             data['High'] /= 100
             data['Low'] /= 100
-            # Ajuster aussi le volume si applicable, mais pour momentum, Close suffit
 
         latest_price = data['Close'].iloc[-1]
         oldest_price = data['Close'].iloc[0]
         
-        if oldest_price == 0: 
+        # --- CORRECTION ICI : S'assurer que oldest_price est scalaire et non NaN avant comparaison ---
+        if pd.isna(oldest_price) or oldest_price == 0: 
             momentum_percent = np.nan
         else:
             momentum_percent = ((latest_price - oldest_price) / oldest_price) * 100
 
         returns = data['Close'].pct_change().dropna()
-        if len(returns) > 1:
+        
+        # --- CORRECTION ICI : Vérifier la taille de 'returns' AVANT d'accéder à ses éléments ou de calculer std ---
+        if len(returns) > 0: # Doit être au moins 1 pour mean/std, et >0 pour accès iloc[-1]
             mean_return = returns.mean()
             std_return = returns.std()
-            if std_return == 0:
-                z_score = 0 
+            
+            # --- CORRECTION ICI : S'assurer que std_return est scalaire et non NaN avant comparaison ---
+            if pd.isna(std_return) or std_return == 0:
+                z_score = 0 # No volatility or cannot be calculated
             else:
                 z_score = (returns.iloc[-1] - mean_return) / std_return
-        else:
+        else: # Pas assez de retours pour calculer un Z-score significatif
             z_score = np.nan
         
         signal = "Neutre"
@@ -172,6 +155,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
             if momentum_percent > 10: 
                 signal = "Fort positif"
                 justification = f"Momentum > 10% ({momentum_percent:.2f}%)."
+                # S'assurer que z_score est numérique avant de le comparer
                 if pd.notna(z_score) and z_score > 1.5: 
                     action = "Acheter"
                     justification += " Fortes performances récentes (Z-score élevé)."
@@ -181,6 +165,7 @@ def fetch_momentum_data(ticker_symbol, months=12):
             elif momentum_percent < -10: 
                 signal = "Fort négatif"
                 justification = f"Momentum < -10% ({momentum_percent:.2f}%)."
+                # S'assurer que z_score est numérique avant de le comparer
                 if pd.notna(z_score) and z_score < -1.5: 
                     action = "Vendre"
                     justification += " Fortes baisses récentes (Z-score faible)."
