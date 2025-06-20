@@ -13,7 +13,7 @@ def fetch_stock_history(ticker, start_date, end_date):
     Récupère l'historique des cours de clôture ajustés pour un ticker donné.
     """
     try:
-    data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
     if not data.empty:
         # C'est ici que la modification a été faite :
         return data['Close'].rename(ticker) 
