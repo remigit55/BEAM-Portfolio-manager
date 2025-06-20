@@ -1,5 +1,5 @@
 # historical_data_fetcher.py
-import yfinance as yf
+import yfinance as yf # This is correct
 import pandas as pd
 from datetime import datetime, timedelta
 import requests
@@ -13,10 +13,13 @@ def fetch_stock_history(ticker, start_date, end_date):
     Récupère l'historique des cours de clôture ajustés pour un ticker donné.
     """
     try:
+        # This is the critical line where yf.download is called
         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
+            # Using 'Close' as discussed, which is correct
             return data['Close'].rename(ticker)
     except Exception as e:
+        # The error message comes from here, but the root cause is the `str` object not callable
         st.warning(f"Impossible de récupérer l'historique pour {ticker}: {e}")
     return pd.Series(dtype='float64')
 
@@ -27,10 +30,6 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
     (ou base_currency vers target_currency si l'API le permet).
     Utilise l'API exchangerate.host qui est gratuite et simple.
     """
-    # exchangerate.host fournit des taux par rapport à EUR par défaut ou toute base
-    # Exemple: https://api.exchangerate.host/timeseries?start_date=2024-01-01&end_date=2024-01-05&base=USD&symbols=JPY
-    
-    # Assurez-vous que les dates sont au format YYYY-MM-DD
     start_str = start_date.strftime("%Y-%m-%d")
     end_str = end_date.strftime("%Y-%m-%d")
 
@@ -46,7 +45,6 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
             if target_currency in rates:
                 rates_series[date_str] = rates[target_currency]
         
-        # Convertir en Series Pandas avec index de date
         if rates_series:
             return pd.Series(rates_series).rename(f"{base_currency}/{target_currency}")
     except requests.exceptions.RequestException as e:
@@ -62,19 +60,18 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     """
     historical_prices = {}
     for ticker in tickers:
-        prices = fetch_stock_history(ticker, start_date, end_date)
+        prices = fetch_stock_history(ticker, start_date, end_date) # Calling fetch_stock_history
         if not prices.empty:
             historical_prices[ticker] = prices.reindex(pd.bdate_range(start_date, end_date)).ffill().bfill() # Fill missing dates
 
     historical_fx = {}
     unique_currencies = set(currencies)
-    unique_currencies.add(target_currency) # Ensure target currency is also handled if it's a source
+    unique_currencies.add(target_currency)
     
     for currency in unique_currencies:
         if currency != target_currency:
-            # Fetch conversion rate from source currency to target currency
-            rate_series = fetch_historical_fx_rates(currency, target_currency, start_date, end_date)
+            rate_series = fetch_historical_fx_rates(currency, target_currency, start_date, end_date) # Calling fetch_historical_fx_rates
             if not rate_series.empty:
-                historical_fx[f"{currency}/{target_currency}"] = rate_series.reindex(pd.bdate_range(start_date, end_date)).ffill().bfill() # Fill missing dates
+                historical_fx[f"{currency}/{target_currency}"] = rate_series.reindex(pd.bdate_range(start_date, end_date)).ffill().bfill()
 
     return historical_prices, historical_fx
