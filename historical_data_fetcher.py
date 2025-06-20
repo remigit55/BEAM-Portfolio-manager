@@ -8,19 +8,19 @@ import streamlit as st
 
 # Cache pour les données historiques (pour éviter des requêtes répétées à Yahoo Finance ou aux API de taux de change)
 @st.cache_data(ttl=3600) # Cache for 1 hour
-def fetch_stock_history(ticker, start_date, end_date):
+def fetch_stock_history(Ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné.
     """
     try:
         # This is the critical line where yf.download is called
-        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
             # Using 'Close' as discussed, which is correct
-            return data['Close'].rename(ticker)
+            return data['Close'].rename(Ticker)
     except Exception as e:
         # The error message comes from here, but the root cause is the `str` object not callable
-        st.warning(f"Impossible de récupérer l'historique pour {ticker}: {e}")
+        st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {e}")
     return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600*24) # Cache for 24 hours (FX rates don't change as frequently intraday)
