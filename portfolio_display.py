@@ -13,10 +13,11 @@ def afficher_portefeuille():
     """
     Affiche le portefeuille de l'utilisateur, gère les calculs et l'affichage.
     Récupère les données externes via des fonctions dédiées.
+    Retourne les totaux convertis pour la synthèse.
     """
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
-        return
+        return None, None, None, None # Retourne None pour les totaux si pas de données
 
     df = st.session_state.df.copy()
 
@@ -28,21 +29,19 @@ def afficher_portefeuille():
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
     # Logique d'actualisation des taux de change (gérée par le cache dans data_fetcher)
-    # Les taux seront automatiquement mis à jour si le TTL est expiré ou si la base change
     fx_rates = fetch_fx_rates(devise_cible)
 
     # Normalisation numérique
     for col in ["Quantité", "Acquisition"]:
         if col in df.columns:
-            # Traiter les valeurs qui pourraient être des chaînes avec des virgules ou espaces
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            df[col] = pd.to_numeric(df[col], errors="coerce") # Convertir en numérique, NA si erreur
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     # Calcul de la valeur d'acquisition
     if all(c in df.columns for c in ["Quantité", "Acquisition"]):
         df["Valeur"] = df["Quantité"] * df["Acquisition"]
     else:
-        df["Valeur"] = np.nan # Assurer l'existence de la colonne
+        df["Valeur"] = np.nan
 
     # Ajout de la colonne Catégorie depuis la colonne F du CSV (index 5)
     if len(df.columns) > 5:
@@ -54,13 +53,9 @@ def afficher_portefeuille():
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
     if ticker_col and not df[ticker_col].dropna().empty:
-        # Collecter les tickers uniques et valides pour éviter des appels inutiles
         unique_tickers = df[ticker_col].dropna().unique()
-        
-        # Utiliser la fonction du module data_fetcher
         yahoo_data_dict = {t: fetch_yahoo_data(t) for t in unique_tickers}
         
-        # Appliquer les résultats au DataFrame
         df["shortName"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
         df["currentPrice"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("currentPrice", np.nan))
         df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: yahoo_data_dict.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
@@ -88,13 +83,12 @@ def afficher_portefeuille():
 
     # Momentum Analysis
     if ticker_col and not df[ticker_col].dropna().empty:
-        # Assurez-vous que st.session_state.momentum_results est initialisé
         if "momentum_results" not in st.session_state:
             st.session_state.momentum_results = {}
             
-        momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers}
+        unique_tickers_for_momentum = df[ticker_col].dropna().unique() # S'assurer d'utiliser la bonne liste
+        momentum_results_dict = {ticker: fetch_momentum_data(ticker) for ticker in unique_tickers_for_momentum}
         
-        # Appliquer les résultats au DataFrame
         df["Last Price"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Last Price", np.nan))
         df["Momentum (%)"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: momentum_results_dict.get(t, {}).get("Z-Score", np.nan))
@@ -125,13 +119,13 @@ def afficher_portefeuille():
     def convertir(val, source_devise):
         if pd.isnull(val) or pd.isnull(source_devise):
             return np.nan
-        source_devise = source_devise.upper()
+        source_devise = str(source_devise).upper() # Assurer que c'est une chaîne
         if source_devise == devise_cible:
             return val
         taux = fx_rates.get(source_devise)
-        return val * taux if taux else np.nan # Retourne NaN si pas de taux trouvé
+        return val * taux if taux else np.nan
 
-    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper() # Assurer que la colonne devise existe et est string
+    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper()
 
     df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"]), axis=1)
     df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"]), axis=1)
@@ -161,11 +155,9 @@ def afficher_portefeuille():
         "Signal", "Action", "Justification"
     ]
 
-    # S'assurer que seules les colonnes existantes et non-None sont sélectionnées pour df_disp
     existing_cols_in_df = []
     existing_labels = []
     for i, col_name in enumerate(cols):
-        # Vérifier si ticker_col est valide pour la colonne Ticker/Tickers
         if col_name == ticker_col and ticker_col is not None:
             existing_cols_in_df.append(ticker_col)
             existing_labels.append(labels[i])
@@ -173,55 +165,48 @@ def afficher_portefeuille():
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
     
-    # Ne pas créer df_disp si existing_cols_in_df est vide
     if not existing_cols_in_df:
         st.warning("Aucune colonne de données valide à afficher.")
-        return
+        return total_valeur, total_actuelle, total_h52, total_lt # Retourne les totaux même s'il n'y a rien à afficher
 
     df_disp = df[existing_cols_in_df].copy()
     df_disp.columns = existing_labels
 
-    # Gestion du tri (sans les boutons, le tri ne sera pas actif ici pour l'instant)
     if "sort_column" not in st.session_state:
         st.session_state.sort_column = None
     if "sort_direction" not in st.session_state:
         st.session_state.sort_direction = "asc"
 
-    # Appliquer le tri
     if st.session_state.sort_column:
         sort_col_label = st.session_state.sort_column
         if sort_col_label in df_disp.columns:
             original_col_name = None
-            # Tenter de trouver le nom de colonne original pour le tri numérique
             try:
                 idx = existing_labels.index(sort_col_label)
                 original_col_name = existing_cols_in_df[idx]
-                if original_col_name.endswith("_fmt"): # Si c'est une colonne formatée, utiliser l'originale
-                    original_col_name = original_col_name[:-4] # Enlever '_fmt'
+                if original_col_name.endswith("_fmt"):
+                    original_col_name = original_col_name[:-4]
             except ValueError:
-                pass # La colonne n'est pas dans nos labels/cols connus
+                pass
 
-            # Utilisation de la clé de tri pour les colonnes numériques formatées
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
                  df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: pd.to_numeric(x.astype(str).str.replace(" ", "").str.replace(",", "."), errors="coerce").fillna(-float('inf'))
                 )
-            else: # Tri alphabétique pour les autres
+            else:
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: x.astype(str).str.lower()
                 )
 
-
     total_valeur_str = format_fr(total_valeur, 2)
     total_actuelle_str = format_fr(total_actuelle, 2)
     total_h52_str = format_fr(total_h52, 2)
     total_lt_str = format_fr(total_lt, 2)
 
-    # Construction HTML pour la table
     html_code = f"""
     <style>
       .scroll-wrapper {{
@@ -257,28 +242,25 @@ def afficher_portefeuille():
         font-size: 11px;
         white-space: nowrap;
       }}
-      .portfolio-table td:nth-child(1), /* Ticker */
-      .portfolio-table td:nth-child(2), /* Nom */
-      .portfolio-table td:nth-child(3), /* Catégorie */
-      .portfolio-table td:nth-child(16), /* Signal (index peut varier si colonnes non présentes) */
-      .portfolio-table td:nth-child(17), /* Action */
-      .portfolio-table td:nth-child(18) {{ /* Justification */
+      .portfolio-table td:nth-child(1),
+      .portfolio-table td:nth-child(2),
+      .portfolio-table td:nth-child(3),
+      .portfolio-table td:nth-child(16),
+      .portfolio-table td:nth-child(17),
+      .portfolio-table td:nth-child(18) {{
         text-align: left;
         white-space: normal;
       }}
-      /* Ajustement des largeurs de colonnes basé sur l'ordre actuel des labels */
       { (lambda : '' if 'Ticker' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Ticker") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Ticker") + 1}) {{ width: 80px; }}')() }
       { (lambda : '' if 'Nom' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Nom") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Nom") + 1}) {{ width: 200px; }}')() }
       { (lambda : '' if 'Catégorie' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Catégorie") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Catégorie") + 1}) {{ width: 100px; }}')() }
       { (lambda : '' if 'Devise' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Devise") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Devise") + 1}) {{ width: 60px; }}')() }
 
-      /* Largeurs génériques pour les colonnes numériques (peut nécessiter un ajustement si l'ordre change) */
       .portfolio-table th:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)),
       .portfolio-table td:not(:nth-child(1)):not(:nth-child(2)):not(:nth-child(3)):not(:nth-child(16)):not(:nth-child(17)):not(:nth-child(18)):not(:nth-child(19)) {{
-        width: 100px; /* Largeur par défaut pour les colonnes numériques et de valeurs */
+        width: 100px;
       }}
 
-      /* Styles pour les colonnes de signal et action */
       { (lambda : '' if 'Signal' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Signal") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Signal") + 1}) {{ width: 100px; }}')() }
       { (lambda : '' if 'Action' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Action") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Action") + 1}) {{ width: 150px; }}')() }
       { (lambda : '' if 'Justification' not in df_disp.columns else f'.portfolio-table th:nth-child({df_disp.columns.get_loc("Justification") + 1}), .portfolio-table td:nth-child({df_disp.columns.get_loc("Justification") + 1}) {{ width: 200px; }}')() }
@@ -312,12 +294,9 @@ def afficher_portefeuille():
             html_code += f"<td>{val_str}</td>"
         html_code += "</tr>"
 
-    # Ligne TOTAL
     num_cols_displayed = len(df_disp.columns)
     total_row_cells = [""] * num_cols_displayed
     
-    # Mapping des labels d'affichage vers les noms de colonnes du DataFrame original
-    # pour retrouver les totaux
     total_cols_mapping = {
         "Valeur": total_valeur_str,
         "Valeur Actuelle": total_actuelle_str,
@@ -325,13 +304,11 @@ def afficher_portefeuille():
         "Valeur LT": total_lt_str
     }
 
-    # Remplir les cellules de total dans la ligne du bas
     for display_label, total_value_str in total_cols_mapping.items():
         if display_label in df_disp.columns:
             idx = list(df_disp.columns).index(display_label)
             total_row_cells[idx] = safe_escape(total_value_str)
 
-    # La première cellule pour "TOTAL (Devise)"
     total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
 
     html_code += "<tr class='total-row'>"
@@ -348,8 +325,24 @@ def afficher_portefeuille():
 
     components.html(html_code, height=600, scrolling=True)
 
-    # --- Statistiques Récapitulatives (Optionnel: Peut être déplacé dans un autre module) ---
-    st.subheader("Synthèse Globale")
+    # La fonction retourne maintenant les totaux
+    return total_valeur, total_actuelle, total_h52, total_lt
+
+# --- NOUVELLE FONCTION POUR AFFICHER LA SYNTHÈSE GLOBALE ---
+def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
+    """
+    Affiche la section de synthèse globale du portefeuille.
+    Prend les totaux calculés en arguments.
+    """
+    st.subheader("Synthèse Globale du Portefeuille")
+
+    devise_cible = st.session_state.get("devise_cible", "EUR")
+
+    # Vérifiez si les totaux sont valides avant d'afficher
+    if total_valeur is None: # Si afficher_portefeuille a retourné None
+        st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
+        return
+
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
