@@ -11,7 +11,6 @@ def display_performance_history():
     """
     Displays the portfolio's historical performance with a date filter.
     """
-    st.header("📊 Historique des Performances du Portefeuille")
     st.subheader("Historique des Totaux Quotidiens")
 
     df_history = load_historical_data()
