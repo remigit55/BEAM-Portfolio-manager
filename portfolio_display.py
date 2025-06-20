@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
 import numpy as np
+import json # Import json module
 
 # Import des fonctions depuis les nouveaux modules
 from utils import safe_escape, format_fr
@@ -297,6 +298,7 @@ def afficher_portefeuille():
         current_sort_icon = ""
         if st.session_state.sort_column == lbl:
             current_sort_icon = "▲" if st.session_state.sort_direction == "asc" else "▼"
+        # The onClick event now calls sortColumn with the column label
         header_html += f'<th onclick="sortColumn(\'{safe_escape(lbl)}\')">{safe_escape(lbl)}<span class="sort-icon">{current_sort_icon}</span></th>'
 
 
@@ -398,40 +400,56 @@ def afficher_portefeuille():
         // Only re-declare if the component is re-rendered
         if (!window.sortColumn) {
             window.sortColumn = function(columnLabel) {
+                const currentSortColumn = window.streamlitSortColumn;
+                const currentSortDirection = window.streamlitSortDirection;
+                
+                let newSortDirection = 'asc';
+                if (currentSortColumn === columnLabel && currentSortDirection === 'asc') {
+                    newSortDirection = 'desc';
+                }
+                
+                const payload = {
+                    sort_column: columnLabel,
+                    sort_direction: newSortDirection
+                };
+
+                // Send a JSON string as the payload
                 const streamlitMessage = {
                     type: "streamlit:setComponentValue",
-                    payload: {
-                        sort_column: columnLabel,
-                        # Toggle sort direction
-                        sort_direction: (
-                            window.streamlitSortColumn === columnLabel && window.streamlitSortDirection === 'asc'
-                        ) ? 'desc' : 'asc'
-                    }
+                    payload: JSON.stringify(payload)
                 };
                 window.parent.postMessage(streamlitMessage, "*");
             };
         }
         // Store current sort state in browser's window object for JavaScript
+        // These values are injected by Python at render time
         window.streamlitSortColumn = "{{ st.session_state.sort_column if st.session_state.sort_column else '' }}";
         window.streamlitSortDirection = "{{ st.session_state.sort_direction if st.session_state.sort_direction else '' }}";
     </script>
     """
 
     # Use components.html to render and listen for messages
-    component_value = components.html(html_code, height=600, scrolling=True, key="portfolio_table_display")
+    component_value_raw = components.html(html_code, height=600, scrolling=True, key="portfolio_table_display")
 
     # Update session state if a message is received from JavaScript
-    if component_value:
-        if "sort_column" in component_value and "sort_direction" in component_value:
-            new_sort_column = component_value["sort_column"]
-            new_sort_direction = component_value["sort_direction"]
-            
-            # Only trigger rerun if sort state actually changed
-            if (new_sort_column != st.session_state.sort_column or 
-                new_sort_direction != st.session_state.sort_direction):
-                st.session_state.sort_column = new_sort_column
-                st.session_state.sort_direction = new_sort_direction
-                st.rerun() # Force rerun to re-render with new sort order
+    if component_value_raw:
+        try:
+            # Parse the JSON string received from JavaScript
+            component_value = json.loads(component_value_raw)
+            if "sort_column" in component_value and "sort_direction" in component_value:
+                new_sort_column = component_value["sort_column"]
+                new_sort_direction = component_value["sort_direction"]
+                
+                # Only trigger rerun if sort state actually changed
+                if (new_sort_column != st.session_state.sort_column or 
+                    new_sort_direction != st.session_state.sort_direction):
+                    st.session_state.sort_column = new_sort_column
+                    st.session_state.sort_direction = new_sort_direction
+                    st.rerun() # Force rerun to re-render with new sort order
+        except json.JSONDecodeError as e:
+            st.error(f"Erreur lors de la lecture du message de tri depuis la table HTML : {e}. Message reçu: {component_value_raw}")
+        except TypeError as e:
+            st.error(f"Erreur de type lors du traitement du message de tri : {e}. Message reçu: {component_value_raw}")
 
 
     st.markdown("---")
