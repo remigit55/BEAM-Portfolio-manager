@@ -2,20 +2,25 @@
 
 import streamlit as st
 import pandas as pd
-import datetime
+import numpy as np
+import datetime # Importation de datetime
 from PIL import Image
 import base64
 from io import BytesIO
-import os # Nécessaire pour historical_data_manager
+import os # Nécessaire pour les opérations de fichiers
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
-from performance import display_performance_history # Renommé pour correspondre à notre implémentation
+from performance import display_performance_history # Nom de la fonction mis à jour
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change, actualiser_taux_change
 from parametres import afficher_parametres_globaux # La fonction qui gère tous les paramètres globaux
-from historical_data_manager import save_daily_totals, load_historical_data # Nouveau pour l'historique
+from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal # Nouveau import
+# from historical_data_fetcher import get_all_historical_data # Non nécessaire ici directement
+# from historical_performance_calculator import reconstruct_historical_performance # Non nécessaire ici directement
+from data_loader import load_data, save_data # Nécessaire si vous avez une fonction de sauvegarde du df initial
+from utils import safe_escape, format_fr # Assurez-vous que ces fonctions sont présentes
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -38,9 +43,17 @@ st.markdown(f"""
             text-align: right !important;
         }}
         /* Supprimer la sidebar */
-        .st-emotion-cache-vk33gh {{ /* Ou .st-emotion-cache-1f06xpt / .st-emotion-cache-18ni7ap */
+        /*
+        .st-emotion-cache-vk33gh {{
             display: none !important;
         }}
+        .st-emotion-cache-1f06xpt {{
+            display: none !important;
+        }}
+        .st-emotion-cache-18ni7ap {{
+            display: none !important;
+        }}
+        */
         /* Ajuster le contenu principal pour qu'il prenne toute la largeur si la sidebar est masquée */
         section.main {{
             padding-right: 1rem; /* ou ajustez si nécessaire */
@@ -62,11 +75,11 @@ st.markdown(f"""
 # Chargement du logo
 try:
     # Assurez-vous que le fichier 'Logo.png.png' existe dans le même répertoire que streamlit_app.py
-    logo = Image.open("Logo.png.png") 
+    logo = Image.open("Logo.png.png")
     buffer = BytesIO()
     logo.save(buffer, format="PNG")
     logo_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-except FileNotFoundError: # Capturer l'erreur spécifique si le fichier n'est pas trouvé
+except FileNotFoundError:
     st.warning("Logo.png.png non trouvé. Assurez-vous qu'il est dans le même répertoire que streamlit_app.py.")
     logo_base64 = ""
 except Exception as e:
@@ -85,54 +98,51 @@ st.markdown(
 
 # Initialisation des variables de session
 for key, default in {
-    "df": None,
-    "fx_rates": {},
-    "devise_cible": "EUR", # Valeur par défaut
-    "ticker_names_cache": {}, # Cache pour les noms de tickers (utilisé dans portfolio_display)
+    "df": None, # Le DataFrame du portefeuille courant
+    "fx_rates": {}, # Taux de change actuels
+    "devise_cible": "EUR", # Devise d'affichage par défaut
+    "ticker_data_cache": {}, # Cache pour les données Yahoo Finance (prix actuels, noms, etc.)
+    "momentum_results_cache": {}, # Cache pour les résultats de momentum
     "sort_column": None, # Colonne de tri pour le tableau du portefeuille
     "sort_direction": "asc", # Direction de tri
-    "momentum_results": {}, # Cache pour les résultats de momentum
-    "last_devise_cible_for_fx_update": "EUR", # Garder pour la logique de rafraîchissement des taux
+    "last_devise_cible_for_fx_update": "EUR", # Pour la logique d'actualisation des taux
     "last_update_time_fx": datetime.datetime.min, # Timestamp de la dernière mise à jour des taux
     "total_valeur": None, # Total valeur d'acquisition
     "total_actuelle": None, # Total valeur actuelle
     "total_h52": None, # Total valeur H52
     "total_lt": None, # Total valeur LT
-    "uploaded_file_id": None, # Pour suivre l'état du fichier chargé (depuis les paramètres)
-    "_last_processed_file_id": None, # Pour suivre l'état du fichier traité
-    "url_data_loaded": False # Nouveau: pour marquer si les données URL ont été chargées
+    "uploaded_file_id": None, # Pour suivre l'état du fichier chargé via l'uploader dans 'Paramètres'
+    "_last_processed_file_id": None, # Pour suivre l'état du fichier traité pour les mises à jour auto
+    "url_data_loaded": False # Pour marquer si les données URL ont été chargées
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
 # --- Chargement initial des données depuis Google Sheets URL si df est vide ---
-# Cette logique ne s'exécute qu'une fois au début de la session si le DF n'est pas déjà chargé
 if st.session_state.df is None and not st.session_state.url_data_loaded:
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
     try:
         with st.spinner("Chargement initial du portefeuille depuis Google Sheets..."):
             df_initial = pd.read_csv(csv_url)
             st.session_state.df = df_initial
-            st.session_state.url_data_loaded = True # Marquer comme chargé
-            # Utiliser un ID spécifique pour le chargement URL pour éviter le conflit avec le file uploader
-            st.session_state.uploaded_file_id = "initial_url_load" 
+            st.session_state.url_data_loaded = True
+            st.session_state.uploaded_file_id = "initial_url_load"
             st.session_state._last_processed_file_id = "initial_url_load"
             st.success("Portefeuille chargé depuis Google Sheets.")
-            # Forcer une mise à jour des taux après le chargement initial
-            st.session_state.last_update_time_fx = datetime.datetime.min # Remet le timer à zéro pour forcer l'update
-            st.rerun() # Recharger pour que les données soient disponibles pour les autres onglets
+            st.session_state.last_update_time_fx = datetime.datetime.min # Forcer mise à jour des taux
+            st.rerun() # Pour que les données soient disponibles immédiatement
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
-        st.session_state.url_data_loaded = True # Marquer pour ne pas essayer de charger en boucle si échec
+        st.session_state.url_data_loaded = True
 
 
 # --- LOGIQUE D'ACTUALISATION AUTOMATIQUE DES TAUX DE CHANGE ---
 current_time = datetime.datetime.now()
 # Les taux sont actualisés si:
 # 1. C'est le premier chargement (datetime.min)
-# 2. Le fichier (uploaded_file_id ou URL) a changé (pour s'assurer que les devises sont à jour)
-# 3. La devise cible a changé (l'utilisateur a sélectionné une autre devise)
-# 4. Plus de 60 secondes se sont écoulées depuis la dernière mise à jour automatique
+# 2. Le fichier (uploaded_file_id ou URL) a changé
+# 3. La devise cible a changé
+# 4. Plus de 60 secondes se sont écoulées depuis la dernière mise à jour
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
    (st.session_state.get("devise_cible") != st.session_state.get("last_devise_cible_for_fx_update", None)) or \
@@ -144,13 +154,11 @@ if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
     if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
         devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
     
-    # Appel à la fonction d'actualisation des taux de `taux_change.py`
-    st.session_state.fx_rates = actualiser_taux_change(devise_cible_to_use, devises_uniques)
-    st.session_state.last_update_time_fx = datetime.datetime.now()
-    st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
+    with st.spinner(f"Mise à jour automatique des taux de change pour {devise_cible_to_use}..."):
+        st.session_state.fx_rates = actualiser_taux_change(devise_cible_to_use, devises_uniques)
+        st.session_state.last_update_time_fx = datetime.datetime.now()
+        st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
     
-    # Mettre à jour _last_processed_file_id uniquement si un fichier ou une URL a été chargé
-    # Ceci évite de refetcher les taux si l'application est juste relancée sans nouveau fichier
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
 
@@ -193,22 +201,20 @@ def main():
             st.session_state.total_h52 = total_h52
             st.session_state.total_lt = total_lt
 
-            # --- Enregistrement des totaux quotidiens pour l'onglet Performance ---
-            current_date = datetime.date.today() # Utiliser datetime.date pour la comparaison
+            # --- Enregistrement du snapshot du portefeuille pour le journal historique ---
+            current_date = datetime.date.today()
             devise_cible = st.session_state.get("devise_cible", "EUR")
+            
+            # Charger le journal pour vérifier la dernière date enregistrée
+            journal_entries = load_portfolio_journal()
+            journal_dates = [entry['date'] for entry in journal_entries]
 
-            history_df = load_historical_data()
-            # Convertir la colonne 'Date' du DataFrame historique en objets datetime.date pour une comparaison correcte
-            history_dates = history_df['Date'].dt.date.tolist() if not history_df.empty else []
-
-            # Sauvegarder uniquement si les totaux sont valides et la date du jour n'est pas déjà enregistrée
-            if (total_valeur is not None and pd.notna(total_valeur) and
-                total_actuelle is not None and pd.notna(total_actuelle) and
-                current_date not in history_dates):
-                
-                save_daily_totals(current_date, total_valeur, total_actuelle, total_h52, total_lt, devise_cible)
-                st.info(f"Totaux du {current_date.strftime('%Y-%m-%d')} sauvegardés pour l'historique.")
-            # --- Fin de l'enregistrement ---
+            # Sauvegarder si le df n'est pas vide et si la date du jour n'est pas déjà enregistrée
+            if st.session_state.df is not None and not st.session_state.df.empty and current_date not in journal_dates:
+                with st.spinner("Enregistrement du snapshot quotidien du portefeuille..."):
+                    save_portfolio_snapshot(current_date, st.session_state.df, devise_cible)
+                st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
+            # --- Fin de l'enregistrement du snapshot ---
 
     # Onglet : Performance
     with onglets[2]:
