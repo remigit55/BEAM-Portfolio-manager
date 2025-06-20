@@ -24,17 +24,43 @@ def fetch_fx_rates(target_currency="EUR"):
         ticker_symbol = f"{currency}{target_currency}=X" 
         try:
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
-            if not data.empty and 'Close' in data.columns and pd.notna(data['Close'].iloc[-1]):
-                fx_rates[currency] = data['Close'].iloc[-1]
+            
+            # --- CORRECTION ICI pour fetch_fx_rates ---
+            # S'assurer que data n'est pas vide ET contient la colonne 'Close' ET que la dernière valeur est valide
+            if not data.empty and 'Close' in data.columns:
+                last_close_price = data['Close'].iloc[-1] # Extrait la dernière valeur
+                if pd.notna(last_close_price): # Vérifie si la valeur est un nombre (non NaN)
+                    fx_rates[currency] = last_close_price
+                else:
+                    st.warning(f"La dernière valeur pour {ticker_symbol} est manquante. Essai de l'inverse.")
+                    # Tentative de l'inverse si la valeur est NaN
+                    ticker_symbol_inverse = f"{target_currency}{currency}=X" 
+                    data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
+                    if not data_inverse.empty and 'Close' in data_inverse.columns:
+                        last_close_price_inverse = data_inverse['Close'].iloc[-1]
+                        if pd.notna(last_close_price_inverse) and last_close_price_inverse != 0:
+                            fx_rates[currency] = 1 / last_close_price_inverse
+                        else:
+                            st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse aussi vide ou zéro).")
+                            fx_rates[currency] = None
+                    else:
+                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
+                        fx_rates[currency] = None
             else:
-                st.warning(f"Impossible de récupérer le taux pour {ticker_symbol}. Essaie l'inverse.")
+                st.warning(f"Données vides ou colonne 'Close' manquante pour {ticker_symbol}. Essai de l'inverse.")
+                # Tentative de l'inverse si les données originales sont vides ou sans 'Close'
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" 
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
-                if not data_inverse.empty and 'Close' in data_inverse.columns and pd.notna(data_inverse['Close'].iloc[-1]):
-                    fx_rates[currency] = 1 / data_inverse['Close'].iloc[-1]
+                if not data_inverse.empty and 'Close' in data_inverse.columns:
+                    last_close_price_inverse = data_inverse['Close'].iloc[-1]
+                    if pd.notna(last_close_price_inverse) and last_close_price_inverse != 0:
+                        fx_rates[currency] = 1 / last_close_price_inverse
+                    else:
+                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse aussi vide ou zéro).")
+                        fx_rates[currency] = None
                 else:
-                    st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance.")
-                    fx_rates[currency] = None 
+                    st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
+                    fx_rates[currency] = None
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
             fx_rates[currency] = None 
@@ -96,7 +122,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
 
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
-        # *** Point de correction principal ici ***
         # Vérifier si les données sont valides et contiennent une colonne 'Close' avec des valeurs
         if data.empty or 'Close' not in data.columns or data['Close'].empty:
             return {
@@ -227,7 +252,6 @@ def fetch_momentum_data(ticker_symbol, months=12):
         }
 
     except Exception as e:
-        # st.error(f"Erreur lors du calcul du momentum pour {ticker_symbol}: {e}")
         return {
             "Last Price": np.nan,
             "Momentum (%)": np.nan,
