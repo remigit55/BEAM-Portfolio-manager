@@ -199,7 +199,7 @@ def main():
     # Onglet : Taux de change
     with onglets[5]:
         
-        if st.button("Actualiser les taux (manuel)", key="manual_fx_refresh_btn_tab"):
+        if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
                 devises_uniques = []
