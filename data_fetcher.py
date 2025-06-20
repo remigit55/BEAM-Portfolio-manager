@@ -1,5 +1,3 @@
-# data_fetcher.py
-
 import streamlit as st
 import yfinance as yf
 from datetime import datetime, timedelta
@@ -23,43 +21,50 @@ def fetch_fx_rates(target_currency="EUR"):
 
         ticker_symbol = f"{currency}{target_currency}=X" 
         try:
-            # Step 1: Download data
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
             
-            current_rate = np.nan # Initialize as NaN
+            current_rate = np.nan # Initialiser comme NaN
 
-            # Step 2: Process downloaded data (original ticker)
+            # Traiter les données du ticker original
             if not data.empty and 'Close' in data.columns and not data['Close'].empty:
-                temp_close = data['Close'].iloc[-1]
-                if pd.notna(temp_close):
-                    current_rate = temp_close
+                temp_val = data['Close'].iloc[-1]
+                # S'assurer que temp_val est un scalaire. Si c'est une Series de longueur 1, la convertir.
+                if isinstance(temp_val, pd.Series) and len(temp_val) == 1:
+                    temp_val = temp_val.item() # Forcer la conversion en scalaire
+                
+                if pd.notna(temp_val):
+                    current_rate = temp_val
             
-            # Step 3: If original rate is still NaN, try inverse ticker
-            if pd.isna(current_rate):
-                st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essaie l'inverse.")
+            # Si le taux original est toujours NaN, essayer le ticker inverse
+            if pd.isna(current_rate): # Cette vérification est maintenant sûre car current_rate est toujours scalaire ou NaN
+                st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essai de l'inverse.")
                 ticker_symbol_inverse = f"{target_currency}{currency}=X" 
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
 
                 if not data_inverse.empty and 'Close' in data_inverse.columns and not data_inverse['Close'].empty:
-                    temp_close_inverse = data_inverse['Close'].iloc[-1]
-                    if pd.notna(temp_close_inverse) and temp_close_inverse != 0:
-                        current_rate = 1 / temp_close_inverse
+                    temp_val_inverse = data_inverse['Close'].iloc[-1]
+                    # S'assurer que temp_val_inverse est un scalaire
+                    if isinstance(temp_val_inverse, pd.Series) and len(temp_val_inverse) == 1:
+                        temp_val_inverse = temp_val_inverse.item() # Forcer la conversion en scalaire
+
+                    if pd.notna(temp_val_inverse) and temp_val_inverse != 0:
+                        current_rate = 1 / temp_val_inverse
                     else:
                         st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse vide, NaN ou zéro).")
                 else:
                     st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
             
-            # Step 4: Assign final rate or None if still not found
+            # Assigner le taux final
             if pd.notna(current_rate):
                 fx_rates[currency] = current_rate
             else:
-                fx_rates[currency] = None # Explicitly set to None if rate could not be obtained
+                fx_rates[currency] = None # Définir explicitement à None si le taux n'a pas pu être obtenu
 
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
             fx_rates[currency] = None 
             
-    # Ensure target_currency itself is 1.0
+    # S'assurer que la devise cible elle-même est 1.0
     fx_rates[target_currency] = 1.0 
 
     return fx_rates
@@ -117,18 +122,28 @@ def fetch_momentum_data(ticker_symbol, months=12):
 
         data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
 
-        # Vérifier si les données sont valides et contiennent une colonne 'Close' avec des valeurs
-        # Modifié : Supprimez la vérification 'isinstance' car data['Close'] doit être une Series.
-        # Concentrez-vous sur 'empty'
-        if data.empty or 'Close' not in data.columns or data['Close'].empty:
+        # Vérifier si les données sont vides ou si la colonne 'Close' est manquante
+        if data.empty or 'Close' not in data.columns:
             return {
                 "Last Price": np.nan,
                 "Momentum (%)": np.nan,
                 "Z-Score": np.nan,
                 "Signal": "Manquant",
                 "Action": "Vérifier Ticker",
-                "Justification": "Pas de données historiques disponibles ou colonne 'Close' vide."
+                "Justification": "Pas de données historiques disponibles."
             }
+        
+        # Vérification explicite : si la colonne 'Close' existe mais est vide
+        if data['Close'].empty:
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Manquant",
+                "Action": "Vérifier Ticker",
+                "Justification": "La colonne 'Close' ne contient pas de données pour la période demandée."
+            }
+
 
         # Détection GBp et correction des prix si nécessaire
         is_gbp_pence_for_momentum = False
@@ -146,11 +161,9 @@ def fetch_momentum_data(ticker_symbol, months=12):
                     data[col] = data[col] / 100.0
 
         # Créer un DataFrame pour les calculs de momentum avec une colonne 'Close' valide
-        # Cette ligne est maintenant plus sûre après la vérification 'data['Close'].empty' ci-dessus.
         df = pd.DataFrame({'Close': data['Close']}).copy()
         
         # Vérifier si suffisamment de données sont disponibles après le nettoyage
-        # La fenêtre minimale est 39 pour MA_39, mais 10 pour le Z-Score, donc 39 est le plus restrictif.
         if len(df) < 39: 
             last_price = df['Close'].iloc[-1] if not df['Close'].empty else np.nan
             return {
