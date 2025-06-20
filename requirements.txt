@@ -10,3 +10,5 @@ requests
 tenacity
 pillow
 forex-python
+scipy
+numpy
