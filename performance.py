@@ -33,7 +33,7 @@ def display_performance_history():
     
     # Ensuite on peut calculer les bornes normalement
     min_journal_date = min(s['date'] for s in portfolio_journal)
-    max_journal_date = max(s['date'] for s in portfolio_journal)
+    max_journal_date = (datetime.now() - timedelta(days=1)).date()
 
     
     today = datetime.now().date()
