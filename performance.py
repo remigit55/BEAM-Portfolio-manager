@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date # Importez 'date' explicitement si ce n'est pas déjà fait
 
 # Import the new modules
 from portfolio_journal import load_portfolio_journal
@@ -24,7 +24,7 @@ def display_performance_history():
     # Création des onglets dans la section Performance
     performance_tabs = st.tabs(["Performance Globale", "Test Historique GLDG"])
 
-    with performance_tabs[0]: # Onglet Performance Globale (Votre code existant pour la performance)
+    with performance_tabs[0]: # Onglet Performance Globale
         st.subheader("Reconstruction des Totaux Quotidiens")
 
         # Load the portfolio journal
@@ -34,9 +34,9 @@ def display_performance_history():
             st.info("Aucune donnée historique de portefeuille n'a été enregistrée. Chargez un portefeuille et utilisez l'application pour commencer à construire l'historique.")
             return
 
-        from datetime import date
+        # from datetime import date # Déjà importé en haut, mais assurez-vous qu'il est présent
 
-        # 👉 Ajout temporaire d’un ancien snapshot si un seul est disponible (maintenu pour ne pas casser le reste)
+        # 👉 Ajout temporaire d’un ancien snapshot si un seul est disponible
         if len(portfolio_journal) == 1:
             ancien_snapshot = portfolio_journal[0].copy()
             ancien_snapshot["date"] = portfolio_journal[0]["date"] - timedelta(days=7)
@@ -68,11 +68,15 @@ def display_performance_history():
 
         st.info(f"Calcul de la performance historique du {start_date_perf.strftime('%Y-%m-%d')} au {end_date_perf.strftime('%Y-%m-%d')}...")
 
+        # CONVERSION DES DATES AU FORMAT DATETIME.DATETIME POUR LA COMPATIBILITÉ
+        start_datetime_perf = datetime.combine(start_date_perf, datetime.min.time())
+        end_datetime_perf = datetime.combine(end_date_perf, datetime.max.time()) # Pour inclure toute la dernière journée
+
         with st.spinner("Reconstruction de la performance historique (cela peut prendre un certain temps si l'historique est long)..."):
-            # Ici, on appelle la fonction de reconstruction
+            # Ici, on appelle la fonction de reconstruction avec les dates converties
             df_reconstructed = reconstruct_historical_performance(
-                start_date_perf,
-                end_date_perf,
+                start_datetime_perf, # DATE CONVERTIE
+                end_datetime_perf,   # DATE CONVERTIE
                 st.session_state.get("devise_cible", "EUR")
             )
 
@@ -135,7 +139,7 @@ def display_performance_history():
         st.plotly_chart(fig_gain_loss_percent, use_container_width=True)
 
 
-    with performance_tabs[1]: # NOUVEL ONGLET : Test Historique GLDG
+    with performance_tabs[1]: # Onglet : Test Historique GLDG (Gardé le même pour la cohérence)
         st.subheader("📊 Test de Récupération des Données Historiques GLDG")
         st.write("Cet onglet sert à vérifier spécifiquement la récupération des données historiques de GLDG.")
 
