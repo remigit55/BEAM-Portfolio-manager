@@ -9,13 +9,6 @@ import base64
 from io import BytesIO
 import os # Nécessaire pour les opérations de fichiers
 
-import builtins
-# Assurez-vous que la fonction str() native est restaurée au cas où elle aurait été écrasée
-try:
-    if not callable(str): # Vérifie si str n'est plus une fonction
-        str = builtins.str # Restaure la fonction str native
-except NameError: # Au cas où str n'aurait jamais été définie (peu probable mais pour la robustesse)
-    str = builtins.str
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
