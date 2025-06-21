@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime, timedelta, date # Importez 'date' explicitement si ce n'est pas déjà fait
+from datetime import datetime, timedelta, date
 
 # Import the new modules
 from portfolio_journal import load_portfolio_journal
@@ -11,9 +11,9 @@ from historical_performance_calculator import reconstruct_historical_performance
 from utils import format_fr # Make sure utils.py contains this function
 
 # NOUVEAUX IMPORTS NÉCESSAIRES POUR LE TEST GLDG
-import yfinance as yf # Ajouté pour le test direct de Yahoo Finance
-from historical_data_fetcher import fetch_stock_history # Pour réutiliser votre fonction existante
-import builtins # Pour gérer les erreurs d'écrasement de built-ins
+import yfinance as yf
+from historical_data_fetcher import fetch_stock_history
+import builtins
 
 def display_performance_history():
     """
@@ -34,12 +34,29 @@ def display_performance_history():
             st.info("Aucune donnée historique de portefeuille n'a été enregistrée. Chargez un portefeuille et utilisez l'application pour commencer à construire l'historique.")
             return
 
-        # from datetime import date # Déjà importé en haut, mais assurez-vous qu'il est présent
+        # --- DÉBUT DE LA VÉRIFICATION AMÉLIORÉE DU JOURNAL ---
+        # Filtre les snapshots potentiellement invalides ou vides
+        valid_snapshots = [
+            s for s in portfolio_journal 
+            if 'portfolio_data' in s 
+            and isinstance(s['portfolio_data'], pd.DataFrame) 
+            and not s['portfolio_data'].empty
+        ]
+        
+        if not valid_snapshots:
+            st.warning("Le journal historique du portefeuille est vide ou ne contient pas de snapshots valides. Veuillez vous assurer que le portefeuille est correctement enregistré via la page Portefeuille (ou via l'import de données).")
+            return
+
+        # Utilise uniquement les snapshots valides pour la suite
+        portfolio_journal = valid_snapshots
+        # --- FIN DE LA VÉRIFICATION AMÉLIORÉE ---
 
         # 👉 Ajout temporaire d’un ancien snapshot si un seul est disponible
         if len(portfolio_journal) == 1:
             ancien_snapshot = portfolio_journal[0].copy()
             ancien_snapshot["date"] = portfolio_journal[0]["date"] - timedelta(days=7)
+            # S'assurer que portfolio_data est aussi une copie profonde pour éviter les références
+            ancien_snapshot["portfolio_data"] = ancien_snapshot["portfolio_data"].copy() 
             portfolio_journal.insert(0, ancien_snapshot)
         
         # Ensuite on peut calculer les bornes normalement
@@ -56,7 +73,7 @@ def display_performance_history():
             "Sélectionnez la période d'analyse de la performance :",
             value=(min_journal_date, default_end_date),
             min_value=min_journal_date,
-            max_value=today, # Max date can be today
+            max_value=today,
             key="performance_date_range"
         )
 
@@ -70,13 +87,12 @@ def display_performance_history():
 
         # CONVERSION DES DATES AU FORMAT DATETIME.DATETIME POUR LA COMPATIBILITÉ
         start_datetime_perf = datetime.combine(start_date_perf, datetime.min.time())
-        end_datetime_perf = datetime.combine(end_date_perf, datetime.max.time()) # Pour inclure toute la dernière journée
+        end_datetime_perf = datetime.combine(end_date_perf, datetime.max.time())
 
         with st.spinner("Reconstruction de la performance historique (cela peut prendre un certain temps si l'historique est long)..."):
-            # Ici, on appelle la fonction de reconstruction avec les dates converties
             df_reconstructed = reconstruct_historical_performance(
-                start_datetime_perf, # DATE CONVERTIE
-                end_datetime_perf,   # DATE CONVERTIE
+                start_datetime_perf,
+                end_datetime_perf,
                 st.session_state.get("devise_cible", "EUR")
             )
 
@@ -98,7 +114,6 @@ def display_performance_history():
         # Display charts
         st.subheader("Tendances des Valeurs du Portefeuille")
 
-        # Long-form data for Plotly
         df_melted = df_reconstructed.melt(
             id_vars=["Date", "Devise"], 
             value_vars=["Valeur Acquisition", "Valeur Actuelle"],
@@ -139,17 +154,13 @@ def display_performance_history():
         st.plotly_chart(fig_gain_loss_percent, use_container_width=True)
 
 
-    with performance_tabs[1]: # Onglet : Test Historique GLDG (Gardé le même pour la cohérence)
+    with performance_tabs[1]: # Onglet : Test Historique GLDG
         st.subheader("📊 Test de Récupération des Données Historiques GLDG")
         st.write("Cet onglet sert à vérifier spécifiquement la récupération des données historiques de GLDG.")
 
-        # Utilisation de la date du jour comme date de fin par défaut
         today = datetime.now()
-        
-        # Le début de la période pour GLDG
         default_start_date_gldg = today - timedelta(days=30)
         
-        # Sélecteurs de date pour le test GLDG
         start_date_gldg = st.date_input(
             "Date de début (GLDG)",
             value=default_start_date_gldg,
@@ -165,16 +176,12 @@ def display_performance_history():
             key="end_date_gldg_test"
         )
 
-        # Bouton pour lancer la récupération
         if st.button("Récupérer les données GLDG"):
             st.info(f"Tentative de récupération des données pour GLDG du {start_date_gldg.strftime('%Y-%m-%d')} au {end_date_gldg.strftime('%Y-%m-%d')}...")
             
             try:
-                # Appel de votre fonction existante
-                # Assurez-vous que fetch_stock_history attend un objet date et non datetime
-                # Pour être sûr, convertissons-les en datetime si fetch_stock_history l'attend
                 start_dt_gldg = datetime.combine(start_date_gldg, datetime.min.time())
-                end_dt_gldg = datetime.combine(end_date_gldg, datetime.max.time()) # Fin de journée
+                end_dt_gldg = datetime.combine(end_date_gldg, datetime.max.time())
                 
                 historical_prices = fetch_stock_history("GLDG", start_dt_gldg, end_dt_gldg)
 
@@ -190,7 +197,7 @@ def display_performance_history():
                     st.write(f"L'index est un `DatetimeIndex` : `{builtins.isinstance(historical_prices.index, pd.DatetimeIndex)}`")
 
                     st.subheader("Graphique des cours de clôture GLDG")
-                    st.line_chart(historical_prices) # Utilisez l'objet Series directement
+                    st.line_chart(historical_prices)
 
                 else:
                     st.warning(f"❌ Aucune donnée récupérée pour GLDG sur la période spécifiée. "
