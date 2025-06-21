@@ -3,127 +3,104 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+import builtins # IMPORTANT : Explicitement importer builtins pour gérer les problèmes potentiels avec str()
 
-# Import the new modules
-from portfolio_journal import load_portfolio_journal
-from historical_performance_calculator import reconstruct_historical_performance
-from utils import format_fr # Make sure utils.py contains this function
+# Importez uniquement ce qui est nécessaire pour cette version simplifiée
+from historical_data_fetcher import fetch_stock_history 
+from utils import format_fr # Gardez utils pour le formatage, assurez-vous qu'il ne contient pas 'str =' ou 'def str('
 
 def display_performance_history():
     """
-    Displays the portfolio's historical performance with a date filter,
-    recalculating values using historical data.
+    Affiche la performance historique des prix d'un ticker sélectionné.
+    Ceci est une version simplifiée pour le débogage et l'isolation.
     """
-    st.subheader("Reconstruction des Totaux Quotidiens")
+    st.subheader("📊 Performance d'un Symbole Boursier")
+    st.write("Cet onglet vous permet d'afficher la performance historique des prix d'un symbole boursier sélectionné.")
 
-    # Load the portfolio journal
-    portfolio_journal = load_portfolio_journal()
-
-    if not portfolio_journal:
-        st.info("Aucune donnée historique de portefeuille n'a été enregistrée. Chargez un portefeuille et utilisez l'application pour commencer à construire l'historique.")
-        return
-
-    from datetime import date
-
-    # 👉 Ajout temporaire d’un ancien snapshot si un seul est disponible
-    if len(portfolio_journal) == 1:
-        ancien_snapshot = portfolio_journal[0].copy()
-        ancien_snapshot["date"] = portfolio_journal[0]["date"] - timedelta(days=7)
-        portfolio_journal.insert(0, ancien_snapshot)
+    # Définir une liste de tickers courants pour la sélection
+    # Vous pouvez personnaliser cette liste ou la rendre dynamique
+    common_tickers = ["GLDG", "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "BTC-USD", "ETH-USD"]
     
-    # Ensuite on peut calculer les bornes normalement
-    min_journal_date = min(s['date'] for s in portfolio_journal)
-    max_journal_date = (datetime.now() - timedelta(days=1)).date()
+    selected_ticker = st.selectbox(
+        "Sélectionnez un symbole boursier", 
+        options=common_tickers,
+        key="performance_ticker_select" # Clé unique pour ce widget
+    )
 
-    
-    today = datetime.now().date()
-    
-    # Default end date is today or last journal entry, default start date is 6 months ago or min journal date
-    default_end_date = min(today, max_journal_date)
-    default_start_date = max(min_journal_date, default_end_date - timedelta(days=180)) # Last 6 months
+    today = datetime.now()
+    default_end_date = today.date()
+    default_start_date = (today - timedelta(days=90)).date() # Par défaut, les 3 derniers mois
 
     col_start, col_end = st.columns(2)
     with col_start:
         start_date = st.date_input(
             "Date de début", 
             value=default_start_date,
-            min_value=min_journal_date,
-            max_value=default_end_date # Can't start after end
+            min_value=datetime(1990, 1, 1).date(), # Date de début minimale
+            max_value=default_end_date, # Ne peut pas commencer après la date de fin par défaut
+            key="performance_start_date" # Clé unique
         )
     with col_end:
         end_date = st.date_input(
             "Date de fin", 
             value=default_end_date,
-            min_value=start_date, # Must be after start
-            max_value=today
+            min_value=start_date, # Doit être après la date de début sélectionnée
+            max_value=today.date(), # Ne peut pas être dans le futur
+            key="performance_end_date" # Clé unique
         )
 
-    # Ensure start_date is not after end_date
+    # Assurez-vous que la date de début n'est pas après la date de fin
     if start_date > end_date:
         st.error("La date de début ne peut pas être postérieure à la date de fin.")
         return
 
-    target_currency = st.session_state.get("devise_cible", "EUR")
+    # Convertir les objets date en objets datetime pour fetch_stock_history (qui attend des datetimes)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.max.time())
 
-    with st.spinner("Reconstruction de l'historique des performances... Cela peut prendre un certain temps."):
-        df_reconstructed = reconstruct_historical_performance(
-            start_date, end_date, target_currency, portfolio_journal
-        )
+    # Bouton pour lancer la récupération des données
+    if st.button(f"Afficher la performance de {selected_ticker}", key="show_ticker_performance_button"):
+        st.info(f"Récupération des données pour **{selected_ticker}** du **{start_date.strftime('%Y-%m-%d')}** au **{end_date.strftime('%Y-%m-%d')}**...")
+        
+        try:
+            # Appel à fetch_stock_history du module historical_data_fetcher
+            historical_prices = fetch_stock_history(selected_ticker, start_dt, end_dt)
 
-    if df_reconstructed.empty:
-        st.warning("Aucune donnée disponible pour la plage de dates sélectionnée ou impossible de reconstruire l'historique.")
-        return
+            if not historical_prices.empty:
+                st.success(f"✅ Données récupérées avec succès pour {selected_ticker}!")
+                st.write("Aperçu des données (5 premières lignes) :")
+                st.dataframe(historical_prices.head(), use_container_width=True)
+                st.write("...")
+                st.write("Aperçu des données (5 dernières lignes) :")
+                st.dataframe(historical_prices.tail(), use_container_width=True)
+                st.write(f"Nombre total de jours : **{builtins.str(len(historical_prices))}**") # Utiliser builtins.str
+                
+                # Utiliser builtins.str pour l'affichage des types par précaution
+                st.write(f"Type de l'objet retourné : `{builtins.str(type(historical_prices))}`")
+                st.write(f"L'index est un `DatetimeIndex` : `{builtins.str(builtins.isinstance(historical_prices.index, pd.DatetimeIndex))}`")
 
-    # Display data in a table
-    st.subheader("Données Historiques Reconstruites")
-    display_currency = df_reconstructed['Devise'].iloc[0] if not df_reconstructed.empty else 'EUR'
+                st.subheader(f"Graphique des cours de clôture de {selected_ticker}")
+                fig = px.line(
+                    historical_prices, 
+                    x=historical_prices.index, 
+                    y=historical_prices.values, 
+                    title=f"Cours de clôture ajusté pour {selected_ticker}",
+                    labels={"x": "Date", "y": "Prix de Clôture Ajusté"}
+                )
+                fig.update_layout(hovermode="x unified")
+                st.plotly_chart(fig, use_container_width=True)
 
-    st.dataframe(df_reconstructed.set_index("Date").style.format({
-        "Valeur Acquisition": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Valeur Actuelle": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Gain/Perte Absolu": lambda x: f"{format_fr(x, 2)} {display_currency}",
-        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %"
-    }), use_container_width=True)
-
-    # Display charts
-    st.subheader("Tendances des Valeurs du Portefeuille")
-
-    # Long-form data for Plotly
-    df_melted = df_reconstructed.melt(
-        id_vars=["Date", "Devise"], 
-        value_vars=["Valeur Acquisition", "Valeur Actuelle"],
-        var_name="Type de Valeur", 
-        value_name="Montant"
-    )
-
-    fig_values = px.line(
-        df_melted,
-        x="Date",
-        y="Montant",
-        color="Type de Valeur",
-        title="Évolution des Valeurs du Portefeuille",
-        labels={"Montant": f"Montant ({display_currency})", "Date": "Date"}
-    )
-    fig_values.update_layout(hovermode="x unified")
-    st.plotly_chart(fig_values, use_container_width=True)
-
-    st.subheader("Tendance du Gain/Perte")
-    fig_gain_loss = px.line(
-        df_reconstructed,
-        x="Date",
-        y="Gain/Perte Absolu",
-        title="Évolution du Gain/Perte Absolu Quotidien",
-        labels={"Gain/Perte Absolu": f"Gain/Perte Absolu ({display_currency})", "Date": "Date"}
-    )
-    fig_gain_loss.update_layout(hovermode="x unified")
-    st.plotly_chart(fig_gain_loss, use_container_width=True)
-
-    fig_gain_loss_percent = px.line(
-        df_reconstructed,
-        x="Date",
-        y="Gain/Perte (%)",
-        title="Évolution du Gain/Perte Quotidien (%)",
-        labels={"Gain/Perte (%)": "Gain/Perte (%)", "Date": "Date"}
-    )
-    fig_gain_loss_percent.update_layout(hovermode="x unified")
-    st.plotly_chart(fig_gain_loss_percent, use_container_width=True)
+            else:
+                st.warning(f"❌ Aucune donnée récupérée pour {selected_ticker} sur la période spécifiée. "
+                           "Vérifiez le symbole boursier ou la période, et votre connexion à Yahoo Finance.")
+        except Exception as e:
+            st.error(f"❌ Une erreur est survenue lors de la récupération des données : {builtins.str(e)}")
+            # Maintenir la vérification explicite de l'erreur str()
+            if "str' object is not callable" in builtins.str(e):
+                st.error("⚠️ **Confirmation :** L'erreur `str() object is not callable` persiste. Cela indique fortement "
+                         "qu'une variable ou fonction nommée `str` est définie ailleurs dans votre code, "
+                         "écrasant la fonction native de Python. **La recherche globale `str = ` est impérative.**")
+            elif "No data found" in builtins.str(e) or "empty DataFrame" in builtins.str(e):
+                 st.warning("Yahoo Finance n'a pas retourné de données. Le symbole boursier est-il valide ? La période est-elle trop courte ou dans le futur ?")
+            else:
+                st.error(f"Détail de l'erreur : {builtins.str(e)}")
