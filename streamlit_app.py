@@ -18,7 +18,7 @@ from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change, actualiser_taux_change
 from parametres import afficher_parametres_globaux # La fonction qui gère tous les paramètres globaux
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal # Nouveau import
-# from historical_data_fetcher import get_all_historical_data # Non nécessaire ici directement
+from historical_data_fetcher import fetch_stock_history # Importez fetch_stock_history
 # from historical_performance_calculator import reconstruct_historical_performance # Non nécessaire ici directement
 from data_loader import load_data, save_data # Nécessaire si vous avez une fonction de sauvegarde du df initial
 from utils import safe_escape, format_fr # Assurez-vous que ces fonctions sont présentes
@@ -271,8 +271,9 @@ def main():
     
         if st.button("Récupérer les données GLDG"):
             ticker = "GLDG"
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=30) # Les 30 derniers jours
+            # Correct use of datetime.datetime and datetime.timedelta
+            end_date = datetime.datetime.now().date()
+            start_date = end_date - datetime.timedelta(days=30) # Les 30 derniers jours
     
             st.info(f"Tentative de récupération des données pour **{ticker}** du **{start_date}** au **{end_date}**...")
     
