@@ -37,7 +37,7 @@ def display_performance_history():
         index=0,  # Default to first ticker
         help="Choisissez un ticker pour afficher son historique."
     )
-    test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
+    test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 3650, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
         import datetime as dt_test
