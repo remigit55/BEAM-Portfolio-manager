@@ -305,7 +305,7 @@ def main():
 
 
     st.markdown("---")
-   st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
+    st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
     st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
 
     test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="MSFT")
