@@ -6,7 +6,6 @@ from datetime import datetime
 import requests
 import json
 import streamlit as st
-import builtins  # Pour garantir l’accès à str natif même s’il a été écrasé ailleurs
 
 # Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
