@@ -13,7 +13,7 @@ import yfinance as yf
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
-from performance import display_performance_history # Nom de la fonction mis à jour
+# from performance import display_performance_history # Nom de la fonction mis à jour
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change, actualiser_taux_change
