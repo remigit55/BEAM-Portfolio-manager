@@ -308,7 +308,7 @@ def main():
     st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
     st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
 
-    test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="GLDG")
+    test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="MSFT")
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
