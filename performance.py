@@ -15,7 +15,10 @@ def display_performance_history():
     Affiche la performance historique des prix d'un ticker sélectionné.
     Ceci est une version simplifiée pour le débogage et l'isolation.
     """
-    test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="GLDG")
+    tickers_input = st.text_input(
+        "Entrez des symboles boursiers (séparés par des virgules, ex: MSFT,AAPL,GLDG)",
+        value="GLDG,MSFT,AAPL"
+    )
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
