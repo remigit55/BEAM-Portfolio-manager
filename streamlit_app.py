@@ -319,5 +319,5 @@ def main():
             else:
                 st.error(f"Détail de l'erreur : {builtins.str(e)}")
     
-if __name__ == "__main__":
+    if __name__ == "__main__":
     main()
