@@ -178,8 +178,7 @@ def main():
         "OD Comptables",
         "Transactions",
         "Taux de change",
-        "Paramètres",
-        "Test Historique GLDG"
+        "Paramètres"
     ])
 
     # Onglet : Synthèse
@@ -265,46 +264,10 @@ def main():
         # et mettre à jour st.session_state.df, st.session_state.uploaded_file_id et st.session_state.devise_cible
         afficher_parametres_globaux() 
 
-    # Onglet : Test Historique GLDG (AJOUTEZ CE BLOC)
-    with onglets[7]: # L'index dépend du nombre d'onglets que vous avez avant
-        st.header("Test de Récupération de l'Historique GLDG")
-        st.write("Ceci est un onglet temporaire pour vérifier la récupération des cours de clôture de GLDG.")
-    
-        if st.button("Récupérer les données GLDG"):
-            ticker = "GLDG"
-            # Correct use of datetime.datetime and datetime.timedelta
-            end_date = datetime.datetime.now().date()
-            start_date = end_date - datetime.timedelta(days=30) # Les 30 derniers jours
-    
-            st.info(f"Tentative de récupération des données pour **{ticker}** du **{start_date}** au **{end_date}**...")
-    
-            try:
-                historical_prices = fetch_stock_history(ticker, start_date, end_date)
-    
-                if not historical_prices.empty:
-                    st.success(f"Données récupérées avec succès pour {ticker}!")
-                    st.write("Aperçu des données :")
-                    st.dataframe(historical_prices.head())
-                    st.write("...")
-                    st.dataframe(historical_prices.tail())
-                    st.write(f"Nombre total de jours : **{len(historical_prices)}**")
-                    st.write(f"Type de l'objet retourné : `{type(historical_prices)}`")
-                    st.write(f"L'index est un `DatetimeIndex` : `{isinstance(historical_prices.index, pd.DatetimeIndex)}`")
-    
-                    # Optionnel : Afficher un graphique simple
-                    st.subheader("Graphique des cours de clôture GLDG")
-                    st.line_chart(historical_prices) # Utilisez l'objet Series directement
-    
-                else:
-                    st.warning(f"Aucune donnée récupérée pour {ticker} sur la période spécifiée. "
-                               "Vérifiez le ticker ou la période, et votre connexion à Yahoo Finance.")
-            except Exception as e:
-                st.error(f"Une erreur est survenue lors de la récupération des données : {e}")
-    
-    # ... (le reste de votre fichier streamlit_app.py) ...
-
-
+   
     st.markdown("---")
+
+    
     st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
     st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
 
