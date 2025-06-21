@@ -1,16 +1,13 @@
 # historical_performance_calculator.py
-
 import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
 
-# Import the necessary function from historical_data_fetcher.py
-from historical_data_fetcher import get_all_historical_data
+# from historical_data_fetcher import get_all_historical_data # Will be called from here
 
 def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, historical_fx, target_currency):
     """
     Calcule la valeur du portefeuille pour une date donnée en utilisant les cours et taux historiques.
-    Inclut des vérifications de robustesse pour les types de données.
     """
     df_snapshot = snapshot_data['portfolio_data']
     current_date_str = date.strftime("%Y-%m-%d")
@@ -18,171 +15,120 @@ def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, hist
     daily_portfolio_value_acquisition = 0.0
     daily_portfolio_value_current = 0.0
 
-    for index, row in df_snapshot.iterrows():
-        # --- Vérifications défensives pour les types et les valeurs manquantes ---
-        
-        # Ticker
+    for _, row in df_snapshot.iterrows():
         ticker = row.get("Ticker")
-        if not isinstance(ticker, str) or not ticker.strip(): # S'assurer que c'est une chaîne non vide
-            # print(f"DEBUG: Skipping row {index} due to invalid Ticker: '{ticker}' (type: {type(ticker)})")
-            continue # Ignorer cette ligne si le ticker est invalide
+        quantity = row.get("Quantité", 0)
+        acquisition_price = row.get("Acquisition", 0)
+        source_currency = row.get("Devise", target_currency).upper() # Default to target_currency if not specified
 
-        # Quantité
-        quantity = pd.to_numeric(row.get("Quantité"), errors='coerce')
-        if pd.isna(quantity) or quantity <= 0: # Gérer les NaN et les quantités non positives
-            # print(f"DEBUG: Skipping row {index} for Ticker '{ticker}' due to invalid Quantity: '{row.get('Quantité')}' (converted to {quantity})")
+        if pd.isna(quantity) or quantity == 0:
             continue
 
-        # Prix d'Acquisition
-        acquisition_price = pd.to_numeric(row.get("Acquisition"), errors='coerce')
-        if pd.isna(acquisition_price):
-            # print(f"DEBUG: Setting Acquisition Price to 0 for Ticker '{ticker}' due to invalid value: '{row.get('Acquisition')}'")
-            acquisition_price = 0.0 # Défaut à 0.0 si le prix d'acquisition est invalide/manquant
-
-        # Devise source
-        source_currency = row.get("Devise", target_currency)
-        if not isinstance(source_currency, str) or not source_currency.strip():
-            # print(f"DEBUG: Defaulting Source Currency to '{target_currency}' for Ticker '{ticker}' due to invalid value: '{row.get('Devise')}'")
-            source_currency = target_currency # Défaut à la devise cible si invalide
-        source_currency = source_currency.upper() # Uniformiser la casse
-
-        # --- Récupération des cours historiques ---
+        # Get historical current price for the ticker
         current_price = np.nan
-        if ticker in historical_prices:
-            # Vérifier que l'objet dans historical_prices est bien une Series Pandas
-            if isinstance(historical_prices[ticker], pd.Series):
-                # Vérifier si la date est présente dans l'index de la série
-                if current_date_str in historical_prices[ticker].index:
-                    current_price = historical_prices[ticker].loc[current_date_str]
-                # else:
-                    # print(f"DEBUG: Date '{current_date_str}' not found in historical prices for '{ticker}'.")
-            # else:
-                # print(f"DEBUG: historical_prices['{ticker}'] is not a pandas Series (type: {type(historical_prices[ticker])}).")
-        # else:
-            # print(f"DEBUG: Ticker '{ticker}' not found in historical_prices.")
+        if ticker and ticker in historical_prices and current_date_str in historical_prices[ticker].index:
+            current_price = historical_prices[ticker].loc[current_date_str]
         
-        if pd.isna(current_price): 
-            current_price = acquisition_price # Retour au prix d'acquisition si le cours actuel n'est pas trouvé
-
-
-        # --- Récupération des taux de change historiques ---
+        if pd.isna(current_price): # If no specific price, use acquisition price for current value (conservative)
+             current_price = acquisition_price # Or skip this asset if you prefer
+             
+        # Get historical FX rate for conversion
         fx_rate = 1.0
         if source_currency != target_currency:
-            fx_key = (source_currency, target_currency)
-            if fx_key in historical_fx:
-                if isinstance(historical_fx[fx_key], pd.Series):
-                    if current_date_str in historical_fx[fx_key].index:
-                        fx_rate = historical_fx[fx_key].loc[current_date_str]
-                    # else:
-                        # print(f"DEBUG: Date '{current_date_str}' not found in FX rates for {fx_key}.")
-                # else:
-                    # print(f"DEBUG: historical_fx[{fx_key}] is not a pandas Series (type: {type(historical_fx[fx_key])}).")
+            fx_key = f"{source_currency}/{target_currency}"
+            if fx_key in historical_fx and current_date_str in historical_fx[fx_key].index:
+                fx_rate = historical_fx[fx_key].loc[current_date_str]
             else:
-                # Tente de trouver le taux inverse si le taux direct n'existe pas
-                reverse_fx_key = (target_currency, source_currency)
-                if reverse_fx_key in historical_fx and isinstance(historical_fx[reverse_fx_key], pd.Series):
-                    if current_date_str in historical_fx[reverse_fx_key].index:
-                        reverse_rate = historical_fx[reverse_fx_key].loc[current_date_str]
-                        if reverse_rate != 0 and not pd.isna(reverse_rate):
-                            fx_rate = 1.0 / reverse_rate
-                        # else:
-                            # print(f"DEBUG: Reverse FX rate for {reverse_fx_key} is 0 or NaN on {current_date_str}. Using default 1.0.")
-                    # else:
-                        # print(f"DEBUG: Date '{current_date_str}' not found in reverse FX rates for {reverse_fx_key}.")
-                # else:
-                    # print(f"DEBUG: FX pair {fx_key} or {reverse_fx_key} not found in historical_fx or not a Series.")
-            
-            if pd.isna(fx_rate): # Assurer que fx_rate est numérique après toutes les tentatives
-                fx_rate = 1.0
-                # print(f"DEBUG: Using default FX rate 1.0 for {source_currency} to {target_currency} on {current_date_str} due to missing data.")
+                # Fallback: if FX rate not found, treat as 1:1 conversion (warn user if this happens often)
+                # st.warning(f"FX rate for {fx_key} not found for {current_date_str}. Using 1:1 conversion.")
+                fx_rate = 1.0 
 
+        # Calculate values in source currency
+        value_acquisition_source_curr = quantity * acquisition_price
+        value_current_source_curr = quantity * current_price
 
-        # --- Calcul des valeurs quotidiennes ---
-        # S'assurer que toutes les valeurs sont numériques avant la multiplication
-        daily_portfolio_value_acquisition += (quantity * acquisition_price) * fx_rate
-        daily_portfolio_value_current += (quantity * current_price) * fx_rate
-    
+        # Convert to target currency
+        daily_portfolio_value_acquisition += value_acquisition_source_curr * fx_rate
+        daily_portfolio_value_current += value_current_source_curr * fx_rate
+
     return daily_portfolio_value_acquisition, daily_portfolio_value_current
 
 
-def reconstruct_historical_performance(start_date, end_date, target_currency):
+def reconstruct_historical_performance(start_date, end_date, target_currency, portfolio_journal):
     """
-    Reconstruit l'historique de la performance du portefeuille entre deux dates.
+    Reconstruit l'historique de la valeur du portefeuille sur une plage de dates.
     """
-    # Importation locale pour éviter les dépendances circulaires
-    # (portfolio_journal.py pourrait importer historical_performance_calculator.py si on y sauvait des totaux)
-    from portfolio_journal import load_portfolio_journal 
-    
-    portfolio_journal = load_portfolio_journal()
-
-    # Filtrer les snapshots potentiellement invalides (par ex., si 'portfolio_data' n'est pas un DataFrame)
-    # Cette logique de filtre doit être cohérente avec performance.py
-    valid_snapshots = [
-        s for s in portfolio_journal
-        if 'portfolio_data' in s
-        and isinstance(s['portfolio_data'], pd.DataFrame)
-        and not s['portfolio_data'].empty
-    ]
-    portfolio_journal = valid_snapshots # Utiliser uniquement les snapshots valides
-
     if not portfolio_journal:
         return pd.DataFrame()
 
-    # Trier les snapshots par date
-    portfolio_journal.sort(key=lambda x: x['date'])
-
-    # Récupérer les tickers et devises uniques de tous les snapshots pour la récupération des données
+    # Get all unique tickers and currencies from the entire journal
     all_tickers = set()
     all_currencies = set()
     for snapshot in portfolio_journal:
-        # S'assurer que les colonnes 'Ticker' et 'Devise' existent et sont gérées
-        if 'Ticker' in snapshot['portfolio_data'].columns:
-            # Convertir en string et supprimer les espaces pour les tickers
-            all_tickers.update(snapshot['portfolio_data']['Ticker'].dropna().astype(str).str.strip().unique())
-        if 'Devise' in snapshot['portfolio_data'].columns:
-            # Convertir en string et supprimer les espaces pour les devises
-            all_currencies.update(snapshot['portfolio_data']['Devise'].dropna().astype(str).str.strip().unique())
+        df_snap = snapshot['portfolio_data']
+        if 'Ticker' in df_snap.columns:
+            all_tickers.update(df_snap['Ticker'].dropna().unique())
+        if 'Devise' in df_snap.columns:
+            all_currencies.update(df_snap['Devise'].dropna().unique())
     
-    tickers = list(all_tickers)
-    currencies = list(all_currencies)
+    # Import here to avoid circular dependencies if historical_data_fetcher needs calculator later
+    from historical_data_fetcher import get_all_historical_data
+    
+    # Fetch all necessary historical data once
+    historical_prices, historical_fx = get_all_historical_data(
+        list(all_tickers), list(all_currencies), start_date, end_date, target_currency
+    )
 
-    # Récupérer toutes les données historiques nécessaires
-    # start_date et end_date sont déjà des objets datetime.datetime ici
-    historical_prices, historical_fx = get_all_historical_data(tickers, currencies, start_date, end_date, target_currency)
+    # Prepare a date range for the reconstruction
+    # Only consider dates where we have a snapshot or an active portfolio state
+    relevant_dates = sorted(list(set([s['date'] for s in portfolio_journal] + 
+                                     [d.date() for d in pd.bdate_range(start_date, end_date)])))
+    
+    # Filter dates to be within the requested range
+    relevant_dates = [d for d in relevant_dates if start_date <= d <= end_date]
 
+    # Initialize results
     historical_data = []
     
-    # Générer une plage de jours ouvrables pour la période d'analyse
-    # S'assurer que start_date et end_date sont des dates pour pd.bdate_range
-    business_days = pd.bdate_range(start_date.date(), end_date.date())
+    # Find the earliest snapshot that is before or on the start_date
+    current_snapshot_index = -1
+    for i, snapshot in enumerate(portfolio_journal):
+        if snapshot['date'] <= start_date:
+            current_snapshot_index = i
+        else:
+            break
+    
+    if current_snapshot_index == -1: # No snapshot before or on start_date
+        # Try to find the first snapshot available
+        if portfolio_journal:
+            current_snapshot_index = 0
+        else:
+            return pd.DataFrame() # No data at all
 
-    current_snapshot_index = 0
-    # Initialiser avec le premier snapshot valide
-    if portfolio_journal:
-        current_portfolio_state = portfolio_journal[current_snapshot_index]
-    else:
-        return pd.DataFrame() # Pas de snapshots, retourner un DataFrame vide
+    current_portfolio_state = portfolio_journal[current_snapshot_index]
 
+    # Iterate through each business day in the desired range
+    for single_date in pd.bdate_range(start_date, end_date):
+        date_as_date = single_date.date()
 
-    for date_as_date in business_days:
-        # Avancer l'état du portefeuille si un nouveau snapshot est disponible pour cette date ou avant
+        # Update the portfolio state if a new snapshot is available for this date or before
         while current_snapshot_index + 1 < len(portfolio_journal) and \
               portfolio_journal[current_snapshot_index + 1]['date'] <= date_as_date:
             current_snapshot_index += 1
             current_portfolio_state = portfolio_journal[current_snapshot_index]
 
-        # Calculer les valeurs pour la date actuelle en utilisant le current_portfolio_state
+        # Calculate values for the current date using the current_portfolio_state
         daily_acquisition, daily_current = calculate_daily_portfolio_value(
             current_portfolio_state, date_as_date, historical_prices, historical_fx, target_currency
         )
         
-        # Ajouter aux résultats si nous avons des données valides (par ex., pas tous des NaNs)
+        # Add to results if we have valid data
         if not (np.isnan(daily_acquisition) or np.isnan(daily_current)):
             historical_data.append({
                 "Date": date_as_date,
                 "Valeur Acquisition": daily_acquisition,
                 "Valeur Actuelle": daily_current,
-                "Devise": target_currency # Stocker la devise cible utilisée pour ce jour
+                "Devise": target_currency # Store the target currency used for this day
             })
     
     if not historical_data:
@@ -194,8 +140,4 @@ def reconstruct_historical_performance(start_date, end_date, target_currency):
         lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
         axis=1
     )
-    
-    # Formater la colonne Date en chaîne de caractères YYYY-MM-DD pour la cohérence de l'affichage si nécessaire
-    df_reconstructed["Date"] = df_reconstructed["Date"].dt.strftime("%Y-%m-%d")
-
     return df_reconstructed
