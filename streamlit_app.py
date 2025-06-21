@@ -178,8 +178,7 @@ def main():
         "OD Comptables",
         "Transactions",
         "Taux de change",
-        "Paramètres",
-        "Test Historique GLDG"
+        "Paramètres"
     ])
 
     # Onglet : Synthèse
