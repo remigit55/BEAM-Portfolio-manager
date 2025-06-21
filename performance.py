@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
+import yfinance as yf
 import builtins # IMPORTANT : Explicitement importer builtins pour gérer les problèmes potentiels avec str()
 
 # Importez uniquement ce qui est nécessaire pour cette version simplifiée
