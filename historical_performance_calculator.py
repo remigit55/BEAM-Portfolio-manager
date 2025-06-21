@@ -4,7 +4,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import numpy as np
 
-# from historical_data_fetcher import get_all_historical_data # Will be called from here
+# Import the necessary function from historical_data_fetcher.py
+from historical_data_fetcher import get_all_historical_data
 
 def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, historical_fx, target_currency):
     """
@@ -12,8 +13,6 @@ def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, hist
     Inclut des vérifications de robustesse pour les types de données.
     """
     df_snapshot = snapshot_data['portfolio_data']
-    # Assurez-vous que l'index de df_snapshot est un DatetimeIndex si nécessaire,
-    # bien que .iterrows() ne dépende pas de l'index.
     current_date_str = date.strftime("%Y-%m-%d")
 
     daily_portfolio_value_acquisition = 0.0
@@ -107,5 +106,96 @@ def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, hist
 
 
 def reconstruct_historical_performance(start_date, end_date, target_currency):
-    # ... (le reste de la fonction reconstruct_historical_performance reste inchangé) ...
-    # Assurez-vous que cette fonction appelle la version mise à jour de calculate_daily_portfolio_value
+    """
+    Reconstruit l'historique de la performance du portefeuille entre deux dates.
+    """
+    # Importation locale pour éviter les dépendances circulaires
+    # (portfolio_journal.py pourrait importer historical_performance_calculator.py si on y sauvait des totaux)
+    from portfolio_journal import load_portfolio_journal 
+    
+    portfolio_journal = load_portfolio_journal()
+
+    # Filtrer les snapshots potentiellement invalides (par ex., si 'portfolio_data' n'est pas un DataFrame)
+    # Cette logique de filtre doit être cohérente avec performance.py
+    valid_snapshots = [
+        s for s in portfolio_journal
+        if 'portfolio_data' in s
+        and isinstance(s['portfolio_data'], pd.DataFrame)
+        and not s['portfolio_data'].empty
+    ]
+    portfolio_journal = valid_snapshots # Utiliser uniquement les snapshots valides
+
+    if not portfolio_journal:
+        return pd.DataFrame()
+
+    # Trier les snapshots par date
+    portfolio_journal.sort(key=lambda x: x['date'])
+
+    # Récupérer les tickers et devises uniques de tous les snapshots pour la récupération des données
+    all_tickers = set()
+    all_currencies = set()
+    for snapshot in portfolio_journal:
+        # S'assurer que les colonnes 'Ticker' et 'Devise' existent et sont gérées
+        if 'Ticker' in snapshot['portfolio_data'].columns:
+            # Convertir en string et supprimer les espaces pour les tickers
+            all_tickers.update(snapshot['portfolio_data']['Ticker'].dropna().astype(str).str.strip().unique())
+        if 'Devise' in snapshot['portfolio_data'].columns:
+            # Convertir en string et supprimer les espaces pour les devises
+            all_currencies.update(snapshot['portfolio_data']['Devise'].dropna().astype(str).str.strip().unique())
+    
+    tickers = list(all_tickers)
+    currencies = list(all_currencies)
+
+    # Récupérer toutes les données historiques nécessaires
+    # start_date et end_date sont déjà des objets datetime.datetime ici
+    historical_prices, historical_fx = get_all_historical_data(tickers, currencies, start_date, end_date, target_currency)
+
+    historical_data = []
+    
+    # Générer une plage de jours ouvrables pour la période d'analyse
+    # S'assurer que start_date et end_date sont des dates pour pd.bdate_range
+    business_days = pd.bdate_range(start_date.date(), end_date.date())
+
+    current_snapshot_index = 0
+    # Initialiser avec le premier snapshot valide
+    if portfolio_journal:
+        current_portfolio_state = portfolio_journal[current_snapshot_index]
+    else:
+        return pd.DataFrame() # Pas de snapshots, retourner un DataFrame vide
+
+
+    for date_as_date in business_days:
+        # Avancer l'état du portefeuille si un nouveau snapshot est disponible pour cette date ou avant
+        while current_snapshot_index + 1 < len(portfolio_journal) and \
+              portfolio_journal[current_snapshot_index + 1]['date'] <= date_as_date:
+            current_snapshot_index += 1
+            current_portfolio_state = portfolio_journal[current_snapshot_index]
+
+        # Calculer les valeurs pour la date actuelle en utilisant le current_portfolio_state
+        daily_acquisition, daily_current = calculate_daily_portfolio_value(
+            current_portfolio_state, date_as_date, historical_prices, historical_fx, target_currency
+        )
+        
+        # Ajouter aux résultats si nous avons des données valides (par ex., pas tous des NaNs)
+        if not (np.isnan(daily_acquisition) or np.isnan(daily_current)):
+            historical_data.append({
+                "Date": date_as_date,
+                "Valeur Acquisition": daily_acquisition,
+                "Valeur Actuelle": daily_current,
+                "Devise": target_currency # Stocker la devise cible utilisée pour ce jour
+            })
+    
+    if not historical_data:
+        return pd.DataFrame()
+
+    df_reconstructed = pd.DataFrame(historical_data)
+    df_reconstructed["Gain/Perte Absolu"] = df_reconstructed["Valeur Actuelle"] - df_reconstructed["Valeur Acquisition"]
+    df_reconstructed["Gain/Perte (%)"] = df_reconstructed.apply(
+        lambda row: (row["Gain/Perte Absolu"] / row["Valeur Acquisition"]) * 100 if row["Valeur Acquisition"] != 0 else 0,
+        axis=1
+    )
+    
+    # Formater la colonne Date en chaîne de caractères YYYY-MM-DD pour la cohérence de l'affichage si nécessaire
+    df_reconstructed["Date"] = df_reconstructed["Date"].dt.strftime("%Y-%m-%d")
+
+    return df_reconstructed
