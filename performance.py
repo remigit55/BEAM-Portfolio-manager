@@ -1,3 +1,5 @@
+# performance.py
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,14 +11,30 @@ from utils import format_fr
 
 def display_performance_history():
     """
-    Affiche la performance historique des prix d'un ticker sélectionné.
+    Affiche la performance historique des prix d'un ticker sélectionné dans le portefeuille.
     Version simplifiée pour le débogage et l'isolation.
     """
     st.subheader("Test de Performance Historique")
+
+    # Get tickers from portfolio
+    tickers = []
+    if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
+        tickers = sorted(st.session_state.df['Ticker'].dropna().unique())
+    
+    if not tickers:
+        st.warning("Aucun ticker trouvé dans le portefeuille. Veuillez importer un fichier CSV via l'onglet 'Paramètres'.")
+        test_ticker = st.selectbox(
+            "Sélectionnez un symbole boursier",
+            options=["Aucun ticker disponible"],
+            index=0,
+            disabled=True
+        )
+        return
+
     test_ticker = st.selectbox(
-        "Sélectionnez un symbole boursier",
-        options=["GLDG", "MSFT", "AAPL"],
-        index=0,  # Default to "GLDG"
+        "Sélectionnez un symbole boursier du portefeuille",
+        options=tickers,
+        index=0,  # Default to first ticker
         help="Choisissez un ticker pour afficher son historique."
     )
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
