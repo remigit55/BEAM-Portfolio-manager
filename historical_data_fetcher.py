@@ -39,22 +39,24 @@ def fetch_stock_history(Ticker, start_date, end_date):
 
 
 @st.cache_data(ttl=3600)
-def fetch_stock_history_direct_api(Ticker, start_date, end_date):
+def fetch_stock_history_direct_api(ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné
-    en appelant directement l'API de Yahoo Finance.
+    en utilisant l'API directe de Yahoo Finance (pour les cas où yf.download pose problème).
     """
-    if not isinstance(Ticker, builtins.str): # Use builtins.str
-        st.warning(f"Ticker mal formé pour l'API directe : {Ticker} (type: {type(Ticker)})")
-        return pd.Series(dtype='float64')
+    try:
+        if not isinstance(ticker, str):
+            st.warning(f"Ticker mal formé : {ticker} (type: {type(ticker)})")
+            return pd.Series(dtype='float64')
 
-    base_url = "https://query1.finance.yahoo.com/v8/finance/chart/"
-    
-    # Yahoo Finance API expects Unix timestamps (seconds since epoch)
-    start_timestamp = int(start_date.timestamp())
-    # Add one day to end_date to ensure the last day's data is included,
-    # as Yahoo API's 'end' parameter is exclusive for daily data.
-    end_timestamp = int((end_date + timedelta(days=1)).timestamp())
+        # Convert date objects to datetime objects for timestamp() method
+        if isinstance(start_date, datetime.date) and not isinstance(start_date, datetime):
+            start_date = datetime.combine(start_date, time.min) # Use time.min for start of day
+        if isinstance(end_date, datetime.date) and not isinstance(end_date, datetime):
+            end_date = datetime.combine(end_date, time.max) # Use time.max for end of day
+
+        start_timestamp = int(start_date.timestamp())
+        end_timestamp = int(end_date.timestamp())
 
     # 'interval' can be '1d', '1wk', '1mo', etc. 'range' for the period.
     # We'll use '1d' for daily data.
