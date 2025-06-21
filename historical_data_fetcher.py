@@ -2,7 +2,7 @@
 
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta # Import timedelta
+from datetime import datetime, timedelta, time # Import time as well
 import requests
 import json
 import streamlit as st
@@ -16,7 +16,7 @@ def fetch_stock_history(Ticker, start_date, end_date):
     """
     try:
         if not isinstance(Ticker, builtins.str): # Use builtins.str
-            st.warning(f"Ticker mal formé : {Ticker} (type: {type(Ticker)})")
+            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker))})")
             return pd.Series(dtype='float64')
         
         # This check for callable(yf.download) is good for debugging, keep it.
@@ -39,24 +39,29 @@ def fetch_stock_history(Ticker, start_date, end_date):
 
 
 @st.cache_data(ttl=3600)
-def fetch_stock_history_direct_api(ticker, start_date, end_date):
+def fetch_stock_history_direct_api(Ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné
-    en utilisant l'API directe de Yahoo Finance (pour les cas où yf.download pose problème).
+    en appelant directement l'API de Yahoo Finance.
     """
-    try:
-        if not isinstance(ticker, str):
-            st.warning(f"Ticker mal formé : {ticker} (type: {type(ticker)})")
-            return pd.Series(dtype='float64')
+    if not isinstance(Ticker, builtins.str): # Use builtins.str
+        st.warning(f"Ticker mal formé pour l'API directe : {Ticker} (type: {builtins.str(type(Ticker))})")
+        return pd.Series(dtype='float64')
 
-        # Convert date objects to datetime objects for timestamp() method
-        if isinstance(start_date, datetime.date) and not isinstance(start_date, datetime):
-            start_date = datetime.combine(start_date, time.min) # Use time.min for start of day
-        if isinstance(end_date, datetime.date) and not isinstance(end_date, datetime):
-            end_date = datetime.combine(end_date, time.max) # Use time.max for end of day
+    base_url = "https://query1.finance.yahoo.com/v8/finance/chart/"
+    
+    # Convert date objects to datetime objects for timestamp() method
+    # It's good practice to ensure they are datetime objects, as .timestamp() is a datetime method.
+    if isinstance(start_date, datetime.date) and not isinstance(start_date, datetime):
+        start_date = datetime.combine(start_date, time.min) # Use time.min for start of day
+    if isinstance(end_date, datetime.date) and not isinstance(end_date, datetime):
+        end_date = datetime.combine(end_date, time.max) # Use time.max for end of day
 
-        start_timestamp = int(start_date.timestamp())
-        end_timestamp = int(end_date.timestamp())
+    # Yahoo Finance API expects Unix timestamps (seconds since epoch)
+    start_timestamp = int(start_date.timestamp())
+    # Add one day to end_date to ensure the last day's data is included,
+    # as Yahoo API's 'end' parameter is exclusive for daily data.
+    end_timestamp = int((end_date + timedelta(days=1)).timestamp())
 
     # 'interval' can be '1d', '1wk', '1mo', etc. 'range' for the period.
     # We'll use '1d' for daily data.
@@ -94,7 +99,8 @@ def fetch_stock_history_direct_api(ticker, start_date, end_date):
         
         # Filter dates to be strictly within the requested start_date and end_date
         # The Yahoo API might return data slightly outside the range, so we refine it.
-        prices = prices[(prices.index.date >= start_date) & (prices.index.date <= end_date)]
+        prices = prices[(prices.index.date >= start_date.date()) & (prices.index.date <= end_date.date())]
+
 
         if prices.empty:
             st.warning(f"Aucune donnée valide récupérée pour {Ticker} sur la période spécifiée via l'API directe après filtrage.")
@@ -113,11 +119,6 @@ def fetch_stock_history_direct_api(ticker, start_date, end_date):
     return pd.Series(dtype='float64')
 
 
-# The rest of your file (fetch_historical_fx_rates, get_all_historical_data) remains the same.
-# You will need to decide whether to call fetch_stock_history or fetch_stock_history_direct_api
-# in your get_all_historical_data function.
-# For now, I'll update get_all_historical_data to use the new direct API function by default.
-
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
     """
     Récupère l'ensemble des données historiques nécessaires :
@@ -130,9 +131,9 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
 
     # Récupération des prix
     for ticker in tickers:
-        # !!! IMPORTANT: Switch this line to use the direct API function
+        # !!! IMPORTANT: We are now using the direct API function for stocks
         prices = fetch_stock_history_direct_api(ticker, start_date, end_date)
-        # Or, to revert to yfinance:
+        # If you wanted to switch back to yfinance, uncomment the line below and comment the one above:
         # prices = fetch_stock_history(ticker, start_date, end_date)
 
         if not prices.empty:
@@ -160,7 +161,6 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     return historical_prices, historical_fx
 
 
-# Keep fetch_historical_fx_rates as is, as it uses requests for exchange rates
 @st.cache_data(ttl=3600)
 def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_date):
     """
@@ -168,10 +168,6 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
     """
     if base_currency == target_currency:
         return pd.Series(1.0, index=pd.bdate_range(start_date, end_date), name=f"{base_currency}/{target_currency}")
-
-    # exchangerate.host API is date-based, not timestamp-based.
-    # It also requires fetching day by day for a range if you need specific daily rates.
-    # A simpler approach for historical ranges is to use their 'timeseries' endpoint.
 
     api_url = f"https://api.exchangerate.host/timeseries"
     params = {
