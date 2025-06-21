@@ -303,10 +303,57 @@ def main():
     # ... (le reste de votre fichier streamlit_app.py) ...
 
 
-
-    
-
     st.markdown("---")
+    st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
+    st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
+
+    test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="MSFT")
+    test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
+
+    if st.button("Lancer le test de connexion Yahoo Finance"):
+        start_date = datetime.now() - timedelta(days=test_days_ago)
+        end_date = datetime.now()
+
+        st.info(f"Tentative de récupération des données pour **{test_ticker}** du **{start_date.strftime('%Y-%m-%d')}** au **{end_date.strftime('%Y-%m-%d')}**...")
+        
+        # Importez builtins ici pour s'assurer qu'il est disponible pour ce test spécifique
+        import builtins 
+
+        try:
+            # Appel direct à yf.download pour isoler le test
+            # Utilisez builtins.str et builtins.callable si des doutes subsistent sur leur intégrité
+            data = yf.download(test_ticker, 
+                               start=start_date.strftime('%Y-%m-%d'), 
+                               end=end_date.strftime('%Y-%m-%d'), 
+                               progress=False)
+
+            if not data.empty:
+                st.success(f"✅ Données récupérées avec succès pour {test_ticker}!")
+                st.write("Aperçu des données :")
+                st.dataframe(data.head())
+                st.write("...")
+                st.dataframe(data.tail())
+                st.write(f"Nombre total d'entrées : **{len(data)}**")
+                st.write(f"Type de l'objet retourné : `{builtins.str(type(data))}`")
+                st.write(f"L'index est un `DatetimeIndex` : `{builtins.isinstance(data.index, pd.DatetimeIndex)}`")
+
+                st.subheader("Graphique des cours de clôture")
+                st.line_chart(data['Close'])
+
+            else:
+                st.warning(f"❌ Aucune donnée récupérée pour {test_ticker} sur la période spécifiée. "
+                           "Vérifiez le ticker ou la période, et votre connexion à Yahoo Finance.")
+        except Exception as e:
+            # Ici, nous utilisons builtins.str pour afficher l'erreur, au cas où str() serait toujours écrasé
+            st.error(f"❌ Une erreur est survenue lors de la récupération des données : {builtins.str(e)}")
+            if "str' object is not callable" in builtins.str(e):
+                st.error("⚠️ **Confirmation :** L'erreur `str() object is not callable` persiste. Cela indique fortement "
+                         "qu'une variable ou fonction nommée `str` est définie ailleurs dans votre code, "
+                         "écrasant la fonction native de Python. **La recherche globale `str = ` est impérative.**")
+            elif "No data found" in builtins.str(e) or "empty DataFrame" in builtins.str(e):
+                 st.warning("Yahoo Finance n'a pas retourné de données. Le ticker est-il valide ? La période est-elle trop courte ou dans le futur ?")
+            else:
+                st.error(f"Détail de l'erreur : {builtins.str(e)}")
     
 if __name__ == "__main__":
     main()
