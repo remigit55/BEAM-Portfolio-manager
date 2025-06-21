@@ -8,6 +8,7 @@ from PIL import Image
 import base64
 from io import BytesIO
 import os # Nécessaire pour les opérations de fichiers
+import yfinance as yf
 
 
 # Importation des modules fonctionnels
@@ -304,14 +305,13 @@ def main():
 
 
     st.markdown("---")
-    st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
+   st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
     st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
 
     test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="MSFT")
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
-        # 👉 CHANGEMENT ICI : Importation explicite et renommage pour le test
         import datetime as dt_test
         from datetime import timedelta as td_test
         
@@ -320,12 +320,10 @@ def main():
 
         st.info(f"Tentative de récupération des données pour **{test_ticker}** du **{start_date.strftime('%Y-%m-%d')}** au **{end_date.strftime('%Y-%m-%d')}**...")
         
-        # Importez builtins ici pour s'assurer qu'il est disponible pour ce test spécifique
         import builtins 
 
         try:
-            # Appel direct à yf.download pour isoler le test
-            # Utilisez builtins.str et builtins.callable si des doutes subsistent sur leur intégrité
+            # L'appel à yf.download est maintenant valide car yf est importé au début du fichier
             data = yf.download(test_ticker, 
                                start=start_date.strftime('%Y-%m-%d'), 
                                end=end_date.strftime('%Y-%m-%d'), 
@@ -348,7 +346,6 @@ def main():
                 st.warning(f"❌ Aucune donnée récupérée pour {test_ticker} sur la période spécifiée. "
                            "Vérifiez le ticker ou la période, et votre connexion à Yahoo Finance.")
         except Exception as e:
-            # Ici, nous utilisons builtins.str pour afficher l'erreur, au cas où str() serait toujours écrasé
             st.error(f"❌ Une erreur est survenue lors de la récupération des données : {builtins.str(e)}")
             if "str' object is not callable" in builtins.str(e):
                 st.error("⚠️ **Confirmation :** L'erreur `str() object is not callable` persiste. Cela indique fortement "
