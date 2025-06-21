@@ -311,8 +311,12 @@ def main():
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
-        start_date = datetime.now() - timedelta(days=test_days_ago)
-        end_date = datetime.now()
+        # 👉 CHANGEMENT ICI : Importation explicite et renommage pour le test
+        import datetime as dt_test
+        from datetime import timedelta as td_test
+        
+        start_date = dt_test.datetime.now() - td_test(days=test_days_ago)
+        end_date = dt_test.datetime.now()
 
         st.info(f"Tentative de récupération des données pour **{test_ticker}** du **{start_date.strftime('%Y-%m-%d')}** au **{end_date.strftime('%Y-%m-%d')}**...")
         
