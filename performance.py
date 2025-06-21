@@ -15,10 +15,29 @@ def display_performance_history():
     Affiche la performance historique des prix d'un ticker sélectionné.
     Ceci est une version simplifiée pour le débogage et l'isolation.
     """
-    st.subheader("🛠️ Outil de Test Yahoo Finance (temporaire)")
-    st.write("Utilisez cet outil pour vérifier la connectivité de l'application à Yahoo Finance.")
+        st.write("Sélectionnez un symbole boursier de votre portefeuille pour afficher son historique de prix.")
 
-    test_ticker = st.text_input("Entrez un symbole boursier pour le test (ex: MSFT, AAPL, GLDG)", value="GLDG")
+    if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
+        st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' pour charger votre portefeuille et afficher les tickers disponibles.")
+        return
+
+    # Extraire les tickers uniques du DataFrame du portefeuille
+    # Assurez-vous que la colonne 'Ticker' existe et n'est pas vide
+    if 'Ticker' in st.session_state.df.columns and not st.session_state.df['Ticker'].empty:
+        # Convertir en string avant unique() pour gérer les types mixtes si nécessaire
+        # Filtrer les valeurs vides ou NaN après la conversion
+        unique_tickers = [
+            t for t in st.session_state.df['Ticker'].astype(builtins.str).unique().tolist() 
+            if builtins.isinstance(t, builtins.str) and t.strip() # Ensure it's a non-empty string
+        ]
+        
+        if not unique_tickers:
+            st.warning("Aucun symbole boursier valide trouvé dans votre portefeuille pour la sélection.")
+            return
+    else:
+        st.warning("La colonne 'Ticker' est introuvable ou vide dans votre portefeuille. Assurez-vous d'avoir une colonne 'Ticker' dans votre fichier importé.")
+        return
+        
     test_days_ago = st.slider("Nombre de jours d'historique à récupérer", 1, 365, 30)
 
     if st.button("Lancer le test de connexion Yahoo Finance"):
