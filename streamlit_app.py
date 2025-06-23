@@ -16,7 +16,7 @@ from performance import display_performance_history
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change
-from data_fetcher import fetch_fx_rates  # Updated import
+from data_fetcher import fetch_fx_rates
 from data_loader import load_data, save_data
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
@@ -83,7 +83,7 @@ st.markdown(
 # Initialisation des variables de session
 for key, default in {
     "df": None,
-    "fx_rates": {},
+    "fx_rates": None,
     "devise_cible": "EUR",
     "ticker_data_cache": {},
     "momentum_results_cache": {},
@@ -113,9 +113,9 @@ for key, default in {
 
 # Chargement initial des données
 if st.session_state.df is None and not st.session_state.url_data_loaded:
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/kw?gjd0=1844300862&single=true&output=csv"
     try:
-        with st.spinner("Chargement initial du portefeuille depuis Google Sheets..."):
+        with st.spinner("Chargement initial du portefeuille..."):
             df_initial = pd.read_csv(csv_url)
             st.session_state.df = df_initial
             st.session_state.url_data_loaded = True
@@ -130,23 +130,24 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
 
 # Actualisation automatique des taux de change
 current_time = datetime.datetime.now()
-if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
+if (st.session_state.last_update_time_fx == None or st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
-   (st.session_state.get("devise_cible") != st.session_state.get("last_devise_cible_for_fx_update", None)) or \
    ((current_time - st.session_state.last_update_time_fx).total_seconds() >= 60):
 
     devise_cible_to_use = st.session_state.get("devise_cible", "EUR")
 
-    with st.spinner(f"Mise à jour automatique des taux de change pour {devise_cible_to_use}..."):
-        st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
-        st.session_state.last_update_time_fx = datetime.datetime.now()
-        st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
+    with st.spinner(f"Mise à jour automatique des devises pour {devise_cible_to_use}..."):
+        try:
+            st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
+            st.session_state.last_update_time_fx = datetime.datetime.now()
+            st.session_state.last_devise_cible_for_currency_update = devise_cible_to_use
+        except Exception as e:
+            st.error(f"Erreur lors de la mise à jour des taux de change : {e}")
 
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
 
 # Fonction principale de l'application
-
 def main():
     onglets = st.tabs([
         "Synthèse",
@@ -207,14 +208,17 @@ def main():
 
     with onglets[5]:
         st.markdown("#### Taux de Change Actuels")
-        st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier, changement de devise cible, ou toutes les 60 secondes.")
+        st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier ou toutes les 60 secondes, ou lors d'un changement de devise cible.")
         if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
-            with st.spinner("Mise à jour manuelle des taux de change..."):
+            with st.spinner("Mise à jour manuelle des devises..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
-                st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
-                st.session_state.last_update_time_fx = datetime.datetime.now()
-                st.session_state.last_devise_cible_for_fx_update = devise_cible_for_manual_update
-                st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update}.")
+                try:
+                    st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
+                    st.session_state.last_update_time_fx = datetime.datetime.now()
+                    st.session_state.last_devise_cible_for_currency_update = devise_cible_for_manual_update
+                    st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update}.")
+                except Exception as e:
+                    st.error(f"Erreur lors de la mise à jour manuelle des taux de change : {e}")
                 st.rerun()
 
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
