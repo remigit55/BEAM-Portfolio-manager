@@ -17,7 +17,7 @@ def fetch_fx_rates(target_currency="EUR", all_currencies=None):
     """
     st.info(f"Tentative de récupération des taux de change pour le portefeuille avec exchangerate.host. Devise cible: {target_currency}")
     fx_rates = {}
-    
+
     # Assurez-vous que la devise cible est en majuscules
     target_currency = target_currency.strip().upper()
 
@@ -36,7 +36,7 @@ def fetch_fx_rates(target_currency="EUR", all_currencies=None):
 
     # Construire la liste des symboles pour l'API
     symbols_str = ",".join([c for c in currencies_to_fetch if c != target_currency])
-    
+
     # Si aucune devise à convertir, retourner tôt
     if not symbols_str:
         st.info("Aucune autre devise à convertir que la devise cible pour le portefeuille. Retourne le taux par défaut.")
@@ -44,7 +44,7 @@ def fetch_fx_rates(target_currency="EUR", all_currencies=None):
 
     # URL de l'API exchangerate.host pour les taux "latest"
     api_url = f"https://api.exchangerate.host/latest?base={target_currency}&symbols={symbols_str}"
-    
+
     try:
         st.info(f"Requête API pour le portefeuille: {api_url}")
         response = requests.get(api_url, timeout=5)
@@ -65,7 +65,7 @@ def fetch_fx_rates(target_currency="EUR", all_currencies=None):
                 # Exemple : base=EUR, symbol=USD. api_rates['USD'] = 1.08 (1 EUR = 1.08 USD)
                 # On veut USD/EUR, ce qui signifie 1 USD = ? EUR.
                 # Donc 1 USD = 1/1.08 EUR = 0.9259 EUR.
-                
+
                 if currency in api_rates and pd.notna(api_rates[currency]) and api_rates[currency] != 0:
                     fx_rates[f"{currency}/{target_currency}"] = 1 / api_rates[currency] 
                     st.success(f"✔️ Taux {currency}/{target_currency} (via {target_currency}/{currency} inversé) pour le portefeuille : {fx_rates[f'{currency}/{target_currency}']:.4f}")
@@ -209,7 +209,7 @@ def plot_momentum_chart(ticker, data_df):
     ax3.plot(data_df.index, data_df['Z_Momentum'], label='Z-Score Momentum', color='purple', linestyle=':')
     ax3.set_ylabel('Z-Score')
     ax3.legend(loc='upper right')
-    
+
     ax3.axhline(2, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 2')
     ax3.axhline(1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 1.5')
     ax3.axhline(-1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score < -1.5')
