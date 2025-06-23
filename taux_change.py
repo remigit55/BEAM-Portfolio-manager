@@ -2,155 +2,94 @@
 
 import streamlit as st
 import pandas as pd
-# import yfinance as yf # COMMENTÉ : plus utilisé pour les taux en temps réel ici
+import yfinance as yf
 import datetime
 import html
 import streamlit.components.v1 as components # Toujours nécessaire pour components.html
-import requests # NOUVEAU : Ajout de l'import pour les requêtes HTTP
-import json     # NOUVEAU : Ajout de l'import pour traiter le JSON
-import numpy as np # NOUVEAU : Pour np.nan et np.isnan
 
 # --- Fonctions utilitaires ---
 
-# L'ancienne fonction obtenir_taux_yfinance est remplacée par l'appel direct à exchangerate.host
-# Les fonctions yfinance sont désormais inutiles dans ce fichier pour les taux de change actuels.
-
-# Utilisation de st.cache_data pour les taux de change (valable 1 minute)
-@st.cache_data(ttl=60)
-def actualiser_taux_change(devise_cible="EUR", devises_uniques=None):
+# CHANGEMENT ICI : Utilisation de st.cache_resource au lieu de st.cache_data
+@st.cache_resource(ttl=60*15) # Cache la ressource (l'objet Ticker) pendant 15 minutes
+def get_yfinance_ticker_info(ticker_symbol):
     """
-    Récupère les taux de change actuels par rapport à une devise cible en utilisant exchangerate.host.
+    Récupère des informations de base pour un ticker yfinance.
+    Retourne un objet ticker ou None en cas d'erreur.
     """
-    st.info(f"Actualisation des taux de change avec exchangerate.host. Devise cible: {devise_cible}")
-    taux_actuels = {}
-
-    # Assurez-vous que la devise cible est en majuscules
-    devise_cible = devise_cible.strip().upper()
-
-    # Si devises_uniques n'est pas fourni, utilisez la liste par défaut.
-    if devises_uniques is None:
-        devises_a_traiter = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"]
-    else:
-        # Nettoyer et mettre en majuscules toutes les devises, et s'assurer que la devise cible est incluse
-        devises_a_traiter = list(set([c.strip().upper() for c in devises_uniques] + [devise_cible]))
-    
-    # Le taux de la devise cible par rapport à elle-même est 1.0
-    taux_actuels[f"{devise_cible}/{devise_cible}"] = 1.0
-    # Ajouter la devise cible seule pour compatibilité avec d'autres fonctions si nécessaire
-    taux_actuels[devise_cible] = 1.0
-
-
-    # Construire la liste des symboles pour l'API
-    symbols_str = ",".join([c for c in devises_a_traiter if c != devise_cible])
-    
-    if not symbols_str: # S'il n'y a que la devise cible
-        st.info("Aucune devise unique à convertir autre que la devise cible.")
-        return taux_actuels
-
-    # URL de l'API exchangerate.host pour les taux "latest"
-    # On utilise la devise cible comme base pour obtenir les taux directement BASE/SYMBOL (TARGET/SOURCE)
-    api_url = f"https://api.exchangerate.host/latest?base={devise_cible}&symbols={symbols_str}"
-    
     try:
-        st.info(f"Requête API pour actualisation des taux: {api_url}")
-        response = requests.get(api_url, timeout=5)
-        response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP (4xx ou 5xx)
-        data = response.json()
-
-        if data.get("success"):
-            api_rates = data.get("rates", {})
-            st.success(f"Réponse API reçue (succès) pour l'actualisation des taux: {api_rates}")
-
-            for source_currency in devises_a_traiter:
-                source_currency = source_currency.strip().upper()
-                if source_currency == devise_cible:
-                    continue
-
-                # Le taux de l'API est BASE/SYMBOL, soit TARGET/SOURCE.
-                # Nous voulons SOURCE/TARGET. Donc il faut 1 / (TARGET/SOURCE).
-                # Exemple : base=EUR, symbol=USD. api_rates['USD'] = 1.08 (1 EUR = 1.08 USD)
-                # On veut USD/EUR, ce qui signifie 1 USD = ? EUR.
-                
-                if source_currency in api_rates and pd.notna(api_rates[source_currency]) and api_rates[source_currency] != 0:
-                    taux = 1 / api_rates[source_currency]
-                    taux_actuels[f"{source_currency}/{devise_cible}"] = taux
-                    st.success(f"✔️ Taux {source_currency}/{devise_cible} (via {devise_cible}/{source_currency} inversé) : {taux:.4f}")
-                else:
-                    st.warning(f"Taux de {source_currency} par rapport à {devise_cible} non trouvé ou invalide dans la réponse API. Taux pour {source_currency}/{devise_cible} sera N/A.")
-                    taux_actuels[f"{source_currency}/{devise_cible}"] = np.nan # Si non trouvé, NaN
-
-        else:
-            st.error(f"❌ La réponse de l'API exchangerate.host indique un échec lors de l'actualisation des taux: {data.get('error', 'Pas de message d\'erreur détaillé.')}")
-            for source_currency in devises_a_traiter:
-                if source_currency != devise_cible:
-                    taux_actuels[f"{source_currency}/{devise_cible}"] = np.nan
-
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Erreur de requête HTTP lors de l'actualisation des taux de change : {e}")
-        for source_currency in devises_a_traiter:
-            if source_currency != devise_cible:
-                taux_actuels[f"{source_currency}/{devise_cible}"] = np.nan
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Erreur de décodage JSON de la réponse API lors de l'actualisation des taux : {e}")
-        for source_currency in devises_a_traiter:
-            if source_currency != devise_cible:
-                taux_actuels[f"{source_currency}/{devise_cible}"] = np.nan
+        ticker = yf.Ticker(ticker_symbol)
+        # Tente de récupérer une donnée simple pour valider le ticker
+        # On peut appeler .info.get() pour s'assurer que l'objet est bien initialisé
+        _ = ticker.info.get('regularMarketPrice') 
+        return ticker
     except Exception as e:
-        st.error(f"❌ Une erreur inattendue est survenue lors de l'actualisation des taux de change : {e}")
-        for source_currency in devises_a_traiter:
-            if source_currency != devise_cible:
-                taux_actuels[f"{source_currency}/{devise_cible}"] = np.nan
+        # st.warning(f"Impossible de récupérer les informations pour le ticker {ticker_symbol} : {e}")
+        return None
 
-    st.info("Fin de l'actualisation des taux de change.")
-    return taux_actuels
+def obtenir_taux_yfinance(devise_source, devise_cible):
+    """
+    Récupère le taux de change entre deux devises en utilisant yfinance.
+    """
+    if devise_source.upper() == devise_cible.upper():
+        return 1.0
 
-# Importez la fonction format_fr de utils.py
-try:
-    from utils import format_fr
-except ImportError:
-    st.error("Erreur: Impossible d'importer la fonction format_fr de utils.py. Veuillez vous assurer que utils.py existe et contient cette fonction.")
-    # Fallback pour éviter une erreur si utils.py n'est pas accessible ou si format_fr est manquant
-    def format_fr(value, decimals=2):
-        if pd.isna(value):
-            return "N/A"
-        return f"{value:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    ticker_symbol = f"{devise_source.upper()}{devise_cible.upper()}=X"
+    ticker = get_yfinance_ticker_info(ticker_symbol)
 
+    if ticker:
+        try:
+            taux = ticker.info.get("regularMarketPrice")
+            if taux is not None:
+                return float(taux)
+            else:
+                st.warning(f"Taux 'regularMarketPrice' non trouvé pour {ticker_symbol}.")
+                return None
+        except Exception as e:
+            st.warning(f"Erreur lors de l'extraction du taux pour {ticker_symbol} depuis info : {e}")
+            return None
+    else:
+        # st.warning(f"Aucune donnée yfinance disponible pour {ticker_symbol}.")
+        return None
+
+def actualiser_taux_change(devise_cible, devises_uniques):
+    """
+    Actualise les taux de change pour une devise cible donnée,
+    en utilisant les devises uniques du portefeuille.
+    """
+    taux_dict = {}
+    for d in devises_uniques:
+        if d.upper() != devise_cible.upper():
+            taux = obtenir_taux_yfinance(d, devise_cible)
+            if taux is not None:
+                taux_dict[d] = taux
+            else:
+                taux_dict[d] = None 
+        else:
+            taux_dict[d] = 1.0
+    return taux_dict
+
+def format_fr(x, dec):
+    """
+    Formate un nombre en chaîne de caractères avec la virgule comme séparateur décimal
+    et l'espace comme séparateur de milliers (format français).
+    """
+    if pd.isnull(x):
+        return ""
+    s = f"{x:,.{dec}f}"
+    return s.replace(",", " ").replace(".", ",")
+
+# --- Fonction d'affichage du tableau des taux de change ---
 
 def afficher_tableau_taux_change(devise_cible, fx_rates):
     """
-    Affiche un tableau des taux de change actuels dans un style plus compact.
+    Génère et affiche le tableau HTML stylisé des taux de change.
     """
-    st.subheader(f"Taux de Change Actuels (Base : {devise_cible})")
-    
     if not fx_rates:
-        st.info("Aucun taux de change disponible pour l'affichage.")
+        st.info("Aucun taux de change valide récupéré ou aucune devise unique dans le portefeuille.")
         return
 
-    # Préparer les données pour le DataFrame
-    data_for_df = []
-    # Sortir les clés pour s'assurer que la devise cible est en premier, puis trier le reste
-    sorted_keys = sorted([k for k in fx_rates.keys() if k.split('/')[0] != devise_cible])
-    
-    # Ajouter la devise cible en premier si elle existe sous la forme "EUR/EUR" ou "EUR"
-    if f"{devise_cible}/{devise_cible}" in fx_rates:
-        data_for_df.append({"Devise source": devise_cible, f"Taux vers {devise_cible}": fx_rates[f"{devise_cible}/{devise_cible}"]})
-    elif devise_cible in fx_rates: # Fallback si seulement la devise est la clé
-        data_for_df.append({"Devise source": devise_cible, f"Taux vers {devise_cible}": fx_rates[devise_cible]})
-
-
-    for key in sorted_keys:
-        source_currency = key.split('/')[0] # Extraire la devise source de la clé "SOURCE/CIBLE"
-        # S'assurer que ce n'est pas la devise cible elle-même
-        if source_currency == devise_cible:
-            continue
-        data_for_df.append({
-            "Devise source": source_currency,
-            f"Taux vers {devise_cible}": fx_rates[key]
-        })
-
-    df_fx = pd.DataFrame(data_for_df, columns=["Devise source", f"Taux vers {devise_cible}"])
+    df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
     df_fx = df_fx.sort_values(by="Devise source")
-
 
     html_code = f"""
     <style>
@@ -173,18 +112,12 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
         <tbody>
     """
     for _, row in df_fx.iterrows():
-        # Utilisation de format_fr si la valeur n'est pas NaN, sinon "N/A"
-        taux_str = format_fr(row[f"Taux vers {devise_cible}"], 4) if pd.notna(row[f"Taux vers {devise_cible}"]) else "N/A"
-        html_code += f"""
-            <tr>
-                <td>{html.escape(str(row['Devise source']))}</td>
-                <td>{taux_str}</td>
-            </tr>
-        """
+        taux_str = format_fr(row[f"Taux vers {devise_cible}"], 6) if pd.notnull(row[f"Taux vers {devise_cible}"]) else "N/A"
+        html_code += f"<tr><td>{html.escape(str(row['Devise source']))}</td><td>{taux_str}</td></tr>"
     html_code += """
         </tbody>
       </table>
     </div>
     """
-    components.html(html_code, height=320)
+    components.html(html_code, height=250, scrolling=True)
     st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
