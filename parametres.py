@@ -1,7 +1,8 @@
+# parametres.py
+
 import streamlit as st
 import pandas as pd
 import datetime
-from taux_change import actualiser_taux_change # Nécessaire pour actualiser les taux
 
 def afficher_parametres_globaux():
     """
