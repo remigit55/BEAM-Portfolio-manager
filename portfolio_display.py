@@ -75,17 +75,29 @@ def afficher_portefeuille():
     else:
         df["Valeur"] = np.nan
 
-    # Gérer la colonne Catégorie
+    # --- NOUVELLE GESTION DE LA COLONNE CATÉGORIE ---
     st.write("DEBUG (afficher_portefeuille): Colonnes du DataFrame avant traitement Catégorie:", df.columns.tolist())
     st.write("DEBUG (afficher_portefeuille): Nombre de colonnes:", len(df.columns))
-    if len(df.columns) > 5:
-        st.write("DEBUG (afficher_portefeuille): Contenu de df.iloc[:, 5] (premières lignes):")
-        st.dataframe(df.iloc[:, 5].head())
-        df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
+
+    if "Categories" in df.columns:
+        # Renommer "Categories" en "Catégorie" (avec accent et sans 's')
+        df.rename(columns={"Categories": "Catégorie"}, inplace=True)
+        # Assurer que la colonne est de type string et remplir les NaN/vides
+        df["Catégorie"] = df["Catégorie"].astype(str).str.strip().replace("", np.nan).fillna("Non classé")
+        st.write("DEBUG (afficher_portefeuille): Contenu de la colonne 'Categories' (renommée en 'Catégorie') (premières lignes):")
+        st.dataframe(df["Catégorie"].head())
+    elif "Catégorie" in df.columns:
+        # Si la colonne est déjà nommée "Catégorie", assurez-vous qu'elle est traitée
+        df["Catégorie"] = df["Catégorie"].astype(str).str.strip().replace("", np.nan).fillna("Non classé")
+        st.write("DEBUG (afficher_portefeuille): Contenu de la colonne 'Catégorie' (premières lignes):")
+        st.dataframe(df["Catégorie"].head())
     else:
-        df["Catégorie"] = ""
-    st.write("DEBUG (afficher_portefeuille): Colonne 'Catégorie' créée. Contenu unique:", df["Catégorie"].unique())
+        # Si ni "Categories" ni "Catégorie" n'existent, créer une colonne "Non classé"
+        df["Catégorie"] = "Non classé"
+    
+    st.write("DEBUG (afficher_portefeuille): Colonne 'Catégorie' créée/traitée. Contenu unique:", df["Catégorie"].unique())
     st.write("DEBUG (afficher_portefeuille): Le DataFrame contient bien la colonne 'Catégorie' ?", "Catégorie" in df.columns)
+    # --- FIN NOUVELLE GESTION DE LA COLONNE CATÉGORIE ---
 
 
     # Déterminer la colonne Ticker (Tickers est un fallback)
