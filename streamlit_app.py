@@ -3,26 +3,25 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import datetime # Importation de datetime
+import datetime
 from PIL import Image
 import base64
 from io import BytesIO
-import os # Nécessaire pour les opérations de fichiers
+import os
 import yfinance as yf
-
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
-from performance import display_performance_history # Nom de la fonction mis à jour
+from performance import display_performance_history
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
-from taux_change import afficher_tableau_taux_change, actualiser_taux_change
-from parametres import afficher_parametres_globaux # La fonction qui gère tous les paramètres globaux
-from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal # Nouveau import
-from historical_data_fetcher import fetch_stock_history # Importez fetch_stock_history
-# from historical_performance_calculator import reconstruct_historical_performance # Non nécessaire ici directement
-from data_loader import load_data, save_data # Nécessaire si vous avez une fonction de sauvegarde du df initial
-from utils import safe_escape, format_fr # Assurez-vous que ces fonctions sont présentes
+from taux_change import afficher_tableau_taux_change
+from data_fetcher import fetch_fx_rates  # Updated import
+from parametres import afficher_parametres_globaux
+from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
+from historical_data_fetcher import fetch_stock_history
+from data_loader import load_data, save_data
+from utils import safe_escape, format_fr
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -76,7 +75,6 @@ st.markdown(f"""
 
 # Chargement du logo
 try:
-    # Assurez-vous que le fichier 'Logo.png.png' existe dans le même répertoire que streamlit_app.py
     logo = Image.open("Logo.png.png")
     buffer = BytesIO()
     logo.save(buffer, format="PNG")
@@ -100,22 +98,22 @@ st.markdown(
 
 # Initialisation des variables de session
 for key, default in {
-    "df": None, # Le DataFrame du portefeuille courant
-    "fx_rates": {}, # Taux de change actuels
-    "devise_cible": "EUR", # Devise d'affichage par défaut
-    "ticker_data_cache": {}, # Cache pour les données Yahoo Finance (prix actuels, noms, etc.)
-    "momentum_results_cache": {}, # Cache pour les résultats de momentum
-    "sort_column": None, # Colonne de tri pour le tableau du portefeuille
-    "sort_direction": "asc", # Direction de tri
-    "last_devise_cible_for_fx_update": "EUR", # Pour la logique d'actualisation des taux
-    "last_update_time_fx": datetime.datetime.min, # Timestamp de la dernière mise à jour des taux
-    "total_valeur": None, # Total valeur d'acquisition
-    "total_actuelle": None, # Total valeur actuelle
-    "total_h52": None, # Total valeur H52
-    "total_lt": None, # Total valeur LT
-    "uploaded_file_id": None, # Pour suivre l'état du fichier chargé via l'uploader dans 'Paramètres'
-    "_last_processed_file_id": None, # Pour suivre l'état du fichier traité pour les mises à jour auto
-    "url_data_loaded": False # Pour marquer si les données URL ont été chargées
+    "df": None,
+    "fx_rates": {},
+    "devise_cible": "EUR",
+    "ticker_data_cache": {},
+    "momentum_results_cache": {},
+    "sort_column": None,
+    "sort_direction": "asc",
+    "last_devise_cible_for_fx_update": "EUR",
+    "last_update_time_fx": datetime.datetime.min,
+    "total_valeur": None,
+    "total_actuelle": None,
+    "total_h52": None,
+    "total_lt": None,
+    "uploaded_file_id": None,
+    "_last_processed_file_id": None,
+    "url_data_loaded": False
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -131,20 +129,14 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
             st.session_state.uploaded_file_id = "initial_url_load"
             st.session_state._last_processed_file_id = "initial_url_load"
             st.success("Portefeuille chargé depuis Google Sheets.")
-            st.session_state.last_update_time_fx = datetime.datetime.min # Forcer mise à jour des taux
-            st.rerun() # Pour que les données soient disponibles immédiatement
+            st.session_state.last_update_time_fx = datetime.datetime.min
+            st.rerun()
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
         st.session_state.url_data_loaded = True
 
-
 # --- LOGIQUE D'ACTUALISATION AUTOMATIQUE DES TAUX DE CHANGE ---
 current_time = datetime.datetime.now()
-# Les taux sont actualisés si:
-# 1. C'est le premier chargement (datetime.min)
-# 2. Le fichier (uploaded_file_id ou URL) a changé
-# 3. La devise cible a changé
-# 4. Plus de 60 secondes se sont écoulées depuis la dernière mise à jour
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
    (st.session_state.get("devise_cible") != st.session_state.get("last_devise_cible_for_fx_update", None)) or \
@@ -157,20 +149,18 @@ if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
         devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
     
     with st.spinner(f"Mise à jour automatique des taux de change pour {devise_cible_to_use}..."):
-        st.session_state.fx_rates = actualiser_taux_change(devise_cible_to_use, devises_uniques)
+        st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
         st.session_state.last_update_time_fx = datetime.datetime.now()
         st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
     
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
 
-
 # --- Structure de l'application principale ---
 def main():
     """
     Gère la logique principale de l'application Streamlit, y compris la navigation par onglets.
     """
-    # Onglets horizontaux pour la navigation principale
     onglets = st.tabs([
         "Synthèse",
         "Portefeuille",
@@ -181,7 +171,6 @@ def main():
         "Paramètres"
     ])
 
-    # Onglet : Synthèse
     with onglets[0]:
         afficher_synthese_globale(
             st.session_state.total_valeur,
@@ -190,56 +179,45 @@ def main():
             st.session_state.total_lt
         )
 
-    # Onglet : Portefeuille
     with onglets[1]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
         else:
-            # La fonction afficher_portefeuille retourne les totaux calculés
             total_valeur, total_actuelle, total_h52, total_lt = afficher_portefeuille()
-            # Mettre à jour les totaux dans session_state pour qu'ils soient accessibles à la synthèse
             st.session_state.total_valeur = total_valeur
             st.session_state.total_actuelle = total_actuelle
             st.session_state.total_h52 = total_h52
             st.session_state.total_lt = total_lt
 
-            # --- Enregistrement du snapshot du portefeuille pour le journal historique ---
             current_date = datetime.date.today()
             devise_cible = st.session_state.get("devise_cible", "EUR")
             
-            # Charger le journal pour vérifier la dernière date enregistrée
             journal_entries = load_portfolio_journal()
             journal_dates = [entry['date'] for entry in journal_entries]
 
-            # Sauvegarder si le df n'est pas vide et si la date du jour n'est pas déjà enregistrée
             if st.session_state.df is not None and not st.session_state.df.empty and current_date not in journal_dates:
                 with st.spinner("Enregistrement du snapshot quotidien du portefeuille..."):
                     save_portfolio_snapshot(current_date, st.session_state.df, devise_cible)
                 st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
-            # --- Fin de l'enregistrement du snapshot ---
 
-    # Onglet : Performance
     with onglets[2]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
         else:
-            display_performance_history() # Appel de la fonction de performance.py
+            display_performance_history()
             
-    # Onglet : OD Comptables
     with onglets[3]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour générer les OD Comptables.")
         else:
-            afficher_od_comptables() # Appel de la fonction de od_comptables.py
+            afficher_od_comptables()
             
-    # Onglet : Transactions
     with onglets[4]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour gérer les transactions.")
         else:
-            afficher_transactions() # Appel de la fonction de transactions.py
+            afficher_transactions()
             
-    # Onglet : Taux de change
     with onglets[5]:
         st.markdown("#### Taux de Change Actuels")
         st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier, changement de devise cible, ou toutes les 60 secondes.")
@@ -250,23 +228,18 @@ def main():
                 if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
                     devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
                 
-                st.session_state.fx_rates = actualiser_taux_change(devise_cible_for_manual_update, devises_uniques)
-                st.session_state.last_update_time_fx = datetime.datetime.now() # Met à jour le timestamp
+                st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
+                st.session_state.last_update_time_fx = datetime.datetime.now()
                 st.session_state.last_devise_cible_for_fx_update = devise_cible_for_manual_update
                 st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update}.")
-                st.rerun() # Re-exécuter pour afficher les nouveaux taux
+                st.rerun()
 
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
-    # Onglet : Paramètres
     with onglets[6]:
-        # Cette fonction doit gérer le téléchargement de fichier et la sélection de la devise cible
-        # et mettre à jour st.session_state.df, st.session_state.uploaded_file_id et st.session_state.devise_cible
         afficher_parametres_globaux()    
     
     st.markdown("---")
 
-
-    
 if __name__ == "__main__":
     main()
