@@ -14,7 +14,7 @@ def fetch_fx_rates(target_currency="EUR"):
     Utilise EUR comme devise de base par défaut pour les taux de change populaires.
     """
     fx_rates = {}
-    currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"]
+    currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF", "HKD", "SGD"]
 
     for currency in currencies_to_fetch:
         if currency == target_currency:
