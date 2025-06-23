@@ -634,7 +634,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     )[cols_to_display]
                     df_disp_cat.columns = labels_for_display
                 else:  
-                    df_sort sur une base de chaînes ou non-numériques
+                    # Sort sur une base de chaînes ou non-numériques
                     df_disp_cat = df_disp_cat.sort_values(
                         by=sort_col_label_cat,
                         ascending=(st.session_state.sort_direction_cat == "asc"),
@@ -654,8 +654,9 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         left_aligned_labels_cat = ["Catégories"]
 
         for i, label in enumerate(df_disp_cat.columns):
-            col_idx = i +  if col_idx in width_specific_cols_cat:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[cols_cat_label]}; }}\n"
+            col_idx = i + 1
+            if label in width_specific_cols_cat:
+                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[label]}; }}\n"
             else:
                 css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: auto; }}\n"
             
