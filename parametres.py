@@ -102,9 +102,11 @@ def afficher_parametres_globaux():
             else:
                 st.session_state["target_allocations"] = new_allocations
                 st.success("✅ Objectifs mis à jour.")
+                st.experimental_rerun()
 
     st.markdown("---")
 
     # --- 4. Autres Réglages ---
     st.markdown("#### Autres Réglages")
     st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
+
