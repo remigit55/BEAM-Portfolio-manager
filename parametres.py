@@ -102,7 +102,7 @@ def afficher_parametres_globaux():
             else:
                 st.session_state["target_allocations"] = new_allocations
                 st.success("✅ Objectifs mis à jour.")
-                st.experimental_rerun()
+                st.rerun()
 
     st.markdown("---")
 
