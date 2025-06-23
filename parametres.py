@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+from data_fetcher import fetch_fx_rates
 
 def afficher_parametres_globaux():
     """
@@ -20,9 +21,11 @@ def afficher_parametres_globaux():
     )
 
     if st.session_state.devise_cible != previous_devise:
-        st.session_state.last_update_time_fx = datetime.datetime.min
-        st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Les taux de change seront mis à jour au prochain rechargement.")
-        st.rerun()
+        with st.spinner(f"Mise à jour des taux de change pour {st.session_state.devise_cible}..."):
+            st.session_state.fx_rates = fetch_fx_rates(st.session_state.devise_cible)
+            st.session_state.last_update_time_fx = datetime.datetime.now()
+            st.session_state.last_devise_cible_for_fx_update = st.session_state.devise_cible
+        st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Taux de change mis à jour.")
 
     st.markdown("---")
 
@@ -109,4 +112,3 @@ def afficher_parametres_globaux():
     # --- 4. Autres Réglages ---
     st.markdown("#### Autres Réglages")
     st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
-
