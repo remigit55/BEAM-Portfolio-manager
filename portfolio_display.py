@@ -38,7 +38,6 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # st.warning(f"Conversion ignorée pour {source_devise} vers {devise_cible}. Taux manquant/zéro ({taux_scalar}). Valeur originale: {val}")
         return val, np.nan # Retourne la valeur non convertie si le taux est manquant
     
     return val * taux_scalar, taux_scalar
@@ -63,7 +62,6 @@ def afficher_portefeuille():
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
     fx_rates = fetch_fx_rates(devise_cible)
-    # st.write("Taux de change récupérés:", fx_rates) # Ligne de débogage supprimée
 
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition"]:
@@ -146,29 +144,32 @@ def afficher_portefeuille():
         df["Action"] = ""
         df["Justification"] = ""
 
+    # --- NOUVEL EMPLACEMENT POUR L'APPLICATION DES CONVERSIONS DE DEVISES ---
+    # Ces colonnes doivent exister avant d'être formatées
+    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper() # S'assurer que la colonne Devise existe et est en majuscules
+
+    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
+    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
+    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
+    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
+    # --- FIN DU NOUVEL EMPLACEMENT ---
+
+
     # Formatage des colonnes (inclut maintenant les colonnes converties)
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("Valeur", 2), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4), ("Valeur_LT", 2), 
         ("Momentum (%)", 2), ("Z-Score", 2),
-        # NOUVELLES LIGNES POUR LES VALEURS CONVERTIES
+        # LIGNES POUR LES VALEURS CONVERTIES
         ("Valeur_conv", 2),
         ("Valeur_Actuelle_conv", 2),
         ("Valeur_H52_conv", 2),
         ("Valeur_LT_conv", 2)
     ]:
-        if col_name in df.columns:
+        if col_name in df.columns: # Cette condition est maintenant plus fiable car les colonnes _conv existent
             df[f"{col_name}_fmt"] = df[col_name].map(lambda x: format_fr(x, dec_places))
             
-    # S'assurer que la colonne Devise existe et est en majuscules
-    df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper()
-
-    # Application des conversions de devises
-    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
-    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
-    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
 
     # Calcul des totaux convertis pour la synthèse
     total_valeur = df["Valeur_conv"].sum()
@@ -482,260 +483,3 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             label=f"**Objectif Long Terme ({devise_cible})**",
             value=f"{format_fr(total_lt, 2)} {devise_cible}"
         )
-    st.markdown("---")
-
-
-    # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.markdown("#### Répartition et Objectifs par Catégorie")
-
-    # Définition des allocations cibles par catégorie
-    target_allocations = {
-        "Minières": 0.41,
-        "Asie": 0.25,
-        "Energie": 0.25,
-        "Matériaux": 0.01,
-        "Devises": 0.08,
-        "Crypto": 0.00,
-        "Autre": 0.00 
-    }
-
-    if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
-        df = st.session_state.df.copy()
-        
-        if 'Catégorie' not in df.columns:
-            st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
-                     "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
-                     "la fonction 'afficher_portefeuille' la traite correctement.")
-            st.info(f"Colonnes disponibles : {df.columns.tolist()}") 
-            return
-
-        portfolio_total_value = total_actuelle
-        
-        if portfolio_total_value <= 0 or pd.isna(portfolio_total_value):
-            st.info("La valeur totale actuelle du portefeuille est de 0 ou moins, ou non définie. Impossible de calculer la répartition par catégorie de manière significative.")
-            return
-
-        df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
-        
-        category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
-        
-        results_data = []
-
-        all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
-        
-        for category in all_relevant_categories:
-            target_pct = target_allocations.get(category, 0.0) 
-            current_value_cat = category_values.get(category, 0.0) 
-            
-            if pd.isna(current_value_cat):
-                current_value_cat = 0.0
-
-            current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0.0
-
-            deviation_pct = current_pct - target_pct
-            
-            target_value_for_category = target_pct * portfolio_total_value
-            
-            value_to_adjust = target_value_for_category - current_value_cat
-            
-            valeur_pour_atteindre_objectif_str = ""
-            if pd.notna(value_to_adjust):
-                valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
-            
-            results_data.append({
-                "Catégorie": category,
-                "Valeur Actuelle": current_value_cat,
-                "Part Actuelle (%)": current_pct * 100,
-                "Cible (%)": target_pct * 100,
-                "Écart à l'objectif (%)": deviation_pct * 100,
-                "Ajustement Nécessaire": value_to_adjust
-            })
-
-        df_allocation = pd.DataFrame(results_data)
-        
-        df_allocation = df_allocation.sort_values(by='Part Actuelle (%)', ascending=False)
-        
-        # Formatage des colonnes pour l'affichage dans le HTML
-        df_allocation["Valeur Actuelle_fmt"] = df_allocation["Valeur Actuelle"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
-        df_allocation["Part Actuelle (%_fmt)"] = df_allocation["Part Actuelle (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
-        df_allocation["Cible (%_fmt)"] = df_allocation["Cible (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
-        df_allocation["Écart à l'objectif (%_fmt)"] = df_allocation["Écart à l'objectif (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
-        df_allocation[f"Ajustement Nécessaire_fmt"] = df_allocation["Ajustement Nécessaire"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
-
-
-        # Définition des colonnes à afficher dans le tableau HTML
-        cols_to_display = [
-            "Catégorie",
-            "Valeur Actuelle_fmt",
-            "Part Actuelle (%_fmt)",
-            "Cible (%_fmt)",
-            "Écart à l'objectif (%_fmt)",
-            f"Ajustement Nécessaire_fmt"
-        ]
-        labels_for_display = [
-            "Catégorie",
-            "Valeur Actuelle",
-            "Part Actuelle (%)",
-            "Cible (%)",
-            "Écart à l'objectif (%)",
-            f"Ajustement Nécessaire" 
-        ]
-
-        df_disp_cat = df_allocation[cols_to_display].copy()
-        df_disp_cat.columns = labels_for_display
-
-        # Gestion du tri pour le tableau de catégories
-        if "sort_column_cat" not in st.session_state:
-            st.session_state.sort_column_cat = None
-        if "sort_direction_cat" not in st.session_state:
-            st.session_state.sort_direction_cat = "asc"
-
-        if st.session_state.sort_column_cat:
-            sort_col_label_cat = st.session_state.sort_column_cat
-            if sort_col_label_cat in df_disp_cat.columns:
-                original_col_for_sort = None
-                if sort_col_label_cat == "Valeur Actuelle":
-                    original_col_for_sort = "Valeur Actuelle"
-                elif sort_col_label_cat == "Part Actuelle (%)":
-                    original_col_for_sort = "Part Actuelle (%)"
-                elif sort_col_label_cat == "Cible (%)":
-                    original_col_for_sort = "Cible (%)"
-                elif sort_col_label_cat == "Écart à l'objectif (%)":
-                    original_col_for_sort = "Écart à l'objectif (%)"
-                elif sort_col_label_cat == f"Ajustement Nécessaire":
-                    original_col_for_for_sort = "Ajustement Nécessaire"
-                
-                if original_col_for_sort and pd.api.types.is_numeric_dtype(df_allocation[original_col_for_sort]):
-                    df_disp_cat = df_allocation.sort_values(
-                        by=original_col_for_sort,
-                        ascending=(st.session_state.sort_direction_cat == "asc")
-                    )[cols_to_display]
-                    df_disp_cat.columns = labels_for_display
-                else: 
-                    df_disp_cat = df_disp_cat.sort_values(
-                        by=sort_col_label_cat,
-                        ascending=(st.session_state.sort_direction_cat == "asc"),
-                        key=lambda x: x.astype(str).str.lower()
-                    )
-
-
-        # CSS spécifique pour le tableau de catégories
-        css_col_widths_cat = ""
-        width_specific_cols_cat = {
-            "Catégorie": "120px",
-            "Valeur Actuelle": "120px",
-            "Part Actuelle (%)": "100px",
-            "Cible (%)": "80px",
-            "Écart à l'objectif (%)": "120px",
-            f"Ajustement Nécessaire": "150px"
-        }
-        left_aligned_labels_cat = ["Catégorie"]
-
-        for i, label in enumerate(df_disp_cat.columns):
-            col_idx = i + 1 
-            
-            if label in width_specific_cols_cat:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[label]}; }}\n"
-            else:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: auto; }}\n"
-            
-            if label in left_aligned_labels_cat:
-                css_col_widths_cat += f".category-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n" 
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n" 
-
-
-        html_code_cat = f"""
-        <style>
-            .scroll-wrapper-cat {{
-                overflow-x: auto !important;
-                overflow-y: auto;
-                max-height: 400px;
-                max-width: none !important;
-                width: auto;
-                display: block;
-                position: relative;
-            }}
-            .category-table {{
-                min-width: 800px;
-                border-collapse: collapse;
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            }}
-            .category-table th {{
-                background: #363636;
-                color: white;
-                padding: 8px;
-                text-align: center;
-                border: none;
-                position: sticky;
-                top: 0;
-                z-index: 2;
-                font-size: 12px;
-                box-sizing: border-box;
-                cursor: pointer;
-            }}
-            .category-table td {{
-                padding: 6px;
-                text-align: right;
-                border: none;
-                font-size: 11px;
-                white-space: nowrap;
-            }}
-            {css_col_widths_cat}
-
-            .category-table tr:nth-child(even) {{ background: #efefef; }}
-            .total-row-cat td {{
-                background: #A49B6D;
-                color: white;
-                font-weight: bold;
-            }}
-        </style>
-        <div class="scroll-wrapper-cat">
-            <table class="category-table">
-                <thead><tr>
-        """
-
-        for lbl in df_disp_cat.columns:
-            sort_icon = ""
-            if st.session_state.sort_column_cat == lbl:
-                sort_icon = " ▲" if st.session_state.sort_direction_cat == "asc" else " ▼"
-            html_code_cat += f'<th id="sort-cat-{safe_escape(lbl)}">{safe_escape(lbl)}{sort_icon}</th>'
-
-        html_code_cat += """
-                </tr></thead>
-                <tbody>
-        """
-
-        for _, row in df_disp_cat.iterrows():
-            html_code_cat += "<tr>"
-            for lbl in df_disp_cat.columns:
-                val = row[lbl]
-                val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-                html_code_cat += f"<td>{val_str}</td>"
-            html_code_cat += "</tr>"
-
-        html_code_cat += """
-                </tbody>
-            </table>
-        </div>
-        <script>
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('.category-table th').forEach(function(header) {
-                    header.addEventListener('click', function() {
-                        const columnLabel = this.id.replace('sort-cat-', '');
-                        window.parent.postMessage(JSON.stringify({
-                            streamlit: {
-                                type: 'setComponentValue',
-                                args: ['sort_event_cat', {column: columnLabel}],
-                            },
-                        }), '*');
-                    });
-                });
-            });
-        </script>
-        """
-        
-        components.html(html_code_cat, height=450, scrolling=True)
-
-    else:
-        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégorie' pour calculer la répartition.")
-        st.warning("Veuillez importer votre portefeuille et vérifier la présence de la colonne 'Categories' dans votre fichier source.")
