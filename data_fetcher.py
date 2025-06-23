@@ -18,7 +18,7 @@ def fetch_fx_rates(target_currency="EUR"):
 
     for currency in currencies_to_fetch:
         if currency == target_currency:
-            fx_rates[f"{currency}/{target_currency}"] = 1.0
+            fx_rates[currency] = 1.0
             continue
 
         ticker_symbol = f"{currency}{target_currency}=X"
