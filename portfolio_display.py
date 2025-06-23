@@ -76,11 +76,11 @@ def afficher_portefeuille():
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # GESTION DE LA COLONNE 'CATÉGORIE'
+    # GESTION DE LA COLONNE 'Categorie'
     if "Categories" in df.columns:  
         df["Categorie"] = df["Categories"].astype(str).fillna("").str.strip() # Ajout de .str.strip() pour nettoyer les espaces
         # Remplacer les chaînes vides résultantes du stripping par 'Non classé'
-        df["Categorie"] = df["Catégorie"].replace("", np.nan).fillna("Non classé")
+        df["Categorie"] = df["Categorie"].replace("", np.nan).fillna("Non classé")
     else:
         st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Categorie' sera 'Non classé' pour l'affichage et la synthèse.")
         df["Categorie"] = "Non classé"
@@ -291,7 +291,7 @@ def afficher_portefeuille():
     width_specific_cols = {
         "Ticker": "80px",
         "Nom": "200px",
-        "Catégorie": "100px",
+        "Categorie": "100px",
         "Devise Source": "60px",
         "Valeur Acquisition (Source)": "120px", # Largeur pour la nouvelle colonne
         "Taux FX (Source/Cible)": "100px", # Largeur pour la nouvelle colonne
@@ -300,7 +300,7 @@ def afficher_portefeuille():
         "Justification": "200px",
     }
     
-    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification", "Devise Source"] # Devise Source aussi alignée à gauche
+    left_aligned_labels = ["Ticker", "Nom", "Categorie", "Signal", "Action", "Justification", "Devise Source"] # Devise Source aussi alignée à gauche
 
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1  
@@ -452,7 +452,7 @@ def afficher_portefeuille():
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
     Affiche la synthèse globale du portefeuille, y compris les métriques clés et le nouveau
-    tableau de répartition par catégorie avec les objectifs.
+    tableau de répartition par Categorie avec les objectifs.
     """
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
@@ -501,10 +501,10 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     st.markdown("---")
 
 
-    # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.markdown("#### Répartition et Objectifs par Catégorie")
+    # --- Nouveau Tableau de Répartition par Categorie ---
+    st.markdown("#### Répartition et Objectifs par Categorie")
 
-    # Définition des allocations cibles par catégorie
+    # Définition des allocations cibles par Categorie
     target_allocations = {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -519,7 +519,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         df = st.session_state.df.copy()
         
         if 'Categorie' not in df.columns:
-            st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
+            st.error("ERREUR : La colonne 'Categorie' est manquante dans le DataFrame pour la synthèse. "
                      "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
                      "la fonction 'afficher_portefeuille' la traite correctement.")
             st.info(f"Colonnes disponibles : {df.columns.tolist()}")  
@@ -528,7 +528,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         portfolio_total_value = total_actuelle
         
         if portfolio_total_value <= 0 or pd.isna(portfolio_total_value):
-            st.info("La valeur totale actuelle du portefeuille est de 0 ou moins, ou non définie. Impossible de calculer la répartition par catégorie de manière significative.")
+            st.info("La valeur totale actuelle du portefeuille est de 0 ou moins, ou non définie. Impossible de calculer la répartition par Categorie de manière significative.")
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
@@ -589,7 +589,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
-            "Catégorie",
+            "Categorie",
             "Valeur Actuelle",
             "Part Actuelle (%)",
             "Cible (%)",
@@ -600,7 +600,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         df_disp_cat = df_allocation[cols_to_display].copy()
         df_disp_cat.columns = labels_for_display
 
-        # Gestion du tri pour le tableau de catégories
+        # Gestion du tri pour le tableau de Categories
         if "sort_column_cat" not in st.session_state:
             st.session_state.sort_column_cat = None
         if "sort_direction_cat" not in st.session_state:
@@ -635,17 +635,17 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     )
 
 
-        # CSS spécifique pour le tableau de catégories
+        # CSS spécifique pour le tableau de Categories
         css_col_widths_cat = ""
         width_specific_cols_cat = {
-            "Catégorie": "120px",
+            "Categorie": "120px",
             "Valeur Actuelle": "120px",
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
             "Écart à l'objectif (%)": "120px",
             f"Ajustement Nécessaire": "150px"
         }
-        left_aligned_labels_cat = ["Catégorie"]
+        left_aligned_labels_cat = ["Categorie"]
 
         for i, label in enumerate(df_disp_cat.columns):
             col_idx = i + 1  
@@ -753,5 +753,5 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         components.html(html_code_cat, height=450, scrolling=True)
 
     else:
-        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégorie' pour calculer la répartition.")
+        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Categorie' pour calculer la répartition.")
         st.warning("Veuillez importer votre portefeuille et vérifier la présence de la colonne 'Categories' dans votre fichier source.")
