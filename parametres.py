@@ -21,11 +21,13 @@ def afficher_parametres_globaux():
     )
 
     if st.session_state.devise_cible != previous_devise:
-        with st.spinner(f"Mise à jour des taux de change pour {st.session_state.devise_cible}..."):
-            st.session_state.fx_rates = fetch_fx_rates(st.session_state.devise_cible)
-            st.session_state.last_update_time_fx = datetime.datetime.now()
-            st.session_state.last_devise_cible_for_fx_update = st.session_state.devise_cible
-        st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Taux de change mis à jour.")
+    with st.spinner(f"Mise à jour des taux de change pour {st.session_state.devise_cible}..."):
+        st.session_state.fx_rates = fetch_fx_rates(st.session_state.devise_cible)
+        st.session_state.last_update_time_fx = datetime.datetime.now()
+        st.session_state.last_devise_cible_for_fx_update = st.session_state.devise_cible
+    st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Taux de change mis à jour.")
+    st.experimental_rerun()  # ✅ rechargement total pour actualiser la synthèse
+
 
     st.markdown("---")
 
