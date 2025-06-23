@@ -65,7 +65,13 @@ def afficher_parametres_globaux():
     if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"):
         try:
             with st.spinner("Chargement des données du portefeuille depuis Google Sheets..."):
-                df_url = pd.read_csv(csv_url)
+                import requests
+                from io import StringIO
+                
+                response = requests.get(csv_url)
+                response.encoding = 'utf-8'
+                df_url = pd.read_csv(StringIO(response.text))
+
                 st.session_state.df = df_url
                 st.session_state.uploaded_file_id = "url_source_" + str(datetime.datetime.now())
                 st.session_state.url_data_loaded = True
