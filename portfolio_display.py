@@ -40,7 +40,7 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         # Important: Retourne la valeur non convertie si le taux est manquant ou nul
         return val 
     
-    return val * taux_scalar
+    return val # Return original value if conversion rate is invalid
 # --- Fin de la fonction convertir ---
 
 
@@ -272,7 +272,6 @@ def afficher_portefeuille():
     }
     
     left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]
-    left_align_selectors = []
 
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1 # nth-child est 1-indexé
@@ -411,10 +410,8 @@ def afficher_portefeuille():
     
     components.html(html_code, height=600, scrolling=True)
 
-    # <<<<<<<<<<<<<<< C'EST LA LIGNE CLÉ QUI ÉTAIT MANQUANTE/MAL PLACÉE >>>>>>>>>>>>>>>>>
     # Mettre à jour le DataFrame dans st.session_state avec toutes les colonnes calculées
     st.session_state.df = df 
-    # <<<<<<<<<<<<<<<<<<<<<< FIN LIGNE CLÉ >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     # IMPORTANT: retourne les totaux convertis pour la synthèse globale
     return total_valeur, total_actuelle, total_h52, total_lt
@@ -473,21 +470,26 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
 
     # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.markdown("#### Répartition et Objectifs par Catégorie")
+    st.subheader("Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
+    # Assurez-vous que les clés ici correspondent exactement aux valeurs de votre colonne 'Catégorie'
     target_allocations = {
         "Minières": 0.41,
         "Asie": 0.25,
         "Énergie": 0.25,
         "Matériaux": 0.01,
         "Devises": 0.08,
-        "Crypto": 0.00
+        "Crypto": 0.00,
+        # Ajoutez ou ajustez d'autres catégories si nécessaire
+        "Autre": 0.00 # Une catégorie "Autre" par défaut pour les non-classées
     }
 
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
-
+        
+        # SUPPRIMER CETTE LIGNE DE DÉBOGAGE APRÈS VÉRIFICATION !
+        # st.write("Colonnes du DataFrame dans afficher_synthese_globale (après la mise à jour par afficher_portefeuille) :", df.columns.tolist())
 
         if 'Catégorie' not in df.columns:
             st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
@@ -511,31 +513,34 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         results_data = []
 
         # Fusionner toutes les catégories uniques (cibles et réelles) pour l'affichage
+        # Inclure toutes les catégories présentes dans les données réelles
         all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
         
         for category in all_relevant_categories:
-            target_pct = target_allocations.get(category, 0.0)
+            target_pct = target_allocations.get(category, 0.0) # 0.0 si la catégorie n'a pas d'objectif défini
             current_value_cat = category_values.get(category, 0)
             current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0
 
             deviation_pct = current_pct - target_pct
             
-            # Calcul spécifique pour "Minières" pour la valeur à atteindre l'objectif
-            value_to_reach_target = None
-            if category == "Minières":
-                if current_pct < target_pct:
-                    # Formule pour calculer le montant nécessaire si l'objectif n'est pas atteint
-                    # (objectif * total_portefeuille - valeur_actuelle_cat) / (1 - objectif)
-                    if (1 - target_pct) != 0: # Éviter division par zéro si l'objectif est 100%
-                        value_to_reach_target = (target_pct * portfolio_total_value - current_value_cat) / (1 - target_pct)
-                        value_to_reach_target = max(0, value_to_reach_target) # Ne peut pas être négatif
-                    else:
-                        value_to_reach_target = np.nan # Si objectif est 100% et non atteint, valeur indéfinie
-                else:
-                    value_to_reach_target = 0 # Si l'objectif est atteint ou dépassé, 0 à ajouter
+            value_to_reach_target = 0.0 # Initialise à 0.0 par défaut
 
+            # Calcul du montant à ajouter/retirer pour atteindre l'objectif
+            if target_pct > 0 and portfolio_total_value > 0: # S'il y a un objectif et un portefeuille non nul
+                # Valeur cible = pourcentage cible * valeur totale du portefeuille
+                target_value_cat = target_pct * portfolio_total_value
+                
+                # Montant à ajuster = Valeur Cible - Valeur Actuelle de la Catégorie
+                amount_to_adjust = target_value_cat - current_value_cat
+                
+                # Si l'objectif n'est pas atteint (écart négatif), c'est la valeur à ajouter
+                # Sinon (objectif atteint ou dépassé), c'est 0.0 à ajouter (ou un montant négatif à retirer)
+                value_to_reach_target = amount_to_adjust
+            elif target_pct == 0 and current_pct > 0: # Si l'objectif est 0% mais qu'il y a des fonds
+                value_to_reach_target = -current_value_cat # Indique de retirer la valeur actuelle
+            
             valeur_pour_atteindre_objectif_str = ""
-            if value_to_reach_target is not None and pd.notna(value_to_reach_target):
+            if pd.notna(value_to_reach_target):
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_reach_target, 2)} {devise_cible}"
             
             results_data.append({
@@ -543,10 +548,16 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 "Part Actuelle (%)": format_fr(current_pct * 100, 2),
                 "Cible (%)": format_fr(target_pct * 100, 2),
                 "Écart à l'objectif (%)": format_fr(deviation_pct * 100, 2),
-                f"Valeur pour atteindre objectif ({devise_cible})": valeur_pour_atteindre_objectif_str
+                f"Ajustement Nécessaire ({devise_cible})": valeur_pour_atteindre_objectif_str # Renommé la colonne
             })
 
         df_allocation = pd.DataFrame(results_data)
+        
+        # Trier par 'Part Actuelle (%)' ou 'Cible (%)' pour une meilleure lisibilité
+        df_allocation['Part Actuelle (%)_numeric'] = df_allocation['Part Actuelle (%)'].str.replace(' %', '').str.replace(',', '.').astype(float)
+        df_allocation = df_allocation.sort_values(by='Part Actuelle (%)_numeric', ascending=False)
+        df_allocation = df_allocation.drop(columns=['Part Actuelle (%)_numeric'])
+
 
         st.dataframe(df_allocation, use_container_width=True, hide_index=True)
     else:
