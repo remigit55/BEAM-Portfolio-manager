@@ -86,18 +86,22 @@ def afficher_parametres_globaux():
         new_allocations = {}
         total_alloc_input = 0
 
-        for cat, val in st.session_state["target_allocations"].items():
-            pct = st.number_input(f"{cat}", min_value=0.0, max_value=100.0, value=val * 100, step=0.1, key=f"input_{cat}")
-            new_allocations[cat] = pct / 100
-            total_alloc_input += pct
+        columns = st.columns(len(st.session_state["target_allocations"]))
+        for i, (cat, val) in enumerate(st.session_state["target_allocations"].items()):
+            with columns[i]:
+                pct = st.number_input(f"{cat}", min_value=0.0, max_value=100.0, value=val * 100, step=0.1, key=f"input_{cat}")
+                new_allocations[cat] = pct / 100
+                total_alloc_input += pct
+
+        st.markdown(f"**Total alloué : {total_alloc_input:.2f}%**")
 
         submitted = st.form_submit_button("Enregistrer les objectifs")
         if submitted:
             if abs(total_alloc_input - 100.0) > 0.1:
-                st.error("La somme des allocations doit faire 100 %.")
+                st.error("❌ La somme des allocations doit faire exactement 100 %. Vous avez actuellement {:.2f} %.".format(total_alloc_input))
             else:
                 st.session_state["target_allocations"] = new_allocations
-                st.success("Objectifs mis à jour.")
+                st.success("✅ Objectifs mis à jour.")
 
     st.markdown("---")
 
