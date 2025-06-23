@@ -28,7 +28,7 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         return val, 1.0 # Si c'est la même devise, pas de conversion, taux = 1.0
 
     # Correction ici: Construire la clé fx_key comme "SOURCE/CIBLE"
-    fx_key = f"{source_devise}/{devise_cible}"
+    fx_key = source_devise
     raw_taux = fx_rates.get(fx_key)
     
     try:
