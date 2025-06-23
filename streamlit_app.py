@@ -241,7 +241,7 @@ def main():
             
     # Onglet : Taux de change
     with onglets[5]:
-        st.subheader("Taux de Change Actuels")
+        st.markdown("#### Taux de Change Actuels")
         st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier, changement de devise cible, ou toutes les 60 secondes.")
         if st.button("Actualiser les taux manuellement", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
