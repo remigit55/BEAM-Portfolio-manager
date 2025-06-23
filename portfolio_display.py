@@ -68,15 +68,7 @@ def afficher_portefeuille():
     
     fx_rates = st.session_state.fx_rates
 
-    # Debugging: Afficher fx_rates et devises uniques
-    st.write("**Debugging Info**")
-    st.write(f"fx_rates: {fx_rates}")
-    if "Devise" in df.columns:
-        st.write(f"Devises uniques dans le portefeuille: {df['Devise'].dropna().str.strip().str.upper().unique().tolist()}")
-    else:
-        st.error("Colonne 'Devise' manquante dans le portefeuille.")
-
-    # Debugging: Vérifier les taux manquants
+    # Vérifier les taux manquants
     devises_uniques = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
     missing_rates = [devise for devise in devises_uniques if fx_rates.get(devise) is None and devise != devise_cible.upper()]
     if missing_rates:
@@ -146,10 +138,6 @@ def afficher_portefeuille():
     df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
-    # Debugging: Vérifier les valeurs avant conversion
-    st.write("Valeurs avant conversion (échantillon):")
-    st.dataframe(df[["Devise", "Valeur Acquisition", "Valeur_Actuelle"]].head())
-
     # Conversion des valeurs à la devise cible
     df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
         lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), 
@@ -168,10 +156,6 @@ def afficher_portefeuille():
         axis=1, result_type='expand'
     )
 
-    # Debugging: Vérifier les valeurs après conversion
-    st.write("Valeurs après conversion (échantillon):")
-    st.dataframe(df[["Devise", "Valeur_Actuelle", "Valeur_Actuelle_conv", "Taux_FX_Actuel"]].head())
-
     # Calcul des totaux globaux convertis
     total_valeur = df["Valeur_conv"].sum()
     total_actuelle = df["Valeur_Actuelle_conv"].sum()
@@ -185,11 +169,6 @@ def afficher_portefeuille():
         (df['Gain/Perte'] / df['Valeur_conv']) * 100,
         0
     )
-
-    # Debugging: Vérifier l'index et les colonnes avant formatage
-    st.write("État du DataFrame avant formatage (index et colonnes):")
-    st.write(f"Index: {df.index.tolist()}")
-    st.write(f"Colonnes: {df.columns.tolist()}")
 
     # Formatage des colonnes pour l'affichage
     for col_name, dec_places in [
@@ -266,22 +245,6 @@ def afficher_portefeuille():
         elif col_name in df.columns:
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
-
-    # Debugging: Afficher les colonnes sélectionnées pour le tableau
-    st.write("Colonnes sélectionnées pour l’affichage du tableau:")
-    st.write(f"existing_cols_in_df: {existing_cols_in_df}")
-    st.write(f"existing_labels: {existing_labels}")
-
-    # Debugging: Vérifier les valeurs formatées
-    st.write("Valeurs formatées pour le tableau (échantillon):")
-    debug_cols = [
-        col for col in ["Valeur_Actuelle_fmt", "Valeur_conv", "Gain/Perte_fmt", "Valeur_H52_fmt", "Valeur_LT_fmt"]
-        if col in df.columns
-    ]
-    if debug_cols:
-        st.dataframe(df[["Devise"] + debug_cols].head())
-    else:
-        st.warning("Aucune colonne formatée disponible pour le débogage.")
 
     if not existing_cols_in_df:
         st.warning("Aucune colonne de données valide à afficher.")
