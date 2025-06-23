@@ -78,12 +78,12 @@ def afficher_portefeuille():
 
     # GESTION DE LA COLONNE 'CATÉGORIE'
     if "Categories" in df.columns:  
-        df["Catégorie"] = df["Categories"].astype(str).fillna("").str.strip() # Ajout de .str.strip() pour nettoyer les espaces
+        df["Categorie"] = df["Categories"].astype(str).fillna("").str.strip() # Ajout de .str.strip() pour nettoyer les espaces
         # Remplacer les chaînes vides résultantes du stripping par 'Non classé'
-        df["Catégorie"] = df["Catégorie"].replace("", np.nan).fillna("Non classé")
+        df["Categorie"] = df["Catégorie"].replace("", np.nan).fillna("Non classé")
     else:
-        st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégorie' sera 'Non classé' pour l'affichage et la synthèse.")
-        df["Catégorie"] = "Non classé"
+        st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Categorie' sera 'Non classé' pour l'affichage et la synthèse.")
+        df["Categorie"] = "Non classé"
 
     # Déterminer la colonne Ticker (peut être "Ticker" ou "Tickers")
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -191,7 +191,7 @@ def afficher_portefeuille():
 
     # Définition des colonnes à afficher et de leurs libellés
     cols = [
-        ticker_col, "shortName", "Catégorie", "Devise",
+        ticker_col, "shortName", "Categorie", "Devise",
         "Quantité_fmt", "Acquisition_fmt", 
         "Valeur Acquisition", # La valeur numérique d'origine pour le débogage (avant conversion)
         "Valeur Acquisition_fmt", # La valeur convertie et formatée
@@ -202,7 +202,7 @@ def afficher_portefeuille():
         "Signal", "Action", "Justification"
     ]
     labels = [
-        "Ticker", "Nom", "Catégorie", "Devise Source", # Renommé pour plus de clarté
+        "Ticker", "Nom", "Categorie", "Devise Source", # Renommé pour plus de clarté
         "Quantité", "Prix d'Acquisition (Source)", # Renommé
         "Valeur Acquisition (Source)", # Nouvelle colonne de débogage
         f"Valeur Acquisition ({devise_cible})", # Libellé plus précis
@@ -518,7 +518,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
         
-        if 'Catégorie' not in df.columns:
+        if 'Categorie' not in df.columns:
             st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
                      "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
                      "la fonction 'afficher_portefeuille' la traite correctement.")
@@ -533,7 +533,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
         
-        category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
+        category_values = df.groupby('Categorie')['Valeur_Actuelle_conv'].sum()
         
         results_data = []
 
@@ -559,7 +559,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
             
             results_data.append({
-                "Catégorie": category,
+                "Categorie": category,
                 "Valeur Actuelle": current_value_cat,
                 "Part Actuelle (%)": current_pct * 100,
                 "Cible (%)": target_pct * 100,
@@ -581,7 +581,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         # Définition des colonnes à afficher dans le tableau HTML
         cols_to_display = [
-            "Catégorie",
+            "Categorie",
             "Valeur Actuelle_fmt",
             "Part Actuelle (%_fmt)",
             "Cible (%_fmt)",
