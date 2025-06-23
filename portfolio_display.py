@@ -27,7 +27,7 @@ def convertir(val, source_devise, devise_cible, fx_rates):
     if source_devise == devise_cible:
         return val, 1.0 # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    fx_key = source_devise
+    fx_key = source_devise # <--- C'est la correction précédente
     raw_taux = fx_rates.get(fx_key)
     
     try:
@@ -36,12 +36,10 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # Si le taux est manquant ou nul, la conversion est impossible/non fiable.
-        # Retourne la valeur non convertie et un indicateur de taux manquant (ex: np.nan ou 0)
-        # st.warning(f"Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
-        return val, np.nan # Retourne la valeur originale et un taux NaN pour indiquer l'absence de conversion
-        
-    return val * taux_scalar, taux_scalar # Retourne la valeur convertie ET le taux utilisé
+        st.warning(f"DEBUG: Conversion ignorée pour {source_devise} vers {devise_cible}. Taux manquant/zéro ({taux_scalar}). Valeur originale: {val}") # AJOUTEZ CETTE LIGNE
+        return val, np.nan # Retourne la valeur non convertie si le taux est manquant
+    
+    return val * taux_scalar, taux_scalar
 
 
 def afficher_portefeuille():
