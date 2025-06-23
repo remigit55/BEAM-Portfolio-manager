@@ -186,6 +186,11 @@ def afficher_portefeuille():
         0
     )
 
+    # Debugging: Vérifier l'index et les colonnes avant formatage
+    st.write("État du DataFrame avant formatage (index et colonnes):")
+    st.write(f"Index: {df.index.tolist()}")
+    st.write(f"Colonnes: {df.columns.tolist()}")
+
     # Formatage des colonnes pour l'affichage
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("currentPrice", 4),
@@ -195,10 +200,14 @@ def afficher_portefeuille():
         ("Valeur Acquisition", 2), ("Valeur_Actuelle", 2), ("Valeur_H52", 2), ("Valeur_LT", 2), ("Gain/Perte", 2)
     ]:
         if col_name in df.columns:
-            if col_name in ["Valeur Acquisition"]:
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {df['Devise'].iloc[df.index.get_loc(x.name)]}" if pd.notnull(x) else "")
+            if col_name == "Valeur Acquisition":
+                # Formatage avec la devise source correspondante
+                df[f"{col_name}_fmt"] = [
+                    f"{format_fr(val, dec_places)} {dev}" if pd.notnull(val) else ""
+                    for val, dev in zip(df[col_name], df["Devise"])
+                ]
             elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT", "Gain/Perte"]:
-                # Use converted values for EUR display
+                # Utiliser les valeurs converties pour l'affichage en EUR
                 conv_col = f"{col_name}_conv"
                 if conv_col in df.columns:
                     df[f"{col_name}_fmt"] = df[conv_col].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
