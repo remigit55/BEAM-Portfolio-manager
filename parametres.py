@@ -65,7 +65,7 @@ def afficher_parametres_globaux():
 
     st.markdown("<br>", unsafe_allow_html=True) 
     st.markdown("##### Charger depuis Google Sheets (URL)")
-    csv_url = "https://docs.google.com/sheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
     st.markdown(f"L'application charge les données du portefeuille depuis cette source par défaut : [Google Sheets CSV]({csv_url})")
 
     if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"):
