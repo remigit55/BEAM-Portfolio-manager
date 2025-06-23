@@ -262,9 +262,8 @@ def main():
     with onglets[6]:
         # Cette fonction doit gérer le téléchargement de fichier et la sélection de la devise cible
         # et mettre à jour st.session_state.df, st.session_state.uploaded_file_id et st.session_state.devise_cible
-        afficher_parametres_globaux() 
-
-   
+        afficher_parametres_globaux()    
+    
     st.markdown("---")
 
 
