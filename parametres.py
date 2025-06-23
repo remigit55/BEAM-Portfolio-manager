@@ -26,7 +26,7 @@ def afficher_parametres_globaux():
             st.session_state.last_update_time_fx = datetime.datetime.now()
             st.session_state.last_devise_cible_for_fx_update = st.session_state.devise_cible
         st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Taux de change mis à jour.")
-        st.experimental_rerun()  # ✅ rechargement total pour actualiser la synthèse
+        st.rerun()  # ✅ rechargement total pour actualiser la synthèse
 
 
     st.markdown("---")
