@@ -8,7 +8,7 @@ import numpy as np
 # Import des fonctions utilitaires
 from utils import safe_escape, format_fr
 
-# Import des fonctions de récupération de données.
+# Import des fonctions de récupération de données
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 
 # --- Fonction de conversion de devise ---
@@ -39,11 +39,9 @@ def convertir(val, source_devise, devise_cible, fx_rates):
     if pd.isna(taux_scalar) or taux_scalar == 0:
         # Si le taux est manquant ou nul, la conversion est impossible/non fiable.
         # Retourne la valeur non convertie et un indicateur de taux manquant (ex: np.nan ou 0)
-        # st.warning(f"Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
         return val, np.nan # Retourne la valeur originale et un taux NaN pour indiquer l'absence de conversion
         
     return val * taux_scalar, taux_scalar # Retourne la valeur convertie ET le taux utilisé
-
 
 def afficher_portefeuille():
     """
@@ -67,9 +65,15 @@ def afficher_portefeuille():
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
         devises_uniques_df = df["Devise"].dropna().unique().tolist() if "Devise" in df.columns else []
         devises_a_fetch = list(set([devise_cible] + devises_uniques_df))
-        st.session_state.fx_rates = fetch_fx_rates(devise_cible, devises_a_fetch)
+        st.session_state.fx_rates = fetch_fx_rates(devise_cible)
     
     fx_rates = st.session_state.fx_rates
+
+    # Debugging: Display missing exchange rates
+    devises_uniques = df["Devise"].dropna().unique().tolist() if "Devise" in df.columns else []
+    missing_rates = [devise for devise in devises_uniques if fx_rates.get(devise.upper()) is None and devise.upper() != devise_cible.upper()]
+    if missing_rates:
+        st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
@@ -110,7 +114,6 @@ def afficher_portefeuille():
         df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("currentPrice", np.nan))
         df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
 
-        # df["Last Price"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Last Price", np.nan)) # Ligne supprimée
         df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
         df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Signal", ""))
@@ -121,7 +124,6 @@ def afficher_portefeuille():
         df["shortName"] = ""
         df["currentPrice"] = np.nan
         df["fiftyTwoWeekHigh"] = np.nan
-        # df["Last Price"] = np.nan # Ligne supprimée
         df["Momentum (%)"] = np.nan
         df["Z-Score"] = np.nan
         df["Signal"] = ""
@@ -153,7 +155,6 @@ def afficher_portefeuille():
         lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
-
 
     # Calcul des totaux globaux convertis
     total_valeur = df["Valeur_conv"].sum()
@@ -187,7 +188,6 @@ def afficher_portefeuille():
             else:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places))
 
-
     # Définition des colonnes à afficher et de leurs libellés
     cols = [
         ticker_col, "shortName", "Catégories", "Devise", 
@@ -197,7 +197,6 @@ def afficher_portefeuille():
         "Taux_FX_Acquisition_fmt", 
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        # "Last Price", # Ligne supprimée
         "Momentum (%)_fmt", "Z-Score_fmt",
         "Signal", "Action", "Justification"
     ]
@@ -209,7 +208,6 @@ def afficher_portefeuille():
         "Taux FX (Source/Cible)", 
         "Prix Actuel", f"Valeur Actuelle ({devise_cible})", "Gain/Perte", "Gain/Perte (%)",
         "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT",
-        # "Dernier Prix", # Ligne supprimée
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -445,7 +443,6 @@ def afficher_portefeuille():
 
     return total_valeur, total_actuelle, total_h52, total_lt
 
-
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
     Affiche la synthèse globale du portefeuille, y compris les métriques clés et le nouveau
@@ -498,7 +495,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         )
     st.markdown("---")
 
-
     # --- Nouveau Tableau de Répartition par Catégories ---
     st.markdown("#### Répartition et Objectifs par Catégories")  
 
@@ -541,7 +537,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
             theoretical_portfolio_total_from_minieres = total_actuelle  
-
 
         results_data = []
 
@@ -589,7 +584,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         df_allocation["Cible (%_fmt)"] = df_allocation["Cible (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation["Écart à l'objectif (%_fmt)"] = df_allocation["Écart à l'objectif (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation[f"Ajustement Nécessaire_fmt"] = df_allocation["Ajustement Nécessaire"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
-
 
         # Définition des colonnes à afficher dans le tableau HTML
         cols_to_display = [
@@ -640,12 +634,12 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     )[cols_to_display]
                     df_disp_cat.columns = labels_for_display
                 else:  
+                    df_sort sur une base de chaînes ou non-numériques
                     df_disp_cat = df_disp_cat.sort_values(
                         by=sort_col_label_cat,
                         ascending=(st.session_state.sort_direction_cat == "asc"),
                         key=lambda x: x.astype(str).str.lower()
                     )
-
 
         # CSS spécifique pour le tableau de catégories
         css_col_widths_cat = ""
@@ -655,22 +649,19 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
             "Écart à l'objectif (%)": "120px",
-            f"Ajustement Nécessaire": "150px"
+            "Ajustement Nécessaire": "150px"
         }
         left_aligned_labels_cat = ["Catégories"]
 
         for i, label in enumerate(df_disp_cat.columns):
-            col_idx = i + 1  
-            
-            if label in width_specific_cols_cat:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[label]}; }}\n"
+            col_idx = i +  if col_idx in width_specific_cols_cat:
+                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[cols_cat_label]}; }}\n"
             else:
                 css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: auto; }}\n"
             
             if label in left_aligned_labels_cat:
                 css_col_widths_cat += f".category-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n"  
                 css_col_widths_cat += f".category-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n"  
-
 
         html_code_cat = f"""
         <style>
