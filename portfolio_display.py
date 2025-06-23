@@ -418,6 +418,7 @@ def afficher_portefeuille():
         .total-row td {{
             background: #A49B6D;
             color: white;
+            border: none;
             font-weight: bold;
         }}
     </style>
