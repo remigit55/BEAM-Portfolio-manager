@@ -27,7 +27,8 @@ def convertir(val, source_devise, devise_cible, fx_rates):
     if source_devise == devise_cible:
         return val, 1.0 # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    fx_key = source_devise
+    # Correction ici: Construire la clé fx_key comme "SOURCE/CIBLE"
+    fx_key = f"{source_devise}/{devise_cible}"
     raw_taux = fx_rates.get(fx_key)
     
     try:
@@ -174,7 +175,7 @@ def afficher_portefeuille():
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4), ("Valeur_LT", 2), ("Gain/Perte", 2),
         ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2),
-        ("Taux_FX_Acquisition", 6) 
+        ("Taux_FX_Acquisition", 6)
     ]:
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
@@ -739,6 +740,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 val_str = safe_escape(str(val)) if pd.notnull(val) else ""
                 html_code_cat += f"<td>{val_str}</td>"
             html_code_cat += "</tr>"
+
         html_code_cat += """
                 </tbody>
             </table>
