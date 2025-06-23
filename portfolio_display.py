@@ -38,9 +38,9 @@ def convertir(val, source_devise, devise_cible, fx_rates):
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
         # Si le taux est manquant ou nul, la conversion est impossible/non fiable.
-        # Nous retournons la valeur originale comme spécifié.
-        # Vous pouvez choisir de retourner np.nan ici si vous préférez que les valeurs non convertibles soient vides.
-        return val 
+        # DEBUG: Si cela se produit, c'est une cause potentielle du problème.
+        # st.warning(f"DEBUG: Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
+        return val # Retourne la valeur non convertie
         
     return val * taux_scalar
 
@@ -70,6 +70,9 @@ def afficher_portefeuille():
         st.session_state.fx_rates = fetch_fx_rates(devise_cible, devises_a_fetch)
     
     fx_rates = st.session_state.fx_rates
+
+    # DEBUG: Afficher les taux de change disponibles
+    # st.write("DEBUG: Taux de change disponibles (fx_rates):", fx_rates)
 
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
@@ -134,11 +137,20 @@ def afficher_portefeuille():
 
     df["Devise"] = df["Devise"].fillna(devise_cible).astype(str).str.upper()
 
+    # DEBUG: Avant conversion
+    # st.write("DEBUG: DataFrame avant conversion des valeurs d'acquisition:")
+    # st.dataframe(df[["Ticker", "Quantité", "Acquisition", "Valeur Acquisition", "Devise"]].head())
+
     # Conversion des valeurs à la devise cible
     df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), axis=1)
     df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates), axis=1)
     df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates), axis=1)
     df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), axis=1)
+
+    # DEBUG: Après conversion
+    # st.write("DEBUG: DataFrame après conversion des valeurs d'acquisition (colonne Valeur_conv):")
+    # st.dataframe(df[["Ticker", "Valeur Acquisition", "Devise", "Valeur_conv"]].head())
+    # st.write(f"DEBUG: Somme de Valeur_conv: {df['Valeur_conv'].sum()}")
 
     # Calcul des totaux globaux convertis
     total_valeur = df["Valeur_conv"].sum()
@@ -163,6 +175,8 @@ def afficher_portefeuille():
     ]:
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
+                # Afficher les colonnes formatées avec la devise cible pour le tableau principal
+                # Même si "Valeur Acquisition" est calculée en devise d'origine, son formatage pour l'affichage peut être en devise cible ici
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}")
             elif col_name == "Gain/Perte (%)" or col_name == "Momentum (%)":
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %")
@@ -173,7 +187,7 @@ def afficher_portefeuille():
     # Définition des colonnes à afficher et de leurs libellés
     cols = [
         ticker_col, "shortName", "Catégorie", "Devise",
-        "Quantité_fmt", "Acquisition_fmt", "Valeur Acquisition_fmt",
+        "Quantité_fmt", "Acquisition_fmt", "Valeur Acquisition_fmt", # Note: Valeur Acquisition_fmt est maintenant en devise cible pour l'affichage
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
         "Last Price", "Momentum (%)_fmt", "Z-Score_fmt",
@@ -461,7 +475,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
 
     # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.subheader("Répartition et Objectifs par Catégorie")
+    st.markdown("#### Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
     target_allocations = {
@@ -486,15 +500,28 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         portfolio_total_value = total_actuelle
         
-        if portfolio_total_value <= 0:
-            st.info("La valeur totale actuelle du portefeuille est de 0 ou moins. Impossible de calculer la répartition par catégorie de manière significative.")
-            # Afficher quand même le tableau avec des zéros si on veut, mais les calculs suivants seraient incohérents
+        # DEBUG: Vérification de la devise de portfolio_total_value
+        # st.write(f"DEBUG SYNT: portfolio_total_value = {portfolio_total_value} (devise cible: {devise_cible})")
+        # st.write(f"DEBUG SYNT: Type de portfolio_total_value = {type(portfolio_total_value)}")
+        # st.write(f"DEBUG SYNT: Is portfolio_total_value NaN? {pd.isna(portfolio_total_value)}")
+
+        if portfolio_total_value <= 0 or pd.isna(portfolio_total_value): # Ajout de la vérification NaN
+            st.info("La valeur totale actuelle du portefeuille est de 0 ou moins, ou non définie. Impossible de calculer la répartition par catégorie de manière significative.")
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
         
+        # DEBUG: Vérification des valeurs converties avant groupement
+        # st.write("DEBUG SYNT: Aperçu de df[['Devise', 'Valeur_Actuelle', 'Valeur_Actuelle_conv']] avant groupement:")
+        # st.dataframe(df[['Devise', 'Valeur_Actuelle', 'Valeur_Actuelle_conv']].head())
+        # st.write(f"DEBUG SYNT: Somme des Valeur_Actuelle_conv dans df: {df['Valeur_Actuelle_conv'].sum()} (devrait être total_actuelle)")
+
         category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
         
+        # DEBUG: Vérification des sommes par catégorie
+        # st.write("DEBUG SYNT: Valeurs actuelles par catégorie (déjà converties):")
+        # st.dataframe(category_values)
+
         results_data = []
 
         all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
@@ -502,15 +529,29 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         for category in all_relevant_categories:
             target_pct = target_allocations.get(category, 0.0) 
             current_value_cat = category_values.get(category, 0.0) 
+            
+            # Assurez-vous que current_value_cat est bien un nombre, même si la catégorie est absente
+            if pd.isna(current_value_cat):
+                current_value_cat = 0.0
+
             current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0.0
 
             deviation_pct = current_pct - target_pct
             
             # CALCUL CORRECT DE L'AJUSTEMENT NÉCESSAIRE
+            # Toutes ces valeurs devraient être dans la devise cible
             target_value_for_category = target_pct * portfolio_total_value
             
             value_to_adjust = target_value_for_category - current_value_cat
             
+            # DEBUG: Vérification des composants du calcul d'ajustement
+            # st.write(f"DEBUG SYNT: Catégorie: {category}")
+            # st.write(f"DEBUG SYNT:   target_pct: {target_pct}")
+            # st.write(f"DEBUG SYNT:   current_value_cat: {current_value_cat} ({devise_cible})")
+            # st.write(f"DEBUG SYNT:   portfolio_total_value: {portfolio_total_value} ({devise_cible})")
+            # st.write(f"DEBUG SYNT:   target_value_for_category: {target_value_for_category} ({devise_cible})")
+            # st.write(f"DEBUG SYNT:   value_to_adjust (Ajustement Nécessaire): {value_to_adjust} ({devise_cible})")
+
             valeur_pour_atteindre_objectif_str = ""
             if pd.notna(value_to_adjust):
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
@@ -521,7 +562,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 "Part Actuelle (%)": current_pct * 100, # Garder numérique pour le tri
                 "Cible (%)": target_pct * 100,
                 "Écart à l'objectif (%)": deviation_pct * 100,
-                f"Ajustement Nécessaire ({devise_cible})": value_to_adjust # Garder numérique pour le tri
+                "Ajustement Nécessaire": value_to_adjust # Garder numérique pour le tri
             })
 
         df_allocation = pd.DataFrame(results_data)
@@ -534,7 +575,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         df_allocation["Part Actuelle (%_fmt)"] = df_allocation["Part Actuelle (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation["Cible (%_fmt)"] = df_allocation["Cible (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation["Écart à l'objectif (%_fmt)"] = df_allocation["Écart à l'objectif (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
-        df_allocation[f"Ajustement Nécessaire ({devise_cible})_fmt"] = df_allocation[f"Ajustement Nécessaire ({devise_cible})"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
+        df_allocation[f"Ajustement Nécessaire_fmt"] = df_allocation["Ajustement Nécessaire"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
 
 
         # Définition des colonnes à afficher dans le tableau HTML
@@ -544,7 +585,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%_fmt)",
             "Cible (%_fmt)",
             "Écart à l'objectif (%_fmt)",
-            f"Ajustement Nécessaire ({devise_cible})_fmt"
+            f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
             "Catégorie",
@@ -552,7 +593,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)",
             "Cible (%)",
             "Écart à l'objectif (%)",
-            f"Ajustement Nécessaire ({devise_cible})"
+            f"Ajustement Nécessaire" 
         ]
 
         df_disp_cat = df_allocation[cols_to_display].copy()
@@ -577,8 +618,8 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     original_col_for_sort = "Cible (%)"
                 elif sort_col_label_cat == "Écart à l'objectif (%)":
                     original_col_for_sort = "Écart à l'objectif (%)"
-                elif sort_col_label_cat == f"Ajustement Nécessaire ({devise_cible})":
-                    original_col_for_sort = f"Ajustement Nécessaire ({devise_cible})"
+                elif sort_col_label_cat == f"Ajustement Nécessaire":
+                    original_col_for_sort = "Ajustement Nécessaire"
                 
                 if original_col_for_sort and pd.api.types.is_numeric_dtype(df_allocation[original_col_for_sort]):
                     df_disp_cat = df_allocation.sort_values(
@@ -602,7 +643,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
             "Écart à l'objectif (%)": "120px",
-            f"Ajustement Nécessaire ({devise_cible})": "150px"
+            f"Ajustement Nécessaire": "150px"
         }
         left_aligned_labels_cat = ["Catégorie"]
 
