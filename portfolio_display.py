@@ -609,7 +609,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
-            "Categorie",
+            "Catégories",
             "Valeur Actuelle",
             "Part Actuelle (%)",
             "Cible (%)",
