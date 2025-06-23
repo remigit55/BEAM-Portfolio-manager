@@ -76,10 +76,17 @@ def afficher_portefeuille():
         df["Valeur"] = np.nan
 
     # Gérer la colonne Catégorie
+    st.write("DEBUG (afficher_portefeuille): Colonnes du DataFrame avant traitement Catégorie:", df.columns.tolist())
+    st.write("DEBUG (afficher_portefeuille): Nombre de colonnes:", len(df.columns))
     if len(df.columns) > 5:
+        st.write("DEBUG (afficher_portefeuille): Contenu de df.iloc[:, 5] (premières lignes):")
+        st.dataframe(df.iloc[:, 5].head())
         df["Catégorie"] = df.iloc[:, 5].astype(str).fillna("")
     else:
         df["Catégorie"] = ""
+    st.write("DEBUG (afficher_portefeuille): Colonne 'Catégorie' créée. Contenu unique:", df["Catégorie"].unique())
+    st.write("DEBUG (afficher_portefeuille): Le DataFrame contient bien la colonne 'Catégorie' ?", "Catégorie" in df.columns)
+
 
     # Déterminer la colonne Ticker (Tickers est un fallback)
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -492,10 +499,11 @@ def afficher_repartition_categorie(df):
     """
     Affiche la répartition du portefeuille par catégorie.
     """
-    # st.write("DEBUG: Entrée dans afficher_repartition_categorie") # Ligne de débogage supprimée
-    # st.write("DEBUG: df est None ?", df is None) # Ligne de débogage supprimée
-    # st.write("DEBUG: 'Catégorie' dans df.columns ?", "Catégorie" in df.columns) # Ligne de débogage supprimée
-    # st.write("DEBUG: 'Valeur_Actuelle_conv' dans df.columns ?", "Valeur_Actuelle_conv" in df.columns) # Ligne de débogage supprimée
+    st.write("DEBUG (afficher_repartition_categorie): Est-ce que df est None ?", df is None)
+    st.write("DEBUG (afficher_repartition_categorie): La colonne 'Catégorie' existe ?", "Catégorie" in df.columns)
+    if "Catégorie" in df.columns:
+        st.write("DEBUG (afficher_repartition_categorie): Valeurs uniques dans 'Catégorie':", df["Catégorie"].unique())
+    st.write("DEBUG (afficher_repartition_categorie): La colonne 'Valeur_Actuelle_conv' existe ?", "Valeur_Actuelle_conv" in df.columns)
 
     if df is not None and "Catégorie" in df.columns and "Valeur_Actuelle_conv" in df.columns:
         df_repartition = df.groupby("Catégorie")["Valeur_Actuelle_conv"].sum().reset_index()
