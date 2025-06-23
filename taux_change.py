@@ -15,15 +15,15 @@ def format_fr(value, decimals):
     formatted = f"{value:,.{decimals}f}"
     return formatted.replace(",", " ").replace(".", ",")
 
-def afficher_tableau_taux_change(devise_cible):
+def afficher_tableau_taux_change(devise_cible, fx_rates):
     """
     Génère et affiche le tableau HTML stylisé des taux de change.
+    Args:
+        devise_cible (str): The target currency (e.g., "EUR").
+        fx_rates (dict): Dictionary of currency codes to exchange rates.
     """
-    # Refresh fx_rates pour assurer des données à jour
-    fx_rates = fetch_fx_rates(devise_cible)
-
-    if not fx_rates:
-        st.info("Aucun taux de change valide récupéré ou aucune devise unique dans le portefeuille.")
+    if not fx_rates or not isinstance(fx_rates, dict):
+        st.info("Aucun taux de change valide disponible. Veuillez vérifier les données ou actualiser les taux.")
         return
 
     df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
