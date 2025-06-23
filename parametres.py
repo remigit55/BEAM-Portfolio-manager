@@ -118,4 +118,4 @@ def afficher_parametres_globaux():
 
     # --- 5. Relancer l'app si la devise a changé ---
     if devise_changed:
-        st.rerun()
+        st.session_state.force_refresh_calculs = True
