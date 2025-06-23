@@ -42,7 +42,7 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         # st.warning(f"DEBUG: Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
         return val # Retourne la valeur non convertie
         
-    return val * taux_scalar
+    return val / taux_scalar
 
 
 def afficher_portefeuille():
