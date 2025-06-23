@@ -212,6 +212,7 @@ def afficher_portefeuille():
                 if conv_col in df.columns:
                     df[f"{col_name}_fmt"] = df[conv_col].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
                 else:
+                    st.warning(f"Colonne convertie {conv_col} manquante pour {col_name}. Utilisation de la valeur non convertie.")
                     df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
             elif col_name in ["Gain/Perte (%)", "Momentum (%)"]:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %" if pd.notnull(x) else "")
@@ -224,8 +225,8 @@ def afficher_portefeuille():
     cols = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité_fmt", "Acquisition_fmt", 
-        "Valeur Acquisition", 
-        "Valeur Acquisition_fmt", 
+        "Valeur Acquisition_fmt",  # Use formatted source value
+        "Valeur_conv",  # Use converted value for EUR
         "Taux_FX_Acquisition_fmt", 
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
@@ -244,29 +245,44 @@ def afficher_portefeuille():
         "Signal", "Action", "Justification"
     ]
 
+    # Sélection des colonnes existantes avec priorité aux colonnes formatées
     existing_cols_in_df = []
     existing_labels = []
     for i, col_name in enumerate(cols):
-        if col_name in ["Valeur Acquisition", "Taux_FX_Acquisition", "Taux_FX_Actuel", "Taux_FX_H52", "Taux_FX_LT"]:
-            if col_name in df.columns:
-                existing_cols_in_df.append(col_name)
-                existing_labels.append(labels[i])
-        elif col_name == ticker_col and ticker_col is not None:
+        if col_name == ticker_col and ticker_col is not None:
             if ticker_col in df.columns:
                 existing_cols_in_df.append(ticker_col)
                 existing_labels.append(labels[i])
         elif col_name.endswith("_fmt"):
-            base_col_name = col_name[:-4]  
-            if f"{base_col_name}_fmt" in df.columns:  
-                existing_cols_in_df.append(f"{base_col_name}_fmt")
+            if col_name in df.columns:
+                existing_cols_in_df.append(col_name)
                 existing_labels.append(labels[i])
-            elif base_col_name in df.columns:
-                existing_cols_in_df.append(base_col_name)
-                existing_labels.append(labels[i])
-        elif col_name in df.columns:  
+            else:
+                base_col_name = col_name[:-4]
+                if base_col_name in df.columns:
+                    st.warning(f"Colonne formatée {col_name} manquante. Utilisation de {base_col_name}.")
+                    existing_cols_in_df.append(base_col_name)
+                    existing_labels.append(labels[i])
+        elif col_name in df.columns:
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
-            
+
+    # Debugging: Afficher les colonnes sélectionnées pour le tableau
+    st.write("Colonnes sélectionnées pour l’affichage du tableau:")
+    st.write(f"existing_cols_in_df: {existing_cols_in_df}")
+    st.write(f"existing_labels: {existing_labels}")
+
+    # Debugging: Vérifier les valeurs formatées
+    st.write("Valeurs formatées pour le tableau (échantillon):")
+    debug_cols = [
+        col for col in ["Valeur_Actuelle_fmt", "Valeur_conv", "Gain/Perte_fmt", "Valeur_H52_fmt", "Valeur_LT_fmt"]
+        if col in df.columns
+    ]
+    if debug_cols:
+        st.dataframe(df[["Devise"] + debug_cols].head())
+    else:
+        st.warning("Aucune colonne formatée disponible pour le débogage.")
+
     if not existing_cols_in_df:
         st.warning("Aucune colonne de données valide à afficher.")
         return total_valeur, total_actuelle, total_h52, total_lt
@@ -410,9 +426,11 @@ def afficher_portefeuille():
         for lbl in df_disp.columns:
             val = row[lbl]
             if lbl == "Valeur Acquisition (Source)":
-                val_str = f"{format_fr(val, 2)} {row['Devise Source']}" if pd.notnull(val) else ""
+                val_str = str(val) if pd.notnull(val) else ""  # Already formatted with currency
             elif lbl == "Taux FX (Source/Cible)":
-                val_str = format_fr(val, 6) if pd.notnull(val) else "N/A"
+                val_str = str(val) if pd.notnull(val) else "N/A"  # Already formatted
+            elif lbl == f"Valeur Acquisition ({devise_cible})":
+                val_str = format_fr(val, 2) + f" {devise_cible}" if pd.notnull(val) else ""
             else:
                 val_str = safe_escape(str(val)) if pd.notnull(val) else ""
             
