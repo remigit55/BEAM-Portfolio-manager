@@ -188,15 +188,22 @@ def afficher_portefeuille():
 
     # Formatage des colonnes pour l'affichage
     for col_name, dec_places in [
-        ("Quantité", 0), ("Acquisition", 4), ("Valeur Acquisition", 2), ("currentPrice", 4),
-        ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
-        ("Objectif_LT", 4), ("Valeur_LT", 2), ("Gain/Perte", 2),
+        ("Quantité", 0), ("Acquisition", 4), ("currentPrice", 4),
+        ("fiftyTwoWeekHigh", 4), ("Objectif_LT", 4),
         ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2),
-        ("Taux_FX_Acquisition", 6), ("Taux_FX_Actuel", 6), ("Taux_FX_H52", 6), ("Taux_FX_LT", 6)
+        ("Taux_FX_Acquisition", 6), ("Taux_FX_Actuel", 6), ("Taux_FX_H52", 6), ("Taux_FX_LT", 6),
+        ("Valeur Acquisition", 2), ("Valeur_Actuelle", 2), ("Valeur_H52", 2), ("Valeur_LT", 2), ("Gain/Perte", 2)
     ]:
         if col_name in df.columns:
-            if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
+            if col_name in ["Valeur Acquisition"]:
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {df['Devise'].iloc[df.index.get_loc(x.name)]}" if pd.notnull(x) else "")
+            elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT", "Gain/Perte"]:
+                # Use converted values for EUR display
+                conv_col = f"{col_name}_conv"
+                if conv_col in df.columns:
+                    df[f"{col_name}_fmt"] = df[conv_col].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
+                else:
+                    df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
             elif col_name in ["Gain/Perte (%)", "Momentum (%)"]:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %" if pd.notnull(x) else "")
             elif col_name.startswith("Taux_FX_"):
@@ -222,7 +229,7 @@ def afficher_portefeuille():
         "Valeur Acquisition (Source)", 
         f"Valeur Acquisition ({devise_cible})", 
         "Taux FX (Source/Cible)", 
-        "Prix Actuel", f"Valeur Actuelle ({devise_cible})", "Gain/Perte", "Gain/Perte (%)",
+        "Prix Actuel", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
         "Haut 52 Semaines", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
@@ -277,7 +284,6 @@ def afficher_portefeuille():
                 pass
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                # Sort on the original numeric column for accuracy
                 df = df.sort_values(
                     by=original_col_name,
                     ascending=(st.session_state.sort_direction == "asc")
@@ -285,7 +291,6 @@ def afficher_portefeuille():
                 df_disp = df[existing_cols_in_df].copy()
                 df_disp.columns = existing_labels
             else:
-                # Sort on the display column (string or non-numeric)
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
