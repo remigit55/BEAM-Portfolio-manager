@@ -98,7 +98,6 @@ for key, default in {
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
     "url_data_loaded": False,
-    "force_refresh_calculs": False,
     "target_allocations": {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -129,12 +128,7 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
         st.session_state.url_data_loaded = True
 
-# Actualisation automatique des taux de change ou recalculs si forcés
-if st.session_state.get("force_refresh_calculs", False):
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.session_state.force_refresh_calculs = False
-
+# Actualisation automatique des taux de change
 current_time = datetime.datetime.now()
 if (st.session_state.last_update_time_fx == None or st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
