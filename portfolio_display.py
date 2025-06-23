@@ -36,7 +36,6 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # Log pour debugging
         st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({raw_taux}).")
         return val, np.nan  # Retourne la valeur originale et un taux NaN
         
@@ -185,7 +184,7 @@ def afficher_portefeuille():
                     f"{format_fr(val, dec_places)} {dev}" if pd.notnull(val) else ""
                     for val, dev in zip(df[col_name], df["Devise"])
                 ]
-            elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT", "Gain/Perte"]:
+            elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT"]:
                 # Utiliser les valeurs converties pour l'affichage en EUR
                 conv_col = f"{col_name}_conv"
                 if conv_col in df.columns:
@@ -193,6 +192,9 @@ def afficher_portefeuille():
                 else:
                     st.warning(f"Colonne convertie {conv_col} manquante pour {col_name}. Utilisation de la valeur non convertie.")
                     df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
+            elif col_name == "Gain/Perte":
+                # Gain/Perte est déjà en devise cible, pas besoin de conv_col
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
             elif col_name in ["Gain/Perte (%)", "Momentum (%)"]:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %" if pd.notnull(x) else "")
             elif col_name.startswith("Taux_FX_"):
@@ -518,7 +520,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         "Autre": 0.00  
     }
 
-    if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
+    if "df" in st.session_state and st.session_state.df is None or st.session_state.df.empty:
         df = st.session_state.df.copy()
         
         if 'Catégories' not in df.columns:
