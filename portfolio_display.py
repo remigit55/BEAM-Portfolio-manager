@@ -473,7 +473,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
 
     # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.subheader("Répartition et Objectifs par Catégorie")
     st.markdown("#### Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
