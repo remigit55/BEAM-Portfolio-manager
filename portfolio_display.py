@@ -2,8 +2,8 @@
 
 import streamlit as st
 import pandas as pd
-import streamlit.components.v1 as components
 import numpy as np
+import streamlit.components.v1 as components
 
 # Import des fonctions utilitaires
 from utils import safe_escape, format_fr
@@ -139,7 +139,7 @@ def afficher_portefeuille():
         df["Signal"] = ""
         df["Action"] = ""
         df["Justification"] = ""
-    
+
     # Calcul des valeurs du portefeuille
     df["Valeur Acquisition"] = df["Quantité"] * df["Acquisition"]
     df["Valeur_H52"] = df["Quantité"] * df["fiftyTwoWeekHigh"]
@@ -192,17 +192,17 @@ def afficher_portefeuille():
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4), ("Valeur_LT", 2), ("Gain/Perte", 2),
         ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2),
-        ("Taux_FX_Acquisition", 6)
+        ("Taux_FX_Acquisition", 6), ("Taux_FX_Actuel", 6), ("Taux_FX_H52", 6), ("Taux_FX_LT", 6)
     ]:
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}")
-            elif col_name == "Gain/Perte (%)" or col_name == "Momentum (%)":
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %")
-            elif col_name == "Taux_FX_Acquisition":
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) if pd.notna(x) else "N/A")
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}" if pd.notnull(x) else "")
+            elif col_name in ["Gain/Perte (%)", "Momentum (%)"]:
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %" if pd.notnull(x) else "")
+            elif col_name.startswith("Taux_FX_"):
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) if pd.notnull(x) else "N/A")
             else:
-                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places))
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) if pd.notnull(x) else "")
 
     # Définition des colonnes à afficher et de leurs libellés
     cols = [
@@ -223,7 +223,7 @@ def afficher_portefeuille():
         f"Valeur Acquisition ({devise_cible})", 
         "Taux FX (Source/Cible)", 
         "Prix Actuel", f"Valeur Actuelle ({devise_cible})", "Gain/Perte", "Gain/Perte (%)",
-        "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT",
+        "Haut 52 Semaines", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -231,7 +231,7 @@ def afficher_portefeuille():
     existing_cols_in_df = []
     existing_labels = []
     for i, col_name in enumerate(cols):
-        if col_name in ["Valeur Acquisition", "Taux_FX_Acquisition"]:
+        if col_name in ["Valeur Acquisition", "Taux_FX_Acquisition", "Taux_FX_Actuel", "Taux_FX_H52", "Taux_FX_LT"]:
             if col_name in df.columns:
                 existing_cols_in_df.append(col_name)
                 existing_labels.append(labels[i])
@@ -277,45 +277,16 @@ def afficher_portefeuille():
                 pass
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                df_allocation = df_allocation.sort_values(by=original_col_value, ascending=True, inplace=True)
-                df_allocation = df.sort_values(by=original_col_name, ascending=True, inplace=False)
-                df_allocation = pd.DataFrame(df_allocation, index=df.index, columns=df.columns)
-                df_disp = df_allocation.sort_values(
-                    by=sort_col_label,  
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: pd.to_numeric(
-                        x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
-                        errors='coerce'
-                    ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
+                # Sort on the original numeric column for accuracy
+                df = df.sort_values(
+                    by=original_col_name,
+                    ascending=(st.session_state.sort_direction == "asc")
                 )
+                df_disp = df[existing_cols_in_df].copy()
+                df_disp.columns = existing_labels
             else:
-                df_allocation = df_allocation.sort_values(
-                    by=sort_col,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: x.__str__().lower()
-                )
-                df_allocation = df.sort_values(
-                    by=str,
-                    ascending=False,
-                    inplace=True
-                )
-                df_allocation = df.sort_values(
-                    by=str,
-                    ascending=(False, ),
-                    inplace=True
-                )
-                df = df.sort_values(
-                    by=str.lower(),
-                    ascending=False,
-                    inplace=True
-                )
-                df = df.sort_values(
-                    by=str.lower(),
-                    ascending=(False, ),
-                    False
-                )
-                
-                df_disp = df.sort_values(
+                # Sort on the display column (string or non-numeric)
+                df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: x.astype(str).str.lower()
@@ -441,8 +412,8 @@ def afficher_portefeuille():
     total_cols_mapping = {
         f"Valeur Acquisition ({devise_cible})": total_valeur_str,
         f"Valeur Actuelle ({devise_cible})": total_actuelle_str,
-        "Valeur H52": total_h52_str,  
-        "Valeur LT": total_lt_str
+        f"Valeur H52 ({devise_cible})": total_h52_str,  
+        f"Valeur LT ({devise_cible})": total_lt_str
     }
 
     for display_label, total_value_str in total_cols_mapping.items():
@@ -499,9 +470,8 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
         return
 
-    # Affichage des métriques clés (Valeur d'Acquisition, Actuelle, Gain/Perte, Objectif LT)
-    # Suppression complète de Valeur H52 de cette section
-    col1, col2, col3, col4 = st.columns(4) # Nous utilisons 4 colonnes pour l'équilibre visuel, même si la dernière n'affiche qu'un élément.
+    # Affichage des métriques clés
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
@@ -531,7 +501,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 delta="N/A %"
             )
 
-    # Cette colonne n'affichera PLUS "Valeur H52". Elle affichera uniquement "Objectif LT".
     with col4:
         lt_display = format_fr(total_lt, 2) if pd.notna(total_lt) else "N/A"
         st.metric(
@@ -540,7 +509,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         )
     st.markdown("---")
 
-    # --- Nouveau Tableau de Répartition par Catégories ---
+    # --- Tableau de Répartition par Catégories ---
     st.markdown("#### Répartition et Objectifs par Catégories")  
 
     # Définition des allocations cibles par catégorie
@@ -557,12 +526,9 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
         
-        # Le nom de la colonne est maintenant "Catégories"
         if 'Catégories' not in df.columns:
-            st.error("ERREUR : La colonne 'Catégories' est manquante dans le DataFrame pour la synthèse. "
-                     "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
-                     "la fonction 'afficher_portefeuille' la traite correctement.")
-            st.info(f"Colonnes disponibles : {df.columns.tolist()}")  
+            st.error("ERREUR : La colonne 'Catégories' est manquante dans le DataFrame pour la synthèse.")
+            st.info(f"Colonnes disponibles : {df.columns.tolist()}")
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
@@ -570,15 +536,10 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Regroupe par la colonne "Catégories"
         category_values = df.groupby('Catégories')['Valeur_Actuelle_conv'].sum()
         
-        # --- CALCUL DE LA BASE POUR L'OBJECTIF SELON LA RÈGLE SPÉCIFIQUE ---
+        # Calcul de la base pour l'objectif
         current_minieres_value = category_values.get("Minières", 0.0)
         target_minieres_pct = target_allocations.get("Minières", 0.0)
-
-        theoretical_portfolio_total_from_minieres = 0.0
-        if target_minieres_pct > 0:
-            theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct
-        else:
-            theoretical_portfolio_total_from_minieres = total_actuelle  
+        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
             theoretical_portfolio_total_from_minieres = total_actuelle  
@@ -588,51 +549,41 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
         
         for category in all_relevant_categories:
-            target_pct = target_allocations.get(category, 0.0)  
-            current_value_cat = category_values.get(category, 0.0)  
+            target_pct = target_allocations.get(category, 0.0)
+            current_value_cat = category_values.get(category, 0.0)
             
             if pd.isna(current_value_cat):
                 current_value_cat = 0.0
 
-            # Calcul de la part actuelle basée sur le total réel du portefeuille
             current_pct = (current_value_cat / total_actuelle) if total_actuelle > 0 else 0.0
-
-            # Calcul de la VALEUR CIBLE pour cette catégorie en utilisant le total théorique dérivé des Minières
             target_value_for_category = target_pct * theoretical_portfolio_total_from_minieres
-            
-            # L'écart est la différence en pourcentage (basé sur le total actuel)
-            deviation_pct = (current_pct - target_pct)  
-            
-            # Ajustement nécessaire = (Valeur Cible de la Catégorie) - (Valeur Actuelle de la Catégorie)
+            deviation_pct = (current_pct - target_pct)
             value_to_adjust = target_value_for_category - current_value_cat
             
-            valeur_pour_atteindre_objectif_str = ""
-            if pd.notna(value_to_adjust):
-                valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
-            
+            valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}" if pd.notna(value_to_adjust) else ""
+
             results_data.append({
-                "Catégories": category,  
+                "Catégories": category,
                 "Valeur Actuelle": current_value_cat,
                 "Part Actuelle (%)": current_pct * 100,
                 "Cible (%)": target_pct * 100,
                 "Écart à l'objectif (%)": deviation_pct * 100,
-                "Ajustement Nécessaire": value_to_adjust  
+                "Ajustement Nécessaire": value_to_adjust
             })
 
         df_allocation = pd.DataFrame(results_data)
-        
         df_allocation = df_allocation.sort_values(by='Part Actuelle (%)', ascending=False)
         
-        # Formatage des colonnes pour l'affichage dans le HTML
+        # Formatage des colonnes pour l'affichage
         df_allocation["Valeur Actuelle_fmt"] = df_allocation["Valeur Actuelle"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
         df_allocation["Part Actuelle (%_fmt)"] = df_allocation["Part Actuelle (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation["Cible (%_fmt)"] = df_allocation["Cible (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation["Écart à l'objectif (%_fmt)"] = df_allocation["Écart à l'objectif (%)"].apply(lambda x: f"{format_fr(x, 2)} %")
         df_allocation[f"Ajustement Nécessaire_fmt"] = df_allocation["Ajustement Nécessaire"].apply(lambda x: f"{format_fr(x, 2)} {devise_cible}")
 
-        # Définition des colonnes à afficher dans le tableau HTML
+        # Définition des colonnes à afficher
         cols_to_display = [
-            "Catégories",  
+            "Catégories",
             "Valeur Actuelle_fmt",
             "Part Actuelle (%_fmt)",
             "Cible (%_fmt)",
@@ -640,12 +591,12 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
-            "Catégories",  
+            "Catégories",
             "Valeur Actuelle",
             "Part Actuelle (%)",
             "Cible (%)",
             "Écart à l'objectif (%)",
-            f"Ajustement Nécessaire"  
+            f"Ajustement Nécessaire"
         ]
 
         df_disp_cat = df_allocation[cols_to_display].copy()
@@ -669,7 +620,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     original_col_for_sort = "Cible (%)"
                 elif sort_col_label_cat == "Écart à l'objectif (%)":
                     original_col_for_sort = "Écart à l'objectif (%)"
-                elif sort_col_label_cat == f"Ajustement Nécessaire":
+                elif sort_col_label_cat == "Ajustement Nécessaire":
                     original_col_for_sort = "Ajustement Nécessaire"
                 
                 if original_col_for_sort and pd.api.types.is_numeric_dtype(df_allocation[original_col_for_sort]):
@@ -678,18 +629,17 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                         ascending=(st.session_state.sort_direction_cat == "asc")
                     )[cols_to_display]
                     df_disp_cat.columns = labels_for_display
-                else:  
-                    # Sort sur une base de chaînes ou non-numériques
+                else:
                     df_disp_cat = df_disp_cat.sort_values(
                         by=sort_col_label_cat,
                         ascending=(st.session_state.sort_direction_cat == "asc"),
                         key=lambda x: x.astype(str).str.lower()
                     )
 
-        # CSS spécifique pour le tableau de catégories
+        # CSS pour le tableau de catégories
         css_col_widths_cat = ""
         width_specific_cols_cat = {
-            "Catégories": "120px",  
+            "Catégories": "120px",
             "Valeur Actuelle": "120px",
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
