@@ -208,7 +208,7 @@ def main():
     with onglets[5]:
         st.markdown("#### Taux de Change Actuels")
         st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier, changement de devise cible, ou toutes les 60 secondes.")
-        if st.button("Actualiser les taux manuellement", key="manual_fx_refresh_btn_tab"):
+        if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
                 st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
