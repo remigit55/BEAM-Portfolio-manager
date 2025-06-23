@@ -12,11 +12,13 @@ def afficher_parametres_globaux():
     st.markdown("#### Devise de Référence")
 
     previous_devise = st.session_state.get("devise_cible", "EUR")
+    devise_changed = False
+
     available_currencies = ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"]
     st.session_state.devise_cible = st.selectbox(
         "Sélectionnez la devise de référence pour l'affichage des valeurs du portefeuille et des taux de change.",
         available_currencies,
-        index=available_currencies.index(st.session_state.get("devise_cible", "EUR")),
+        index=available_currencies.index(previous_devise),
         key="devise_selector_settings"
     )
 
@@ -26,8 +28,7 @@ def afficher_parametres_globaux():
             st.session_state.last_update_time_fx = datetime.datetime.now()
             st.session_state.last_devise_cible_for_fx_update = st.session_state.devise_cible
         st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Taux de change mis à jour.")
-        st.rerun()  # ✅ rechargement total pour actualiser la synthèse
-
+        devise_changed = True
 
     st.markdown("---")
 
@@ -114,3 +115,7 @@ def afficher_parametres_globaux():
     # --- 4. Autres Réglages ---
     st.markdown("#### Autres Réglages")
     st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
+
+    # --- 5. Relancer l'app si la devise a changé ---
+    if devise_changed:
+        st.experimental_rerun()
