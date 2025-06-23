@@ -51,7 +51,7 @@ def afficher_portefeuille():
     """
     if "df" not in st.session_state or st.session_state.df is None:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
-        return None, None, None, None
+        return None, None, None, None, None # Ajout d'un 5ème None pour df_repartition si besoin
 
     df = st.session_state.df.copy()
 
@@ -144,7 +144,7 @@ def afficher_portefeuille():
         df["Action"] = ""
         df["Justification"] = ""
 
-    # --- NOUVEL EMPLACEMENT POUR L'APPLICATION DES CONVERSIONS DE DEVISES ---
+    # --- DEPLACÉ ICI : APPLICATION DES CONVERSIONS DE DEVISES ---
     # Ces colonnes doivent exister avant d'être formatées
     df["Devise"] = df["Devise"].fillna("EUR").astype(str).str.upper() # S'assurer que la colonne Devise existe et est en majuscules
 
@@ -152,7 +152,7 @@ def afficher_portefeuille():
     df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
     df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
     df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates)[0], axis=1)
-    # --- FIN DU NOUVEL EMPLACEMENT ---
+    # --- FIN DU DEPLACEMENT ---
 
 
     # Formatage des colonnes (inclut maintenant les colonnes converties)
@@ -229,7 +229,7 @@ def afficher_portefeuille():
             
     if not existing_cols_in_df:
         st.warning("Aucune colonne de données valide à afficher.")
-        return total_valeur, total_actuelle, total_h52, total_lt
+        return total_valeur, total_actuelle, total_h52, total_lt, df # Retourne df même vide pour la catégorie mix
 
     # Créer le DataFrame à afficher avec les colonnes sélectionnées
     df_disp = df[existing_cols_in_df].copy()
@@ -437,7 +437,10 @@ def afficher_portefeuille():
 
     components.html(html_code, height=600, scrolling=True)
 
-    return total_valeur, total_actuelle, total_h52, total_lt
+    # Retourne le DataFrame df qui contient toutes les colonnes nécessaires (y compris les _conv)
+    # afin que afficher_repartition_categorie puisse l'utiliser.
+    return total_valeur, total_actuelle, total_h52, total_lt, df 
+
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
@@ -483,3 +486,112 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             label=f"**Objectif Long Terme ({devise_cible})**",
             value=f"{format_fr(total_lt, 2)} {devise_cible}"
         )
+
+
+def afficher_repartition_categorie(df):
+    """
+    Affiche la répartition du portefeuille par catégorie.
+    """
+    # st.write("DEBUG: Entrée dans afficher_repartition_categorie") # Ligne de débogage supprimée
+    # st.write("DEBUG: df est None ?", df is None) # Ligne de débogage supprimée
+    # st.write("DEBUG: 'Catégorie' dans df.columns ?", "Catégorie" in df.columns) # Ligne de débogage supprimée
+    # st.write("DEBUG: 'Valeur_Actuelle_conv' dans df.columns ?", "Valeur_Actuelle_conv" in df.columns) # Ligne de débogage supprimée
+
+    if df is not None and "Catégorie" in df.columns and "Valeur_Actuelle_conv" in df.columns:
+        df_repartition = df.groupby("Catégorie")["Valeur_Actuelle_conv"].sum().reset_index()
+        df_repartition.columns = ["Catégorie", "Valeur_Actuelle_conv"]
+        total_valeur_actuelle = df_repartition["Valeur_Actuelle_conv"].sum()
+        
+        if total_valeur_actuelle > 0:
+            df_repartition["Pourcentage (%)"] = (df_repartition["Valeur_Actuelle_conv"] / total_valeur_actuelle) * 100
+        else:
+            df_repartition["Pourcentage (%)"] = 0
+
+        # Sort by percentage descending
+        df_repartition = df_repartition.sort_values(by="Pourcentage (%)", ascending=False)
+
+        # Formatting for display
+        df_disp_cat = df_repartition.copy()
+        df_disp_cat["Valeur_Actuelle_conv_fmt"] = df_disp_cat["Valeur_Actuelle_conv"].map(lambda x: format_fr(x, 2))
+        df_disp_cat["Pourcentage (%)_fmt"] = df_disp_cat["Pourcentage (%)"].map(lambda x: format_fr(x, 2))
+
+        devise_cible = st.session_state.get("devise_cible", "EUR")
+
+        # HTML table generation
+        html_code_cat = f"""
+        <style>
+            .scroll-wrapper-cat {{
+                overflow-x: auto;
+                overflow-y: auto;
+                max-height: 400px; /* Adjusted height for category table */
+                width: 100%;
+                display: block;
+            }}
+            .category-table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }}
+            .category-table th {{
+                background: #363636;
+                color: white;
+                padding: 8px;
+                text-align: center;
+                border: none;
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                font-size: 12px;
+                box-sizing: border-box;
+            }}
+            .category-table td {{
+                padding: 6px;
+                text-align: right;
+                border: none;
+                font-size: 11px;
+                white-space: nowrap;
+            }}
+            .category-table tr:nth-child(even) {{ background: #efefef; }}
+            .category-table td:first-child {{ text-align: left; }} /* Align category name to left */
+            .category-table .total-cat-row td {{
+                background: #A49B6D;
+                color: white;
+                font-weight: bold;
+            }}
+        </style>
+        <div class="scroll-wrapper-cat">
+            <table class="category-table">
+                <thead>
+                    <tr>
+                        <th>Catégorie</th>
+                        <th>Valeur Actuelle ({safe_escape(devise_cible)})</th>
+                        <th>Pourcentage (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        for _, row in df_disp_cat.iterrows():
+            html_code_cat += "<tr>"
+            html_code_cat += f"<td>{safe_escape(row['Catégorie'])}</td>"
+            html_code_cat += f"<td>{row['Valeur_Actuelle_conv_fmt']}</td>"
+            html_code_cat += f"<td>{row['Pourcentage (%)_fmt']}%</td>" # Ajout du signe %
+            html_code_cat += "</tr>"
+
+        # Ligne Total pour la répartition par catégorie
+        html_code_cat += "<tr class='total-cat-row'>"
+        html_code_cat += f"<td>Total</td>"
+        html_code_cat += f"<td>{format_fr(total_valeur_actuelle, 2)} {safe_escape(devise_cible)}</td>"
+        html_code_cat += f"<td>100.00%</td>"
+        html_code_cat += "</tr>"
+
+        html_code_cat += """
+                </tbody>
+            </table>
+        </div>
+        """
+        
+        components.html(html_code_cat, height=450, scrolling=True)
+
+    else:
+        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégorie' pour calculer la répartition.")
+        st.warning("Veuillez importer votre portefeuille et vérifier la présence de la colonne 'Categories' dans votre fichier source.")
