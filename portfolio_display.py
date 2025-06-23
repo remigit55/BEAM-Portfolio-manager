@@ -521,7 +521,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 "Part Actuelle (%)": current_pct * 100, # Garder numérique pour le tri
                 "Cible (%)": target_pct * 100,
                 "Écart à l'objectif (%)": deviation_pct * 100,
-                f"Ajustement Nécessaire": value_to_adjust # Garder numérique pour le tri
+                f"Ajustement Nécessaire ({devise_cible})": value_to_adjust # Garder numérique pour le tri
             })
 
         df_allocation = pd.DataFrame(results_data)
