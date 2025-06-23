@@ -467,6 +467,22 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
         return
 
+        # Vérifier et normaliser la colonne 'Catégorie'
+    df = st.session_state.get("df")
+    if df is None:
+        st.warning("Le DataFrame de votre portefeuille est introuvable.")
+        return
+
+    expected_col = next((col for col in df.columns if col.strip().lower() == "catégorie"), None)
+    if expected_col is None:
+        st.warning("Le DataFrame ne contient pas de colonne 'Catégorie'. Veuillez vérifier votre fichier source.")
+        return
+
+    if expected_col != "Catégorie":
+        df["Catégorie"] = df[expected_col]
+
+    
+
     # Affichage des métriques clés
     col1, col2, col3, col4 = st.columns(4)
 
