@@ -461,13 +461,13 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
 
     # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.subheader("Répartition et Objectifs par Catégorie")
+    st.markdown(#### "Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
     target_allocations = {
         "Minières": 0.41,
         "Asie": 0.25,
-        "Énergie": 0.25,
+        "Energie": 0.25,
         "Matériaux": 0.01,
         "Devises": 0.08,
         "Crypto": 0.00,
