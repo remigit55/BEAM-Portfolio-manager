@@ -196,7 +196,7 @@ def main():
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
         else:
             # La fonction afficher_portefeuille retourne les totaux calculés
-            total_valeur, total_actuelle, total_h52, total_lt = afficher_portefeuille()
+            total_valeur, total_actuelle, total_h52, total_lt, df_portefeuille = afficher_portefeuille()
             # Mettre à jour les totaux dans session_state pour qu'ils soient accessibles à la synthèse
             st.session_state.total_valeur = total_valeur
             st.session_state.total_actuelle = total_actuelle
