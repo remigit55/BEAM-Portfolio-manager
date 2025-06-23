@@ -17,11 +17,9 @@ from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change
 from data_fetcher import fetch_fx_rates  # Updated import
-from parametres import afficher_parametres_globaux
-from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
-from historical_data_fetcher import fetch_stock_history
 from data_loader import load_data, save_data
 from utils import safe_escape, format_fr
+from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -43,32 +41,18 @@ st.markdown(f"""
         .stDataFrame td, .stDataFrame th {{
             text-align: right !important;
         }}
-        /* Supprimer la sidebar */
-        /*
-        .st-emotion-cache-vk33gh {{
-            display: none !important;
-        }}
-        .st-emotion-cache-1f06xpt {{
-            display: none !important;
-        }}
-        .st-emotion-cache-18ni7ap {{
-            display: none !important;
-        }}
-        */
-        /* Ajuster le contenu principal pour qu'il prenne toute la largeur si la sidebar est masquée */
         section.main {{
-            padding-right: 1rem; /* ou ajustez si nécessaire */
+            padding-right: 1rem;
         }}
-        /* Ajuster l'en-tête dupliqué si la sidebar est masquée */
         .st-emotion-cache-18ni7ap {{
             background-color: {ACCENT_COLOR};
             padding: 10px;
             border-radius: 0 0 10px 10px;
             margin-bottom: 25px;
-            margin-top: -55px; /* Garder si nécessaire pour alignement avec le logo */
+            margin-top: -55px;
         }}
         section.main > div:nth-child(1) {{
-            margin-top: -55px; /* Garder si nécessaire */
+            margin-top: -55px;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -113,12 +97,21 @@ for key, default in {
     "total_lt": None,
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
-    "url_data_loaded": False
+    "url_data_loaded": False,
+    "target_allocations": {
+        "Minières": 0.41,
+        "Asie": 0.25,
+        "Energie": 0.25,
+        "Matériaux": 0.01,
+        "Devises": 0.08,
+        "Crypto": 0.00,
+        "Autre": 0.00
+    }
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- Chargement initial des données depuis Google Sheets URL si df est vide ---
+# Chargement initial des données
 if st.session_state.df is None and not st.session_state.url_data_loaded:
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
     try:
@@ -135,7 +128,7 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
         st.session_state.url_data_loaded = True
 
-# --- LOGIQUE D'ACTUALISATION AUTOMATIQUE DES TAUX DE CHANGE ---
+# Actualisation automatique des taux de change
 current_time = datetime.datetime.now()
 if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
@@ -143,24 +136,18 @@ if (st.session_state.last_update_time_fx == datetime.datetime.min) or \
    ((current_time - st.session_state.last_update_time_fx).total_seconds() >= 60):
 
     devise_cible_to_use = st.session_state.get("devise_cible", "EUR")
-    
-    devises_uniques = []
-    if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
-        devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
-    
+
     with st.spinner(f"Mise à jour automatique des taux de change pour {devise_cible_to_use}..."):
         st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
         st.session_state.last_update_time_fx = datetime.datetime.now()
         st.session_state.last_devise_cible_for_fx_update = devise_cible_to_use
-    
+
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
 
-# --- Structure de l'application principale ---
+# Fonction principale de l'application
+
 def main():
-    """
-    Gère la logique principale de l'application Streamlit, y compris la navigation par onglets.
-    """
     onglets = st.tabs([
         "Synthèse",
         "Portefeuille",
@@ -191,7 +178,7 @@ def main():
 
             current_date = datetime.date.today()
             devise_cible = st.session_state.get("devise_cible", "EUR")
-            
+
             journal_entries = load_portfolio_journal()
             journal_dates = [entry['date'] for entry in journal_entries]
 
@@ -205,29 +192,25 @@ def main():
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
         else:
             display_performance_history()
-            
+
     with onglets[3]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour générer les OD Comptables.")
         else:
             afficher_od_comptables()
-            
+
     with onglets[4]:
         if st.session_state.df is None:
             st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour gérer les transactions.")
         else:
             afficher_transactions()
-            
+
     with onglets[5]:
         st.markdown("#### Taux de Change Actuels")
         st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier, changement de devise cible, ou toutes les 60 secondes.")
         if st.button("Actualiser les taux manuellement", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des taux de change..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
-                devises_uniques = []
-                if st.session_state.df is not None and "Devise" in st.session_state.df.columns:
-                    devises_uniques = sorted(set(st.session_state.df["Devise"].dropna().unique()))
-                
                 st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
                 st.session_state.last_update_time_fx = datetime.datetime.now()
                 st.session_state.last_devise_cible_for_fx_update = devise_cible_for_manual_update
@@ -237,8 +220,9 @@ def main():
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
     with onglets[6]:
-        afficher_parametres_globaux()    
-    
+        from parametres import afficher_parametres_globaux
+        afficher_parametres_globaux()
+
     st.markdown("---")
 
 if __name__ == "__main__":
