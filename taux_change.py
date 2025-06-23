@@ -2,64 +2,18 @@
 
 import streamlit as st
 import pandas as pd
+# import yfinance as yf # COMMENTÉ : plus utilisé pour les taux en temps réel ici
 import datetime
 import html
 import streamlit.components.v1 as components # Toujours nécessaire pour components.html
-import requests # Ajout de l'import pour les requêtes HTTP
-import json     # Ajout de l'import pour traiter le JSON
-import numpy as np # Pour np.nan et np.isnan
+import requests # NOUVEAU : Ajout de l'import pour les requêtes HTTP
+import json     # NOUVEAU : Ajout de l'import pour traiter le JSON
+import numpy as np # NOUVEAU : Pour np.nan et np.isnan
 
+# --- Fonctions utilitaires ---
 
-# --- Fonctions utilitaires (celles qui étaient là, mais plus utilisées pour les taux) ---
 # L'ancienne fonction obtenir_taux_yfinance est remplacée par l'appel direct à exchangerate.host
-# Je laisse get_yfinance_ticker_info au cas où elle serait utilisée ailleurs, mais elle n'est plus pertinente ici.
-# @st.cache_resource(ttl=60*15) # Cache la ressource (l'objet Ticker) pendant 15 minutes
-# def get_yfinance_ticker_info(ticker_symbol):
-#     """
-#     Récupère des informations de base pour un ticker yfinance.
-#     Retourne un objet ticker ou None en cas d'erreur.
-#     """
-#     try:
-#         ticker = yf.Ticker(ticker_symbol)
-#         # Tente de récupérer une donnée simple pour valider le ticker
-#         # On peut appeler .info.get() pour s'assurer que l'objet est bien initialisé
-#         _ = ticker.info.get('regularMarketPrice')
-#         return ticker
-#     except Exception as e:
-#         # st.warning(f"Impossible de récupérer les informations pour le ticker {ticker_symbol} : {e}")
-#         return None
-
-# # Cette fonction n'est plus utilisée, remplacée par l'implémentation directe dans actualiser_taux_change
-# def obtenir_taux_yfinance(devise_source, devise_cible):
-#     """
-#     Récupère le taux de change entre deux devises en utilisant yfinance.
-#     """
-#     if devise_source.upper() == devise_cible.upper():
-#         return 1.0
-
-#     ticker_symbol = f"{devise_source.upper()}{devise_cible.upper()}=X"
-#     ticker = get_yfinance_ticker_info(ticker_symbol)
-
-#     if ticker:
-#         try:
-#             # On télécharge les données sur une courte période pour obtenir le prix actuel
-#             data = ticker.history(period="1d") # Utilise history au lieu de download pour des raisons de performance et de cache
-#             if not data.empty and 'Close' in data.columns and not data['Close'].empty:
-#                 return data['Close'].iloc[-1]
-#             else:
-#                 # Si pas de données directes, essayer la paire inverse et inverser le taux
-#                 inverse_ticker_symbol = f"{devise_cible.upper()}{devise_source.upper()}=X"
-#                 inverse_ticker = get_yfinance_ticker_info(inverse_ticker_symbol)
-#                 if inverse_ticker:
-#                     inverse_data = inverse_ticker.history(period="1d")
-#                     if not inverse_data.empty and 'Close' in inverse_data.columns and not inverse_data['Close'].empty:
-#                         inverse_rate = inverse_data['Close'].iloc[-1]
-#                         if inverse_rate != 0:
-#                             return 1.0 / inverse_rate
-#         except Exception as e:
-#             st.warning(f"Impossible de récupérer le taux pour {ticker_symbol} ou son inverse : {e}")
-#     return np.nan # Retourne NaN si le taux n'est pas trouvé
-
+# Les fonctions yfinance sont désormais inutiles dans ce fichier pour les taux de change actuels.
 
 # Utilisation de st.cache_data pour les taux de change (valable 1 minute)
 @st.cache_data(ttl=60)
@@ -116,7 +70,6 @@ def actualiser_taux_change(devise_cible="EUR", devises_uniques=None):
                 # Nous voulons SOURCE/TARGET. Donc il faut 1 / (TARGET/SOURCE).
                 # Exemple : base=EUR, symbol=USD. api_rates['USD'] = 1.08 (1 EUR = 1.08 USD)
                 # On veut USD/EUR, ce qui signifie 1 USD = ? EUR.
-                # Donc 1 USD = 1/1.08 EUR = 0.9259 EUR.
                 
                 if source_currency in api_rates and pd.notna(api_rates[source_currency]) and api_rates[source_currency] != 0:
                     taux = 1 / api_rates[source_currency]
@@ -220,10 +173,11 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
         <tbody>
     """
     for _, row in df_fx.iterrows():
-        taux_str = format_fr(row[f"Taux vers {devise_cible}"], 4) # 4 décimales pour les taux
+        # Utilisation de format_fr si la valeur n'est pas NaN, sinon "N/A"
+        taux_str = format_fr(row[f"Taux vers {devise_cible}"], 4) if pd.notna(row[f"Taux vers {devise_cible}"]) else "N/A"
         html_code += f"""
             <tr>
-                <td>{html.escape(row["Devise source"])}</td>
+                <td>{html.escape(str(row['Devise source']))}</td>
                 <td>{taux_str}</td>
             </tr>
         """
@@ -233,3 +187,4 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
     </div>
     """
     components.html(html_code, height=320)
+    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
