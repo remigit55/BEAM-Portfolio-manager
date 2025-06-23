@@ -283,11 +283,9 @@ def afficher_portefeuille():
             css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}\n"
         
         if label in left_aligned_labels:
-            left_align_selectors.append(f"td:nth-child({col_idx})")
-
-    if left_align_selectors:
-        css_col_widths += f".portfolio-table {', '.join(left_align_selectors)} {{ text-align: left; white-space: normal; }}\n"
-
+            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n" # Ajout de !important
+            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n" # Alignement des titres aussi
+            
     # Construction du HTML du tableau
     html_code = f"""
     <style>
@@ -413,6 +411,11 @@ def afficher_portefeuille():
     
     components.html(html_code, height=600, scrolling=True)
 
+    # <<<<<<<<<<<<<<< C'EST LA LIGNE CLÉ QUI ÉTAIT MANQUANTE/MAL PLACÉE >>>>>>>>>>>>>>>>>
+    # Mettre à jour le DataFrame dans st.session_state avec toutes les colonnes calculées
+    st.session_state.df = df 
+    # <<<<<<<<<<<<<<<<<<<<<< FIN LIGNE CLÉ >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     # IMPORTANT: retourne les totaux convertis pour la synthèse globale
     return total_valeur, total_actuelle, total_h52, total_lt
 
@@ -487,7 +490,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         
         # <<<<<<<<<<<<<<<< LIGNE DE DÉBOGAGE CRUCIALE >>>>>>>>>>>>>>>>>>
         # Affiche les colonnes du DataFrame ici pour vérifier si 'Catégorie' est présente
-        st.write("Colonnes du DataFrame dans afficher_synthese_globale (avant calcul) :", df.columns.tolist())
+        st.write("Colonnes du DataFrame dans afficher_synthese_globale (après la mise à jour par afficher_portefeuille) :", df.columns.tolist())
         # <<<<<<<<<<<<<< FIN LIGNE DE DÉBOGAGE CRUCIALE >>>>>>>>>>>>>>>>
 
         if 'Catégorie' not in df.columns:
