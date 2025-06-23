@@ -49,6 +49,10 @@ def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_ca
     else:
         return 0
 
+    # ➕ Calcul de la recommandation spéciale Minières
+    ecart_miniere = calculer_reallocation_miniere(df, allocations_reelles, st.session_state["target_allocations"])
+    if ecart_miniere and abs(ecart_miniere) > 1e-2:
+        st.markdown(f"🔁 <b>Suggestion d'ajustement Minières :</b> {format_fr(ecart_miniere)} {devise_cible}", unsafe_allow_html=True)
 
 
 
