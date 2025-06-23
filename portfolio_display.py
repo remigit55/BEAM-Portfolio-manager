@@ -473,7 +473,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         st.warning("Le DataFrame de votre portefeuille est introuvable.")
         return
 
-    expected_col = next((col for col in df.columns if col.strip().lower() == "catégorie"), None)
+    expected_col = next((col for col in df.columns if col.strip().lower() == "Categorie"), None)
     if expected_col is None:
         st.warning("Le DataFrame ne contient pas de colonne 'Catégorie'. Veuillez vérifier votre fichier source.")
         return
