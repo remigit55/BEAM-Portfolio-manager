@@ -601,7 +601,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         # Définition des colonnes à afficher dans le tableau HTML
         cols_to_display = [
-            "Categorie",
+            "Catégories",
             "Valeur Actuelle_fmt",
             "Part Actuelle (%_fmt)",
             "Cible (%_fmt)",
@@ -609,7 +609,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
-            "Categorie",
+            "Catégories",
             "Valeur Actuelle",
             "Part Actuelle (%)",
             "Cible (%)",
@@ -658,7 +658,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # CSS spécifique pour le tableau de Categories
         css_col_widths_cat = ""
         width_specific_cols_cat = {
-            "Categorie": "120px",
+            "Catégories": "120px",
             "Valeur Actuelle": "120px",
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
