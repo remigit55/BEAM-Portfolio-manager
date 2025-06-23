@@ -41,7 +41,6 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         return val 
     
     return val # Return original value if conversion rate is invalid
-# --- Fin de la fonction convertir ---
 
 
 def afficher_portefeuille():
@@ -77,13 +76,11 @@ def afficher_portefeuille():
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # GESTION DE LA COLONNE 'CATÉGORIE'
-    # Si la colonne 'Categories' (au pluriel, tel que vu dans votre CSV) existe, on l'utilise.
-    # Sinon, on avertit l'utilisateur et on crée une colonne 'Catégorie' vide.
     if "Categories" in df.columns: 
         df["Catégorie"] = df["Categories"].astype(str).fillna("")
     else:
         st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégorie' sera vide pour l'affichage et la synthèse.")
-        df["Catégorie"] = "" # S'assurer que la colonne existe même si vide
+        df["Catégorie"] = "" 
 
     # Déterminer la colonne Ticker (peut être "Ticker" ou "Tickers")
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -197,14 +194,14 @@ def afficher_portefeuille():
                 existing_cols_in_df.append(ticker_col)
                 existing_labels.append(labels[i])
         elif col_name.endswith("_fmt"):
-            base_col_name = col_name[:-4] # Supprime le "_fmt" pour retrouver le nom original
-            if f"{base_col_name}_fmt" in df.columns: # Vérifie si la colonne formatée existe
+            base_col_name = col_name[:-4] 
+            if f"{base_col_name}_fmt" in df.columns: 
                 existing_cols_in_df.append(f"{base_col_name}_fmt")
                 existing_labels.append(labels[i])
-            elif base_col_name in df.columns: # Si la colonne formatée n'existe pas, utilise l'originale si elle est là
+            elif base_col_name in df.columns: 
                 existing_cols_in_df.append(base_col_name)
                 existing_labels.append(labels[i])
-        elif col_name in df.columns: # Pour les colonnes non formatées
+        elif col_name in df.columns: 
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
             
@@ -212,9 +209,8 @@ def afficher_portefeuille():
         st.warning("Aucune colonne de données valide à afficher.")
         return total_valeur, total_actuelle, total_h52, total_lt
 
-    # Crée le DataFrame d'affichage avec seulement les colonnes existantes
     df_disp = df[existing_cols_in_df].copy()
-    df_disp.columns = existing_labels # Renomme les colonnes pour l'affichage
+    df_disp.columns = existing_labels 
 
     # Gestion du tri des colonnes via les en-têtes HTML
     if "sort_column" not in st.session_state:
@@ -227,7 +223,6 @@ def afficher_portefeuille():
         if sort_col_label in df_disp.columns:
             original_col_name = None
             try:
-                # Retrouver le nom de la colonne originale pour le tri numérique
                 idx = existing_labels.index(sort_col_label)
                 original_col_name = existing_cols_in_df[idx]
                 if original_col_name.endswith("_fmt"):
@@ -236,7 +231,6 @@ def afficher_portefeuille():
                 pass
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                # Tri numérique pour les colonnes numériques
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
@@ -246,7 +240,6 @@ def afficher_portefeuille():
                     ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
                 )
             else:
-                # Tri alphabétique pour les autres colonnes
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
@@ -274,7 +267,7 @@ def afficher_portefeuille():
     left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]
 
     for i, label in enumerate(df_disp.columns):
-        col_idx = i + 1 # nth-child est 1-indexé
+        col_idx = i + 1 
         
         if label in width_specific_cols:
             css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: {width_specific_cols[label]}; }}\n"
@@ -282,8 +275,8 @@ def afficher_portefeuille():
             css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}\n"
         
         if label in left_aligned_labels:
-            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n" # Ajout de !important
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n" # Alignement des titres aussi
+            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n" 
+            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n" 
             
     # Construction du HTML du tableau
     html_code = f"""
@@ -390,12 +383,10 @@ def afficher_portefeuille():
         </table>
     </div>
     <script>
-        // JavaScript pour gérer les clics sur les en-têtes de colonne pour le tri
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.portfolio-table th').forEach(function(header) {
                 header.addEventListener('click', function() {
                     const columnLabel = this.id.replace('sort-', '');
-                    // Envoie un message à Streamlit pour déclencher le tri
                     window.parent.postMessage(JSON.stringify({
                         streamlit: {
                             type: 'setComponentValue',
@@ -410,10 +401,8 @@ def afficher_portefeuille():
     
     components.html(html_code, height=600, scrolling=True)
 
-    # Mettre à jour le DataFrame dans st.session_state avec toutes les colonnes calculées
     st.session_state.df = df 
 
-    # IMPORTANT: retourne les totaux convertis pour la synthèse globale
     return total_valeur, total_actuelle, total_h52, total_lt
 
 
@@ -473,7 +462,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     st.subheader("Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
-    # Assurez-vous que les clés ici correspondent exactement aux valeurs de votre colonne 'Catégorie'
     target_allocations = {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -481,79 +469,64 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         "Matériaux": 0.01,
         "Devises": 0.08,
         "Crypto": 0.00,
-        # Ajoutez ou ajustez d'autres catégories si nécessaire
-        "Autre": 0.00 # Une catégorie "Autre" par défaut pour les non-classées
+        "Autre": 0.00 
     }
 
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
         
-        # SUPPRIMER CETTE LIGNE DE DÉBOGAGE APRÈS VÉRIFICATION !
-        # st.write("Colonnes du DataFrame dans afficher_synthese_globale (après la mise à jour par afficher_portefeuille) :", df.columns.tolist())
-
         if 'Catégorie' not in df.columns:
             st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
                      "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
                      "la fonction 'afficher_portefeuille' la traite correctement.")
-            st.info(f"Colonnes disponibles : {df.columns.tolist()}") # Répète les colonnes si erreur
+            st.info(f"Colonnes disponibles : {df.columns.tolist()}") 
             return
 
         portfolio_total_value = total_actuelle
         
         if portfolio_total_value <= 0:
             st.info("La valeur totale actuelle du portefeuille est de 0 ou moins. Impossible de calculer la répartition par catégorie de manière significative.")
+            # Afficher quand même le tableau avec des zéros si on veut, mais les calculs suivants seraient incohérents
             return
 
-        # S'assurer que la colonne de valeur est numérique
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
         
-        # Calcul de la valeur totale par catégorie
         category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
         
         results_data = []
 
-        # Fusionner toutes les catégories uniques (cibles et réelles) pour l'affichage
-        # Inclure toutes les catégories présentes dans les données réelles
         all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
         
         for category in all_relevant_categories:
-            target_pct = target_allocations.get(category, 0.0) # 0.0 si la catégorie n'a pas d'objectif défini
-            current_value_cat = category_values.get(category, 0)
-            current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0
+            target_pct = target_allocations.get(category, 0.0) 
+            current_value_cat = category_values.get(category, 0.0) # Utilisez 0.0 au lieu de 0 pour les calculs float
+            current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0.0
 
             deviation_pct = current_pct - target_pct
             
-            value_to_reach_target = 0.0 # Initialise à 0.0 par défaut
-
-            # Calcul du montant à ajouter/retirer pour atteindre l'objectif
-            if target_pct > 0 and portfolio_total_value > 0: # S'il y a un objectif et un portefeuille non nul
-                # Valeur cible = pourcentage cible * valeur totale du portefeuille
-                target_value_cat = target_pct * portfolio_total_value
-                
-                # Montant à ajuster = Valeur Cible - Valeur Actuelle de la Catégorie
-                amount_to_adjust = target_value_cat - current_value_cat
-                
-                # Si l'objectif n'est pas atteint (écart négatif), c'est la valeur à ajouter
-                # Sinon (objectif atteint ou dépassé), c'est 0.0 à ajouter (ou un montant négatif à retirer)
-                value_to_reach_target = amount_to_adjust
-            elif target_pct == 0 and current_pct > 0: # Si l'objectif est 0% mais qu'il y a des fonds
-                value_to_reach_target = -current_value_cat # Indique de retirer la valeur actuelle
+            # CALCUL CORRECT DE L'AJUSTEMENT NÉCESSAIRE
+            # Montant que la catégorie devrait avoir pour atteindre la cible par rapport au total actuel du portefeuille
+            target_value_for_category = target_pct * portfolio_total_value
+            
+            # L'ajustement est la différence entre la valeur cible et la valeur actuelle de la catégorie
+            value_to_adjust = target_value_for_category - current_value_cat
             
             valeur_pour_atteindre_objectif_str = ""
-            if pd.notna(value_to_reach_target):
-                valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_reach_target, 2)} {devise_cible}"
+            if pd.notna(value_to_adjust):
+                valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
             
             results_data.append({
                 "Catégorie": category,
+                "Valeur Actuelle": f"{format_fr(current_value_cat, 2)} {devise_cible}", # Ajout de cette colonne
                 "Part Actuelle (%)": format_fr(current_pct * 100, 2),
                 "Cible (%)": format_fr(target_pct * 100, 2),
                 "Écart à l'objectif (%)": format_fr(deviation_pct * 100, 2),
-                f"Ajustement Nécessaire ({devise_cible})": valeur_pour_atteindre_objectif_str # Renommé la colonne
+                f"Ajustement Nécessaire ({devise_cible})": valeur_pour_atteindre_objectif_str
             })
 
         df_allocation = pd.DataFrame(results_data)
         
-        # Trier par 'Part Actuelle (%)' ou 'Cible (%)' pour une meilleure lisibilité
+        # Tri du DataFrame pour une meilleure lisibilité
         df_allocation['Part Actuelle (%)_numeric'] = df_allocation['Part Actuelle (%)'].str.replace(' %', '').str.replace(',', '.').astype(float)
         df_allocation = df_allocation.sort_values(by='Part Actuelle (%)_numeric', ascending=False)
         df_allocation = df_allocation.drop(columns=['Part Actuelle (%)_numeric'])
