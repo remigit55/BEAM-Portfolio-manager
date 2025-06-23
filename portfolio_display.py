@@ -79,7 +79,7 @@ def afficher_portefeuille():
     # GESTION DE LA COLONNE 'CATÉGORIES'
     # La colonne d'entrée doit être 'Categories', le nom interne et d'affichage sera 'Catégories'
     if "Categories" in df.columns:  
-        df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip() 
+        df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip()  
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
     else:
         st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégories' sera 'Non classé' pour l'affichage et la synthèse.")
@@ -174,7 +174,8 @@ def afficher_portefeuille():
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4), ("Valeur_LT", 2), ("Gain/Perte", 2),
         ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2),
-        ("Taux_FX_Acquisition", 6) 
+        ("Taux_FX_Acquisition", 6),
+        ("Last Price", 2) # Added 'Last Price' for formatting with 2 decimal places
     ]:
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
@@ -196,7 +197,7 @@ def afficher_portefeuille():
         "Taux_FX_Acquisition_fmt", 
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
-        "Last Price", "Momentum (%)_fmt", "Z-Score_fmt",
+        "Last Price_fmt", "Momentum (%)_fmt", "Z-Score_fmt", # Changed "Last Price" to "Last Price_fmt"
         "Signal", "Action", "Justification"
     ]
     labels = [
@@ -227,7 +228,7 @@ def afficher_portefeuille():
             if f"{base_col_name}_fmt" in df.columns:  
                 existing_cols_in_df.append(f"{base_col_name}_fmt")
                 existing_labels.append(labels[i])
-            elif base_col_name in df.columns:
+            elif base_col_name in df.columns: # Fallback if _fmt not created
                 existing_cols_in_df.append(base_col_name)
                 existing_labels.append(labels[i])
         elif col_name in df.columns:  
@@ -261,7 +262,7 @@ def afficher_portefeuille():
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
                 df_disp = df_disp.sort_values(
-                    by=sort_col_label, 
+                    by=sort_col_label,  
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: pd.to_numeric(
                         x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
@@ -286,10 +287,10 @@ def afficher_portefeuille():
     width_specific_cols = {
         "Ticker": "80px",
         "Nom": "200px",
-        "Catégories": "100px", 
+        "Catégories": "100px",  
         "Devise Source": "60px",
-        "Valeur Acquisition (Source)": "120px", 
-        "Taux FX (Source/Cible)": "100px", 
+        "Valeur Acquisition (Source)": "120px",  
+        "Taux FX (Source/Cible)": "100px",  
         "Signal": "100px",
         "Action": "150px",
         "Justification": "200px",
@@ -322,7 +323,7 @@ def afficher_portefeuille():
             position: relative;
         }}
         .portfolio-table {{
-            min-width: 2500px; 
+            min-width: 2500px;  
             border-collapse: collapse;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
@@ -346,7 +347,7 @@ def afficher_portefeuille():
             font-size: 11px;
             white-space: nowrap;
         }}
-        {css_col_widths} 
+        {css_col_widths}  
 
         .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
         .total-row td {{
@@ -395,7 +396,7 @@ def afficher_portefeuille():
     total_cols_mapping = {
         f"Valeur Acquisition ({devise_cible})": total_valeur_str,
         f"Valeur Actuelle ({devise_cible})": total_actuelle_str,
-        "Valeur H52": total_h52_str, 
+        "Valeur H52": total_h52_str,  
         "Valeur LT": total_lt_str
     }
 
@@ -490,14 +491,14 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     with col4:
         lt_display = format_fr(total_lt, 2) if pd.notna(total_lt) else "N/A"
         st.metric(
-            label=f"**Objectif LT ({devise_cible})**", 
+            label=f"**Objectif LT ({devise_cible})**",  
             value=f"{lt_display} {devise_cible}"
         )
     st.markdown("---")
 
 
     # --- Nouveau Tableau de Répartition par Catégories ---
-    st.markdown("#### Répartition et Objectifs par Catégories") 
+    st.markdown("#### Répartition et Objectifs par Catégories")  
 
     # Définition des allocations cibles par catégorie
     target_allocations = {
@@ -507,7 +508,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         "Matériaux": 0.01,
         "Devises": 0.08,
         "Crypto": 0.00,
-        "Autre": 0.00  
+        "Autre": 0.00    
     }
 
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
@@ -518,7 +519,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             st.error("ERREUR : La colonne 'Catégories' est manquante dans le DataFrame pour la synthèse. "
                      "Vérifiez que votre fichier contient une colonne nommée 'Categories' et que "
                      "la fonction 'afficher_portefeuille' la traite correctement.")
-            st.info(f"Colonnes disponibles : {df.columns.tolist()}")  
+            st.info(f"Colonnes disponibles : {df.columns.tolist()}")    
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
@@ -534,10 +535,10 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         if target_minieres_pct > 0:
             theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct
         else:
-            theoretical_portfolio_total_from_minieres = total_actuelle 
+            theoretical_portfolio_total_from_minieres = total_actuelle  
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
-            theoretical_portfolio_total_from_minieres = total_actuelle 
+            theoretical_portfolio_total_from_minieres = total_actuelle  
 
 
         results_data = []
@@ -558,7 +559,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             target_value_for_category = target_pct * theoretical_portfolio_total_from_minieres
             
             # L'écart est la différence en pourcentage (basé sur le total actuel)
-            deviation_pct = (current_pct - target_pct) 
+            deviation_pct = (current_pct - target_pct)  
             
             # Ajustement nécessaire = (Valeur Cible de la Catégorie) - (Valeur Actuelle de la Catégorie)
             value_to_adjust = target_value_for_category - current_value_cat
@@ -568,12 +569,12 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
             
             results_data.append({
-                "Catégories": category, 
+                "Catégories": category,  
                 "Valeur Actuelle": current_value_cat,
                 "Part Actuelle (%)": current_pct * 100,
                 "Cible (%)": target_pct * 100,
                 "Écart à l'objectif (%)": deviation_pct * 100,
-                "Ajustement Nécessaire": value_to_adjust 
+                "Ajustement Nécessaire": value_to_adjust  
             })
 
         df_allocation = pd.DataFrame(results_data)
@@ -590,7 +591,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         # Définition des colonnes à afficher dans le tableau HTML
         cols_to_display = [
-            "Catégories", 
+            "Catégories",  
             "Valeur Actuelle_fmt",
             "Part Actuelle (%_fmt)",
             "Cible (%_fmt)",
@@ -598,12 +599,12 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire_fmt"
         ]
         labels_for_display = [
-            "Catégories", 
+            "Catégories",  
             "Valeur Actuelle",
             "Part Actuelle (%)",
             "Cible (%)",
             "Écart à l'objectif (%)",
-            f"Ajustement Nécessaire"  
+            f"Ajustement Nécessaire"    
         ]
 
         df_disp_cat = df_allocation[cols_to_display].copy()
@@ -647,7 +648,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # CSS spécifique pour le tableau de catégories
         css_col_widths_cat = ""
         width_specific_cols_cat = {
-            "Catégories": "120px", 
+            "Catégories": "120px",  
             "Valeur Actuelle": "120px",
             "Part Actuelle (%)": "100px",
             "Cible (%)": "80px",
@@ -762,5 +763,5 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         components.html(html_code_cat, height=450, scrolling=True)
 
     else:
-        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégories' pour calculer la répartition.")
+        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégorie' pour calculer la répartition.")
         st.warning("Veuillez importer votre portefeuille et vérifier la présence de la colonne 'Categories' dans votre fichier source.")
