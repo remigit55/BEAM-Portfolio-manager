@@ -510,15 +510,14 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     st.markdown("#### Répartition et Objectifs par Catégories")  
 
     # Définition des allocations cibles par catégorie
-    target_allocations = {
-        "Minières": 0.41,
-        "Asie": 0.25,
-        "Energie": 0.25,
-        "Matériaux": 0.01,
-        "Devises": 0.08,
-        "Crypto": 0.00,
-        "Autre": 0.00  
-    }
+    target_allocations = st.session_state.get("target_allocations", {
+    "Minières": 0.50,
+    "Energie": 0.15,
+    "Asie": 0.10,
+    "Royalties": 0.10,
+    "Cash/Forex": 0.15
+})
+
 
     if "df" in st.session_state and st.session_state.df is None or st.session_state.df.empty:
         df = st.session_state.df.copy()
