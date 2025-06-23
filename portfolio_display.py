@@ -36,10 +36,11 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
+        # st.warning(f"Taux de change pour {fx_key} non trouvé ou nul. Utilisation de 1:1 pour {source_devise}.")
         # Important: Retourne la valeur non convertie si le taux est manquant ou nul
         return val 
     
-    return val 
+    return val # Return original value if conversion rate is invalid
 
 
 def afficher_portefeuille():
@@ -76,10 +77,10 @@ def afficher_portefeuille():
 
     # GESTION DE LA COLONNE 'CATÉGORIE'
     if "Categories" in df.columns: 
-        df["Catégorie"] = df["Categories"].astype(str).fillna("Non Classé") # Utilise "Non Classé" au lieu de vide
+        df["Catégorie"] = df["Categories"].astype(str).fillna("")
     else:
-        st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégorie' sera 'Non Classé' pour l'affichage et la synthèse.")
-        df["Catégorie"] = "Non Classé" 
+        st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégorie' sera vide pour l'affichage et la synthèse.")
+        df["Catégorie"] = "" 
 
     # Déterminer la colonne Ticker (peut être "Ticker" ou "Tickers")
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
@@ -161,7 +162,7 @@ def afficher_portefeuille():
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}")
-            elif col_name == "Gain/Perte (%)" or col_name == "Momentum (%)" or col_name == "Z-Score": # Z-Score n'est pas un pourcentage mais souvent affiché de manière similaire
+            elif col_name == "Gain/Perte (%)" or col_name == "Momentum (%)":
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %")
             else:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places))
@@ -263,7 +264,7 @@ def afficher_portefeuille():
         "Justification": "200px",
     }
     
-    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Devise", "Signal", "Action", "Justification"] # Devise reste à gauche pour le symbole
+    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]
 
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1 
@@ -276,10 +277,7 @@ def afficher_portefeuille():
         if label in left_aligned_labels:
             css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n" 
             css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n" 
-        else: # Pour toutes les autres colonnes (numériques généralement)
-            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: right !important; }}\n" 
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: right !important; }}\n" 
-
+            
     # Construction du HTML du tableau
     html_code = f"""
     <style>
@@ -293,7 +291,7 @@ def afficher_portefeuille():
             position: relative;
         }}
         .portfolio-table {{
-            min-width: 2200px; 
+            min-width: 2200px; /* Ajustez si nécessaire pour éviter le wrap */
             border-collapse: collapse;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
@@ -308,16 +306,16 @@ def afficher_portefeuille():
             z-index: 2;
             font-size: 12px;
             box-sizing: border-box;
-            cursor: pointer; 
+            cursor: pointer; /* Indique que les en-têtes sont cliquables */
         }}
         .portfolio-table td {{
             padding: 6px;
-            text-align: right; /* Default to right for numbers */
+            text-align: right;
             border: none;
             font-size: 11px;
-            white-space: nowrap; 
+            white-space: nowrap; /* Empêche le texte de s'enrouler */
         }}
-        {css_col_widths} 
+        {css_col_widths} /* Applique les largeurs et alignements spécifiques */
 
         .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
         .total-row td {{
@@ -461,7 +459,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
 
     # --- Nouveau Tableau de Répartition par Catégorie ---
-    st.markdown(#### "Répartition et Objectifs par Catégorie")
+    st.subheader("Répartition et Objectifs par Catégorie")
 
     # Définition des allocations cibles par catégorie
     target_allocations = {
@@ -473,9 +471,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         "Crypto": 0.00,
         "Autre": 0.00 
     }
-    
-    # Définir la catégorie de référence pour le calcul de l'ajustement
-    REFERENCE_CATEGORY = "Minières" 
 
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
@@ -487,32 +482,16 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             st.info(f"Colonnes disponibles : {df.columns.tolist()}") 
             return
 
-        portfolio_total_value = total_actuelle # Valeur totale actuelle du portefeuille
+        portfolio_total_value = total_actuelle
         
         if portfolio_total_value <= 0:
             st.info("La valeur totale actuelle du portefeuille est de 0 ou moins. Impossible de calculer la répartition par catégorie de manière significative.")
+            # Afficher quand même le tableau avec des zéros si on veut, mais les calculs suivants seraient incohérents
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
         
         category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
-        
-        # --- Calcul des valeurs de référence pour l'ajustement ---
-        valeur_totale_reference = category_values.get(REFERENCE_CATEGORY, 0.0)
-        pourcentage_cible_reference = target_allocations.get(REFERENCE_CATEGORY, 0.0)
-
-        # Calculer le "total cible idéal" du portefeuille basé sur la catégorie de référence
-        # Si le pourcentage cible de référence est 0, cela signifie qu'il n'y a pas d'objectif clair
-        # ou que la catégorie de référence n'est pas censée exister.
-        ideal_portfolio_total = 0.0
-        if pourcentage_cible_reference > 0:
-            ideal_portfolio_total = valeur_totale_reference / pourcentage_cible_reference
-        elif pourcentage_cible_reference == 0 and valeur_totale_reference > 0:
-            # Si l'objectif pour la catégorie de référence est 0 mais qu'il y a des fonds dedans,
-            # cela peut indiquer une configuration inhabituelle ou une catégorie à liquider.
-            # On pourrait choisir de ne pas calculer l'ajustement ou d'afficher un avertissement.
-            st.warning(f"La catégorie de référence '{REFERENCE_CATEGORY}' a une valeur positive mais un objectif de 0%. L'ajustement ne peut pas être basé sur cette référence.")
-            ideal_portfolio_total = 0.0 # Empêche la division par zéro ou l'infini
         
         results_data = []
 
@@ -520,31 +499,28 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         
         for category in all_relevant_categories:
             target_pct = target_allocations.get(category, 0.0) 
-            current_value_cat = category_values.get(category, 0.0) 
+            current_value_cat = category_values.get(category, 0.0) # Utilisez 0.0 au lieu de 0 pour les calculs float
             current_pct = (current_value_cat / portfolio_total_value) if portfolio_total_value > 0 else 0.0
 
             deviation_pct = current_pct - target_pct
             
-            value_to_adjust = 0.0
-            if ideal_portfolio_total > 0 and target_pct > 0:
-                # Ajustement=(Valeur Total Minière / Pourcentage Cible Minière * Pourcentage Cible de la catégorie) - Valeur Actuelle Catégorie
-                target_value_based_on_reference = ideal_portfolio_total * target_pct
-                value_to_adjust = target_value_based_on_reference - current_value_cat
-            elif target_pct == 0 and current_value_cat > 0:
-                # Si l'objectif est 0% mais qu'il y a une valeur, l'ajustement est de retirer la valeur actuelle.
-                value_to_adjust = -current_value_cat
-            # Si target_pct est 0 et current_value_cat est 0, value_to_adjust reste 0.
-
+            # CALCUL CORRECT DE L'AJUSTEMENT NÉCESSAIRE
+            # Montant que la catégorie devrait avoir pour atteindre la cible par rapport au total actuel du portefeuille
+            target_value_for_category = target_pct * portfolio_total_value
+            
+            # L'ajustement est la différence entre la valeur cible et la valeur actuelle de la catégorie
+            value_to_adjust = target_value_for_category - current_value_cat
+            
             valeur_pour_atteindre_objectif_str = ""
             if pd.notna(value_to_adjust):
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
             
             results_data.append({
                 "Catégorie": category,
-                "Valeur Actuelle": f"{format_fr(current_value_cat, 2)} {devise_cible}", 
-                "Part Actuelle (%)": f"{format_fr(current_pct * 100, 2)} %", # Ajout du symbole %
-                "Cible (%)": f"{format_fr(target_pct * 100, 2)} %", # Ajout du symbole %
-                "Écart à l'objectif (%)": f"{format_fr(deviation_pct * 100, 2)} %", # Ajout du symbole %
+                "Valeur Actuelle": f"{format_fr(current_value_cat, 2)} {devise_cible}", # Ajout de cette colonne
+                "Part Actuelle (%)": format_fr(current_pct * 100, 2),
+                "Cible (%)": format_fr(target_pct * 100, 2),
+                "Écart à l'objectif (%)": format_fr(deviation_pct * 100, 2),
                 f"Ajustement Nécessaire ({devise_cible})": valeur_pour_atteindre_objectif_str
             })
 
