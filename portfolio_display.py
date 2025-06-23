@@ -487,11 +487,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
-        
-        # <<<<<<<<<<<<<<<< LIGNE DE DÉBOGAGE CRUCIALE >>>>>>>>>>>>>>>>>>
-        # Affiche les colonnes du DataFrame ici pour vérifier si 'Catégorie' est présente
-        st.write("Colonnes du DataFrame dans afficher_synthese_globale (après la mise à jour par afficher_portefeuille) :", df.columns.tolist())
-        # <<<<<<<<<<<<<< FIN LIGNE DE DÉBOGAGE CRUCIALE >>>>>>>>>>>>>>>>
+
 
         if 'Catégorie' not in df.columns:
             st.error("ERREUR : La colonne 'Catégorie' est manquante dans le DataFrame pour la synthèse. "
