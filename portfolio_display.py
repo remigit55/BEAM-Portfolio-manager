@@ -90,8 +90,13 @@ def afficher_portefeuille():
     if "Categories" in df.columns:  
         df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip()  
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
+    elif any(col.strip().lower() in ["categories", "catégorie", "category"] for col in df.columns):
+        # Trouver la colonne correspondante (insensible à la casse et accents)
+        cat_col = next(col for col in df.columns if col.strip().lower() in ["categories", "catégorie", "category"])
+        df["Catégories"] = df[cat_col].astype(str).fillna("").str.strip()
+        df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
     else:
-        st.warning("ATTENTION: La colonne 'Categories' est introuvable. 'Catégories' sera 'Non classé'.")
+        st.warning("ATTENTION: Aucune colonne 'Categories' ou équivalente introuvable. 'Catégories' sera 'Non classé'.")
         df["Catégories"] = "Non classé"
 
     # Déterminer la colonne Ticker
@@ -467,22 +472,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         st.info("Veuillez importer un fichier Excel pour voir la synthèse de votre portefeuille.")
         return
 
-        # Vérifier et normaliser la colonne 'Catégorie'
-    df = st.session_state.get("df")
-    if df is None:
-        st.warning("Le DataFrame de votre portefeuille est introuvable.")
-        return
-
-    expected_col = next((col for col in df.columns if col.strip().lower() in ["catégorie", "categorie", "categories", "Catégories", "Catégorie"]), None)
-    if expected_col is None:
-        st.warning("Le DataFrame ne contient pas de colonne 'Categories'. Veuillez vérifier votre fichier source.")
-        return
-
-    if expected_col != "Categories":
-        df["Categories"] = df[expected_col]
-
-    
-
     # Affichage des métriques clés
     col1, col2, col3, col4 = st.columns(4)
 
@@ -527,17 +516,16 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     # Définition des allocations cibles par catégorie
     target_allocations = st.session_state.get("target_allocations", {
-    "Minières": 0.41,
-    "Asie": 0.25,
-    "Energie": 0.25,
-    "Matériaux": 0.01,
-    "Devises": 0.08,
-    "Crypto": 0.00,
-    "Autre": 0.00  
-})
+        "Minières": 0.41,
+        "Asie": 0.25,
+        "Energie": 0.25,
+        "Matériaux": 0.01,
+        "Devises": 0.08,
+        "Crypto": 0.00,
+        "Autre": 0.00  
+    })
 
-
-    if "df" in st.session_state and st.session_state.df is None or st.session_state.df.empty:
+    if "df" in st.session_state and st.session_state.df is not None and not st.session_state.df.empty:
         df = st.session_state.df.copy()
         
         if 'Catégories' not in df.columns:
@@ -766,5 +754,4 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         components.html(html_code_cat, height=450, scrolling=True)
 
     else:
-        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou ne contient pas la colonne 'Catégorie' pour calculer la répartition.")
-        st.warning("Veuillez importer votre portefeuille et vérifier la présence de la colonne 'Categories' dans votre fichier source.")
+        st.info("Le DataFrame de votre portefeuille n'est pas disponible ou est vide. Veuillez importer votre portefeuille.")
