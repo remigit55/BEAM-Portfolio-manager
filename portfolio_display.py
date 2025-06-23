@@ -478,8 +478,8 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         st.warning("Le DataFrame ne contient pas de colonne 'Catégorie'. Veuillez vérifier votre fichier source.")
         return
 
-    if expected_col != "Catégorie":
-        df["Catégorie"] = df[expected_col]
+    if expected_col != "Categorie":
+        df["Categorie"] = df[expected_col]
 
     
 
