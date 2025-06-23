@@ -11,6 +11,55 @@ from utils import safe_escape, format_fr
 # Import des fonctions de récupération de données
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 
+
+
+
+
+def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_cat="Catégorie", colonne_valeur="Valeur Actuelle"):
+    if "Minières" not in allocations_reelles or "Minières" not in objectifs:
+        return None
+
+    # Calcul des dérives relatives hors Minières
+    derive_abs = {
+        cat: abs(allocations_reelles[cat] - objectifs.get(cat, 0))
+        for cat in allocations_reelles
+        if cat != "Minières" and cat in objectifs
+    }
+
+    if not derive_abs:
+        return None
+
+    # Catégorie avec la plus forte dérive absolue
+    cat_ref = max(derive_abs, key=derive_abs.get)
+
+    valeur_cat_ref = df[df[colonne_cat] == cat_ref][colonne_valeur].sum()
+    objectif_cat_ref = objectifs[cat_ref]
+    objectif_miniere = objectifs["Minières"]
+    valeur_actuelle_miniere = df[df[colonne_cat] == "Minières"][colonne_valeur].sum()
+
+    if objectif_cat_ref == 0:
+        return None
+
+    # Valeur cible recalculée pour Minières
+    valeur_cible_miniere = (valeur_cat_ref / objectif_cat_ref) * objectif_miniere
+
+    # Si sous-pondération, on propose une réallocation
+    if allocations_reelles["Minières"] < objectif_miniere:
+        return valeur_cible_miniere - valeur_actuelle_miniere
+    else:
+        return 0
+
+
+
+
+
+
+
+
+
+
+
+
 # --- Fonction de conversion de devise ---
 def convertir(val, source_devise, devise_cible, fx_rates):
     """
