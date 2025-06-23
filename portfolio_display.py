@@ -19,15 +19,14 @@ def convertir(val, source_devise, devise_cible, fx_rates):
     Retourne la valeur convertie et le taux utilisé.
     """
     if pd.isnull(val):
-        return np.nan, np.nan # Retourne NaN pour la valeur et le taux si la valeur est NaN
+        return np.nan, np.nan  # Retourne NaN pour la valeur et le taux si la valeur est NaN
 
-    source_devise = str(source_devise).upper()
-    devise_cible = str(devise_cible).upper()
+    source_devise = str(source_devise).strip().upper()  # Nettoyer et normaliser
+    devise_cible = str(devise_cible).strip().upper()
     
     if source_devise == devise_cible:
-        return val, 1.0 # Si c'est la même devise, pas de conversion, taux = 1.0
+        return val, 1.0  # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    # Correction ici: Construire la clé fx_key comme "SOURCE/CIBLE"
     fx_key = source_devise
     raw_taux = fx_rates.get(fx_key)
     
@@ -37,11 +36,11 @@ def convertir(val, source_devise, devise_cible, fx_rates):
         taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # Si le taux est manquant ou nul, la conversion est impossible/non fiable.
-        # Retourne la valeur non convertie et un indicateur de taux manquant (ex: np.nan ou 0)
-        return val, np.nan # Retourne la valeur originale et un taux NaN pour indiquer l'absence de conversion
+        # Log pour debugging
+        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({raw_taux}).")
+        return val, np.nan  # Retourne la valeur originale et un taux NaN
         
-    return val * taux_scalar, taux_scalar # Retourne la valeur convertie ET le taux utilisé
+    return val * taux_scalar, taux_scalar  # Retourne la valeur convertie ET le taux utilisé
 
 def afficher_portefeuille():
     """
@@ -63,15 +62,23 @@ def afficher_portefeuille():
 
     # Initialisation ou rafraîchissement des taux de change
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        devises_uniques_df = df["Devise"].dropna().unique().tolist() if "Devise" in df.columns else []
+        devises_uniques_df = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
         devises_a_fetch = list(set([devise_cible] + devises_uniques_df))
         st.session_state.fx_rates = fetch_fx_rates(devise_cible)
     
     fx_rates = st.session_state.fx_rates
 
-    # Debugging: Display missing exchange rates
-    devises_uniques = df["Devise"].dropna().unique().tolist() if "Devise" in df.columns else []
-    missing_rates = [devise for devise in devises_uniques if fx_rates.get(devise.upper()) is None and devise.upper() != devise_cible.upper()]
+    # Debugging: Afficher fx_rates et devises uniques
+    st.write("**Debugging Info**")
+    st.write(f"fx_rates: {fx_rates}")
+    if "Devise" in df.columns:
+        st.write(f"Devises uniques dans le portefeuille: {df['Devise'].dropna().str.strip().str.upper().unique().tolist()}")
+    else:
+        st.error("Colonne 'Devise' manquante dans le portefeuille.")
+
+    # Debugging: Vérifier les taux manquants
+    devises_uniques = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
+    missing_rates = [devise for devise in devises_uniques if fx_rates.get(devise) is None and devise != devise_cible.upper()]
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
@@ -81,19 +88,25 @@ def afficher_portefeuille():
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
+    # Nettoyage de la colonne Devise
+    if "Devise" in df.columns:
+        df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
+    else:
+        st.error("Colonne 'Devise' absente. Utilisation de la devise cible par défaut.")
+        df["Devise"] = devise_cible
+
     # GESTION DE LA COLONNE 'CATÉGORIES'
-    # La colonne d'entrée doit être 'Categories', le nom interne et d'affichage sera 'Catégories'
     if "Categories" in df.columns:  
         df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip()  
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
     else:
-        st.warning("ATTENTION (afficher_portefeuille): La colonne 'Categories' est introuvable dans votre fichier d'entrée. La colonne 'Catégories' sera 'Non classé' pour l'affichage et la synthèse.")
+        st.warning("ATTENTION: La colonne 'Categories' est introuvable. 'Catégories' sera 'Non classé'.")
         df["Catégories"] = "Non classé"
 
-    # Déterminer la colonne Ticker (peut être "Ticker" ou "Tickers")
+    # Déterminer la colonne Ticker
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
-    # Initialisation des caches pour les données externes
+    # Initialisation des caches
     if "ticker_data_cache" not in st.session_state:
         st.session_state.ticker_data_cache = {}
     if "momentum_results_cache" not in st.session_state:
@@ -105,11 +118,9 @@ def afficher_portefeuille():
         for ticker in unique_tickers:
             if ticker not in st.session_state.ticker_data_cache:
                 st.session_state.ticker_data_cache[ticker] = fetch_yahoo_data(ticker)
-            
             if ticker not in st.session_state.momentum_results_cache:
                 st.session_state.momentum_results_cache[ticker] = fetch_momentum_data(ticker)
         
-        # Mapping des données récupérées au DataFrame
         df["shortName"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
         df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("currentPrice", np.nan))
         df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
@@ -120,7 +131,6 @@ def afficher_portefeuille():
         df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
     else:
-        # Si pas de tickers, initialiser les colonnes vides pour éviter les erreurs
         df["shortName"] = ""
         df["currentPrice"] = np.nan
         df["fiftyTwoWeekHigh"] = np.nan
@@ -136,7 +146,9 @@ def afficher_portefeuille():
     df["Valeur_Actuelle"] = df["Quantité"] * df["currentPrice"]
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
-    df["Devise"] = df["Devise"].fillna(devise_cible).astype(str).str.upper()
+    # Debugging: Vérifier les valeurs avant conversion
+    st.write("Valeurs avant conversion (échantillon):")
+    st.dataframe(df[["Devise", "Valeur Acquisition", "Valeur_Actuelle"]].head())
 
     # Conversion des valeurs à la devise cible
     df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
@@ -155,6 +167,10 @@ def afficher_portefeuille():
         lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
+
+    # Debugging: Vérifier les valeurs après conversion
+    st.write("Valeurs après conversion (échantillon):")
+    st.dataframe(df[["Devise", "Valeur_Actuelle", "Valeur_Actuelle_conv", "Taux_FX_Actuel"]].head())
 
     # Calcul des totaux globaux convertis
     total_valeur = df["Valeur_conv"].sum()
@@ -261,7 +277,10 @@ def afficher_portefeuille():
                 pass
 
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                df_disp = df_disp.sort_values(
+                df_allocation = df_allocation.sort_values(by=original_col_value, ascending=True, inplace=True)
+                df_allocation = df.sort_values(by=original_col_name, ascending=True, inplace=False)
+                df_allocation = pd.DataFrame(df_allocation, index=df.index, columns=df.columns)
+                df_disp = df_allocation.sort_values(
                     by=sort_col_label,  
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: pd.to_numeric(
@@ -270,7 +289,33 @@ def afficher_portefeuille():
                     ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
                 )
             else:
-                df_disp = df_disp.sort_values(
+                df_allocation = df_allocation.sort_values(
+                    by=sort_col,
+                    ascending=(st.session_state.sort_direction == "asc"),
+                    key=lambda x: x.__str__().lower()
+                )
+                df_allocation = df.sort_values(
+                    by=str,
+                    ascending=False,
+                    inplace=True
+                )
+                df_allocation = df.sort_values(
+                    by=str,
+                    ascending=(False, ),
+                    inplace=True
+                )
+                df = df.sort_values(
+                    by=str.lower(),
+                    ascending=False,
+                    inplace=True
+                )
+                df = df.sort_values(
+                    by=str.lower(),
+                    ascending=(False, ),
+                    False
+                )
+                
+                df_disp = df.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: x.astype(str).str.lower()
@@ -302,13 +347,13 @@ def afficher_portefeuille():
         col_idx = i + 1  
         
         if label in width_specific_cols:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: {width_specific_cols[label]}; }}\n"
+            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: {width_specific_cols[label]}; }}"
         else:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}\n"
+            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}"
         
         if label in left_aligned_labels:
-            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n"  
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n"  
+            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}"
+            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}"
             
     # Construction du HTML du tableau
     html_code = f"""
@@ -349,7 +394,7 @@ def afficher_portefeuille():
         }}
         {css_col_widths}  
 
-        .portfolio-table tr:nth-child(even) {{ background: #efefef; }}
+        .portfolio-table tr:nth-child(even) {{ background: #fefefe; }}
         .total-row td {{
             background: #A49B6D;
             color: white;
@@ -656,13 +701,13 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         for i, label in enumerate(df_disp_cat.columns):
             col_idx = i + 1
             if label in width_specific_cols_cat:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[label]}; }}\n"
+                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: {width_specific_cols_cat[label]}; }}"
             else:
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: auto; }}\n"
+                css_col_widths_cat += f".category-table th:nth-child({col_idx}), .category-table td:nth-child({col_idx}) {{ width: auto; }}"
             
             if label in left_aligned_labels_cat:
-                css_col_widths_cat += f".category-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}\n"  
-                css_col_widths_cat += f".category-table th:nth-child({col_idx}) {{ text-align: left !important; }}\n"  
+                css_col_widths_cat += f".category-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}"
+                css_col_widths_cat += f".category-table th:nth-child({col_idx}) {{ text-align: left !important; }}"
 
         html_code_cat = f"""
         <style>
@@ -702,7 +747,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             }}
             {css_col_widths_cat}
 
-            .category-table tr:nth-child(even) {{ background: #efefef; }}
+            .category-table tr:nth-child(even) {{ background: #fefefe; }}
             .total-row-cat td {{
                 background: #A49B6D;
                 color: white;
