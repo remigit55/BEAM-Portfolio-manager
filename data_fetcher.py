@@ -1,219 +1,369 @@
 import streamlit as st
-import yfinance as yf # Gardons l'import pour d'autres fonctions si elles l'utilisent encore
+import yfinance as yf
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import io
 import matplotlib.pyplot as plt
-import requests # Ajout de l'import pour les requêtes HTTP
-import json     # Ajout de l'import pour traiter le JSON
 
 # Cache pour 1 minute (60 secondes)
 @st.cache_data(ttl=60)
-def fetch_fx_rates(target_currency="EUR", all_currencies=None):
+def fetch_fx_rates(target_currency="EUR"):
     """
-    Récupère les taux de change actuels par rapport à une devise cible en utilisant exchangerate.host.
-    Cette fonction est appelée par portfolio_display.py.
+    Récupère les taux de change actuels par rapport à une devise cible.
+    Utilise EUR comme devise de base par défaut pour les taux de change populaires.
     """
-    st.info(f"Tentative de récupération des taux de change pour le portefeuille avec exchangerate.host. Devise cible: {target_currency}")
     fx_rates = {}
+    currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"]
 
-    # Assurez-vous que la devise cible est en majuscules
-    target_currency = target_currency.strip().upper()
+    for currency in currencies_to_fetch:
+        if currency == target_currency:
+            fx_rates[currency] = 1.0
+            continue
 
-    # Si all_currencies n'est pas fourni, utilisez la liste par default.
-    # Ceci est important car portfolio_display passe maintenant toutes les devises uniques.
-    if all_currencies is None:
-        # Liste par défaut des devises si aucune n'est passée
-        currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF"]
-    else:
-        # Nettoyer et mettre en majuscules toutes les devises, et s'assurer que la devise cible est incluse
-        currencies_to_fetch = list(set([c.strip().upper() for c in all_currencies] + [target_currency]))
+        ticker_symbol = f"{currency}{target_currency}=X"
+        try:
+            data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
+            
+            current_rate = np.nan # Initialiser comme NaN
 
-    # Taux pour la devise cible est toujours 1.0
-    fx_rates[f"{target_currency}/{target_currency}"] = 1.0
-    fx_rates[target_currency] = 1.0 # Pour le cas où la clé est juste la devise
+            # Traiter les données du ticker original
+            if not data.empty and 'Close' in data.columns and not data['Close'].empty:
+                temp_val = data['Close'].iloc[-1]
+                # S'assurer que temp_val est un scalaire. Si c'est une Series de longueur 1, la convertir.
+                if isinstance(temp_val, pd.Series) and len(temp_val) == 1:
+                    temp_val = temp_val.item() # Forcer la conversion en scalaire
+                
+                if pd.notna(temp_val):
+                    current_rate = temp_val
+            
+            # Si le taux original est toujours NaN, essayer le ticker inverse
+            if pd.isna(current_rate):
+                st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essai de l'inverse.")
+                ticker_symbol_inverse = f"{target_currency}{currency}=X"
+                data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
 
-    # Construire la liste des symboles pour l'API
-    symbols_str = ",".join([c for c in currencies_to_fetch if c != target_currency])
+                if not data_inverse.empty and 'Close' in data_inverse.columns and not data_inverse['Close'].empty:
+                    temp_val_inverse = data_inverse['Close'].iloc[-1]
+                    # S'assurer que temp_val_inverse est un scalaire
+                    if isinstance(temp_val_inverse, pd.Series) and len(temp_val_inverse) == 1:
+                        temp_val_inverse = temp_val_inverse.item() # Forcer la conversion en scalaire
 
-    # Si aucune devise à convertir, retourner tôt
-    if not symbols_str:
-        st.info("Aucune autre devise à convertir que la devise cible pour le portefeuille. Retourne le taux par défaut.")
-        return fx_rates
-
-    # URL de l'API exchangerate.host pour les taux "latest"
-    api_url = f"https://api.exchangerate.host/latest?base={target_currency}&symbols={symbols_str}"
-
-    try:
-        st.info(f"Requête API pour le portefeuille: {api_url}")
-        response = requests.get(api_url, timeout=5)
-        response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP (4xx ou 5xx)
-        data = response.json()
-
-        if data.get("success"):
-            api_rates = data.get("rates", {})
-            st.success(f"Réponse API reçue (succès) pour le portefeuille: {api_rates}")
-
-            for currency in currencies_to_fetch:
-                currency = currency.strip().upper()
-                if currency == target_currency:
-                    continue
-
-                # Le taux de l'API est BASE/SYMBOL, soit TARGET/SOURCE.
-                # Nous voulons SOURCE/TARGET. Donc il faut 1 / (TARGET/SOURCE).
-                # Exemple : base=EUR, symbol=USD. api_rates['USD'] = 1.08 (1 EUR = 1.08 USD)
-                # On veut USD/EUR, ce qui signifie 1 USD = ? EUR.
-                # Donc 1 USD = 1/1.08 EUR = 0.9259 EUR.
-
-                if currency in api_rates and pd.notna(api_rates[currency]) and api_rates[currency] != 0:
-                    fx_rates[f"{currency}/{target_currency}"] = 1 / api_rates[currency] 
-                    st.success(f"✔️ Taux {currency}/{target_currency} (via {target_currency}/{currency} inversé) pour le portefeuille : {fx_rates[f'{currency}/{target_currency}']:.4f}")
+                    if pd.notna(temp_val_inverse) and temp_val_inverse != 0:
+                        current_rate = 1 / temp_val_inverse
+                    else:
+                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse vide, NaN ou zéro).")
                 else:
-                    st.warning(f"Taux de {currency} par rapport à {target_currency} non trouvé ou invalide dans la réponse API pour le portefeuille. Taux pour {currency}/{target_currency} sera N/A.")
-                    fx_rates[f"{currency}/{target_currency}"] = np.nan # Si non trouvé, NaN
+                    st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
+            
+            # Assigner le taux final
+            if pd.notna(current_rate):
+                fx_rates[currency] = current_rate
+            else:
+                fx_rates[currency] = None
 
-        else:
-            st.error(f"❌ La réponse de l'API exchangerate.host indique un échec pour le portefeuille: {data.get('error', 'Pas de message d\'erreur détaillé.')}")
-            for currency in currencies_to_fetch:
-                if currency != target_currency:
-                    fx_rates[f"{currency}/{target_currency}"] = np.nan
+        except Exception as e:
+            st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
+            fx_rates[currency] = None
+            
+    # S'assurer que la devise cible elle-même est 1.0
+    fx_rates[target_currency] = 1.0
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Erreur de requête HTTP lors de la récupération des taux de change pour le portefeuille : {e}")
-        for currency in currencies_to_fetch:
-            if currency != target_currency:
-                fx_rates[f"{currency}/{target_currency}"] = np.nan
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Erreur de décodage JSON de la réponse API pour le portefeuille : {e}")
-        for currency in currencies_to_fetch:
-            if currency != target_currency:
-                fx_rates[f"{currency}/{target_currency}"] = np.nan
-    except Exception as e:
-        st.error(f"❌ Une erreur inattendue est survenue lors de la récupération des taux de change pour le portefeuille : {e}")
-        for currency in currencies_to_fetch:
-            if currency != target_currency:
-                fx_rates[f"{currency}/{target_currency}"] = np.nan
-
-    st.info("Fin de la récupération des taux de change pour le portefeuille.")
     return fx_rates
 
 
-# --- Fonctions existantes pour Yahoo Data et Momentum (non modifiées ici) ---
-# Ces fonctions sont supposées être OK car elles sont dans data_fetcher.py
-# et n'ont pas été la source principale des N/A pour les taux de change.
+@st.cache_data(ttl=600) # Cache pour 10 minutes
+def fetch_yahoo_data(ticker_symbol):
+    """
+    Récupère le nom court, le prix actuel et le plus haut sur 52 semaines pour un ticker.
+    Utilise yfinance.
+    Retourne aussi un indicateur si le prix est en pence (GBp) et doit être divisé par 100.
+    Si le prix actuel n'est pas disponible (None ou NaN), tente de récupérer la dernière clôture historique.
+    """
+    data = {}
+    is_gbp_pence = False
 
-@st.cache_data(ttl=3600)
-def fetch_yahoo_data(ticker):
-    """
-    Récupère le nom court et le prix actuel pour un ticker donné.
-    """
-    if not ticker:
-        return {}
     try:
-        info = yf.Ticker(ticker).info
-        return {
-            "shortName": info.get("shortName", ticker),
-            "currentPrice": info.get("currentPrice"),
-            "fiftyTwoWeekHigh": info.get("fiftyTwoWeekHigh"),
-        }
+        ticker = yf.Ticker(ticker_symbol)
+        info = ticker.info
+
+        data['shortName'] = info.get('shortName') or info.get('longName') or ticker_symbol
+        
+        # Tentative 1: currentPrice (prix de marché actuel)
+        current_price_found = info.get('currentPrice')
+        
+        # Tentative 2: regularMarketPrice si currentPrice est None
+        if current_price_found is None:
+            current_price_found = info.get('regularMarketPrice')
+
+        # Si toujours pas de prix "live", tenter de récupérer la dernière clôture historique
+        if current_price_found is None or pd.isna(current_price_found):
+            # Tente de récupérer la dernière clôture disponible avec un intervalle court (1m)
+            hist_data = yf.download(ticker_symbol, period="1d", interval="1m", progress=False) 
+            
+            # Si aucune donnée 1m, tente avec un intervalle plus long (1h)
+            if hist_data.empty:
+                hist_data = yf.download(ticker_symbol, period="5d", interval="1h", progress=False) 
+            
+            # Si des données historiques ont été trouvées et contiennent 'Close'
+            if not hist_data.empty and 'Close' in hist_data.columns and not hist_data['Close'].empty:
+                last_historical_close = hist_data['Close'].iloc[-1]
+                if pd.notna(last_historical_close):
+                    current_price_found = float(last_historical_close)
+                    # st.warning(f"Utilisation du dernier prix de clôture historique pour {ticker_symbol}: {current_price_found}")
+
+        data['currentPrice'] = current_price_found
+        data['fiftyTwoWeekHigh'] = info.get('fiftyTwoWeekHigh')
+
+        currency_yahoo = info.get('currency')
+        if currency_yahoo == 'GBp':
+            is_gbp_pence = True
+        elif currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L")):
+            is_gbp_pence = True
+
+        if is_gbp_pence:
+            if data['currentPrice'] is not None and not np.isnan(data['currentPrice']):
+                data['currentPrice'] /= 100
+            if data['fiftyTwoWeekHigh'] is not None and not np.isnan(data['fiftyTwoWeekHigh']):
+                data['fiftyTwoWeekHigh'] /= 100
+
     except Exception as e:
-        return {"shortName": ticker, "currentPrice": np.nan, "fiftyTwoWeekHigh": np.nan}
+        # En cas d'erreur générale, les valeurs restent NaN
+        # st.error(f"Erreur lors de la récupération des données Yahoo pour {ticker_symbol}: {e}") 
+        data['shortName'] = ticker_symbol
+        data['currentPrice'] = np.nan
+        data['fiftyTwoWeekHigh'] = np.nan
+        is_gbp_pence = False
+        
+    data['is_gbp_pence'] = is_gbp_pence
+    return data
 
-
-@st.cache_data(ttl=3600)
-def fetch_momentum_data(ticker, period="1y", interval="1wk"):
+@st.cache_data(ttl=60) # Cache pour 1 minute
+def fetch_momentum_data(ticker_symbol, months=12):
     """
-    Calcule le momentum à 39 semaines, le Z-Score, le signal et la justification pour un ticker.
+    Calcule le momentum (taux de changement) et le Z-score pour un ticker sur X mois.
+    Utilise yfinance pour récupérer les données historiques.
+    Applique une correction pour les prix en pence si nécessaire.
     """
-    if not ticker:
-        return {
-            "Last Price": np.nan, "Momentum (%)": np.nan, "Z-Score": np.nan,
-            "Signal": "", "Action": "", "Justification": "",
-        }
-
     try:
-        data = yf.download(ticker, period=period, interval=interval, progress=False)
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=5 * 365) # 5 ans pour calculs robustes
 
-        if data.empty or 'Close' not in data.columns:
+        data = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1wk", progress=False)
+
+        close_series = pd.Series([]) # Initialise une Series vide
+        
+        if data.empty:
             return {
-                "Last Price": np.nan, "Momentum (%)": np.nan, "Z-Score": np.nan,
-                "Signal": "N/A", "Action": "N/A", "Justification": "Données de clôture manquantes ou vides.",
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Manquant",
+                "Action": "Vérifier Ticker",
+                "Justification": "Pas de données historiques disponibles."
             }
 
-        df = pd.DataFrame(data['Close']).rename(columns={'Close': 'Prix'})
-        df['MA_39_Semaines'] = df['Prix'].rolling(window=39).mean()
-        df['Momentum'] = (df['Prix'] / df['MA_39_Semaines']) - 1
-        df['MA_Momentum_10'] = df['Momentum'].rolling(window=10).mean()
-        df['Std_Momentum_10'] = df['Momentum'].rolling(window=10).std()
-        df['Z_Momentum'] = np.where(df['Std_Momentum_10'] != 0, 
-                                    (df['Momentum'] - df['MA_Momentum_10']) / df['Std_Momentum_10'], 
-                                    np.nan)
+        # Gère les colonnes MultiIndex (par exemple, lors du téléchargement de données pour plusieurs tickers)
+        if isinstance(data.columns, pd.MultiIndex):
+            if ('Close', ticker_symbol) in data.columns: # Vérifie si 'Close' du ticker spécifique existe
+                close_series = data['Close'][ticker_symbol]
+            elif 'Close' in data.columns: # Fallback si 'Close' est un MultiIndex mais sans le nom du ticker
+                 close_series = data['Close'].iloc[:, 0] if isinstance(data['Close'], pd.DataFrame) else data['Close']
+            else:
+                 return {
+                    "Last Price": np.nan,
+                    "Momentum (%)": np.nan,
+                    "Z-Score": np.nan,
+                    "Signal": "Erreur",
+                    "Action": "Vérifier Ticker",
+                    "Justification": "Colonne 'Close' spécifique au ticker non trouvée dans le MultiIndex."
+                }
+        elif 'Close' in data.columns: # Colonnes simples standards
+            close_series = data['Close']
+        else: # Colonne 'Close' pas trouvée du tout
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Manquant",
+                "Action": "Vérifier Ticker",
+                "Justification": "Colonne 'Close' non trouvée dans les données historiques."
+            }
+            
+        # Maintenant, vérifie si la close_series extraite est vide
+        if close_series.empty:
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Manquant",
+                "Action": "Vérifier Ticker",
+                "Justification": "La colonne 'Close' ne contient pas de données pour la période demandée."
+            }
 
-        last_row = df.iloc[-1]
-        last_price = last_row['Prix']
-        momentum_percent = last_row['Momentum'] * 100
-        z_score = last_row['Z_Momentum']
+        # Détection GBp et correction des prix si nécessaire
+        is_gbp_pence_for_momentum = False
+        try:
+            ticker_info = yf.Ticker(ticker_symbol).info
+            currency_yahoo = ticker_info.get('currency')
+            if currency_yahoo == 'GBp' or (currency_yahoo == 'GBP' and ticker_symbol.endswith((".L", "^L"))):
+                is_gbp_pence_for_momentum = True
+        except Exception:
+            pass # Ignorer les erreurs si info n'est pas dispo ici
 
-        signal = "Neutre"; action = "Maintenir"; justification = ""
-        if z_score >= 2:
-            signal = "Surachat Fort"; action = "Vente (Réduire)"; justification = f"Le Z-Score ({z_score:.2f}) est > 2, indiquant un surachat important."
-        elif z_score >= 1.5:
-            signal = "Surachat Modéré"; action = "Maintenir (Surveiller)"; justification = f"Le Z-Score ({z_score:.2f}) est > 1.5, indiquant un surachat modéré."
-        elif z_score <= -2:
-            signal = "Survente Forte"; action = "Achat (Renforcer)"; justification = f"Le Z-Score ({z_score:.2f}) est < -2, indiquant une survente importante."
-        elif z_score <= -1.5:
-            signal = "Survente Modérée"; action = "Maintenir (Surveiller)"; justification = f"Le Z-Score ({z_score:.2f}) est < -1.5, indiquant une survente modérée."
-        elif momentum_percent > 0:
-            signal = "Momentum Positif"; action = "Maintenir"; justification = f"Le Momentum ({momentum_percent:.2f}%) est positif."
+        if is_gbp_pence_for_momentum:
+            # Applique la correction directement à la close_series
+            close_series = close_series / 100.0
+
+        # Créer un DataFrame pour les calculs de momentum avec la colonne 'Close' valide
+        df = pd.DataFrame({'Close': close_series}).copy()
+        
+        # Vérifier si suffisamment de données sont disponibles après le nettoyage
+        if len(df) < 39:
+            last_price = df['Close'].iloc[-1] if not df['Close'].empty else np.nan
+            return {
+                "Last Price": last_price,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Insuffisant",
+                "Action": "Plus de données requises",
+                "Justification": "Pas assez de données pour calculer le momentum (moins de 39 semaines)."
+            }
+
+        # Calcul des indicateurs de momentum
+        df['MA_39'] = df['Close'].rolling(window=39, min_periods=1).mean()
+        df['Momentum'] = (df['Close'] / df['MA_39']) - 1
+        
+        df['Momentum_Mean_10'] = df['Momentum'].rolling(window=10, min_periods=1).mean()
+        df['Momentum_Std_10'] = df['Momentum'].rolling(window=10, min_periods=1).std()
+
+        df['Z_Momentum'] = (df['Momentum'] - df['Momentum_Mean_10']) / df['Momentum_Std_10']
+        df['Z_Momentum'] = df['Z_Momentum'].replace([np.inf, -np.inf], np.nan)
+
+        # Récupérer la dernière ligne pour les valeurs finales
+        if df.empty:
+            return {
+                "Last Price": np.nan,
+                "Momentum (%)": np.nan,
+                "Z-Score": np.nan,
+                "Signal": "Erreur",
+                "Action": "Vérifier Ticker",
+                "Justification": "DataFrame vide après calculs."
+            }
+
+        latest = df.iloc[-1]
+
+        # Extraire les valeurs finales, en s'assurant qu'elles sont scalaires et non NaN
+        latest_price = latest['Close'] if pd.notna(latest['Close']) else np.nan
+        m = (latest['Momentum'] * 100.0) if pd.notna(latest['Momentum']) else np.nan
+        z = latest['Z_Momentum'] if pd.notna(latest['Z_Momentum']) else np.nan
+
+        signal = "Neutre"
+        action = "Maintenir"
+        justification = ""
+
+        if pd.notna(z):
+            if z > 2:
+                signal = "🔥 Surchauffe"
+                action = "Alléger / Prendre profits"
+                justification = "Momentum extrême, risque de retournement"
+            elif z > 1.5:
+                signal = "↗ Fort"
+                action = "Surveiller"
+                justification = "Momentum soutenu, proche de surchauffe"
+            elif z > 0.5:
+                signal = "↗ Haussier"
+                action = "Conserver / Renforcer"
+                justification = "Momentum sain"
+            elif z > -0.5:
+                signal = "➖ Neutre"
+                action = "Ne rien faire"
+                justification = "Pas de signal exploitable"
+            elif z > -1.5:
+                signal = "↘ Faible"
+                action = "Surveiller / Réduire si confirmé"
+                justification = "Dynamique en affaiblissement"
+            else: # z <= -1.5
+                signal = "🧊 Survendu"
+                action = "Acheter / Renforcer (si signal technique)"
+                justification = "Purge excessive, possible bas de cycle"
         else:
-            signal = "Momentum Négatif"; action = "Maintenir"; justification = f"Le Momentum ({momentum_percent:.2f}%) est négatif."
+            justification = "Z-Score non calculable."
+
+        if pd.notna(m):
+            justification += f" Momentum: {m:.2f}%."
+        if pd.notna(z):
+            justification += f" Z-Score: {z:.2f}."
 
         return {
-            "Last Price": last_price, "Momentum (%)": momentum_percent, "Z-Score": z_score,
-            "Signal": signal, "Action": action, "Justification": justification,
+            "Last Price": latest_price,
+            "Momentum (%)": m,
+            "Z-Score": z,
+            "Signal": signal,
+            "Action": action,
+            "Justification": justification
         }
 
     except Exception as e:
+        # Retourne les valeurs NaN en cas d'erreur
         return {
-            "Last Price": np.nan, "Momentum (%)": np.nan, "Z-Score": np.nan,
-            "Signal": "Erreur", "Action": "Vérifier", "Justification": f"Erreur de calcul: {e}",
+            "Last Price": np.nan,
+            "Momentum (%)": np.nan,
+            "Z-Score": np.nan,
+            "Signal": "Erreur",
+            "Action": "N/A",
+            "Justification": f"Erreur de calcul: {e}."
         }
 
+
+# --- Fonction plot_momentum_chart (si vous l'utilisez ailleurs) ---
 def plot_momentum_chart(ticker, data_df):
     """
-    Génère un graphique interactif avec Plotly pour le prix, la MA et le momentum/Z-score.
+    Génère un graphique de prix et de momentum pour un ticker donné.
+    data_df doit contenir les colonnes 'Close', 'MA_39', 'Momentum', 'Z_Momentum'.
     """
-    if data_df.empty or 'Prix' not in data_df.columns:
-        st.warning(f"Pas de données suffisantes pour tracer le graphique de momentum pour {ticker}.")
-        return
+    if data_df.empty:
+        st.write(f"Pas de données disponibles pour tracer le graphique de {ticker}.")
+        return None
 
-    fig = plt.figure(figsize=(12, 8))
-    gs = fig.add_gridspec(2, 1, height_ratios=[3, 1])
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
 
-    ax1.plot(data_df.index, data_df['Prix'], label='Prix', color='blue')
-    ax1.plot(data_df.index, data_df['MA_39_Semaines'], label='MA 39 semaines', color='red', linestyle='--')
+    # Graphique des prix et MA
+    ax1.plot(data_df.index, data_df['Close'], label='Prix Clôture', color='blue')
+    ax1.plot(data_df.index, data_df['MA_39'], label='MA 39 semaines', color='red', linestyle='--')
     ax1.set_title(f'Prix et Moyenne Mobile 39 semaines pour {ticker}')
     ax1.set_ylabel('Prix')
-    ax1.legend(); ax1.grid(True)
+    ax1.legend()
+    ax1.grid(True)
 
+    # Graphique du Momentum
     ax2.plot(data_df.index, data_df['Momentum'] * 100, label='Momentum (%)', color='green')
-    ax2.axhline(0, color='gray', linestyle='--', linewidth=0.8)
+    ax2.axhline(0, color='gray', linestyle='--', linewidth=0.8) # Ligne zéro pour le momentum
     ax2.set_title(f'Momentum et Z-Score pour {ticker}')
     ax2.set_ylabel('Momentum (%)')
-    ax2.legend(loc='upper left'); ax2.grid(True)
+    ax2.legend(loc='upper left')
+    ax2.grid(True)
 
+    # Ajouter le Z-Score sur l'axe secondaire
     ax3 = ax2.twinx()
     ax3.plot(data_df.index, data_df['Z_Momentum'], label='Z-Score Momentum', color='purple', linestyle=':')
     ax3.set_ylabel('Z-Score')
     ax3.legend(loc='upper right')
-
+    
+    # Lignes pour les seuils de Z-Score
     ax3.axhline(2, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 2')
     ax3.axhline(1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score > 1.5')
     ax3.axhline(-1.5, color='orange', linestyle=':', linewidth=0.8, label='Z-Score < -1.5')
     ax3.axhline(-2, color='orange', linestyle=':', linewidth=0.8, label='Z-Score < -2')
+    
+    # Formatage de l'axe des dates
+    fig.autofmt_xdate()
 
     plt.tight_layout()
-    st.pyplot(fig)
+    
+    # Sauvegarder le graphique dans un buffer pour l'affichage Streamlit
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig) # Fermer la figure pour libérer la mémoire
+    buf.seek(0)
+    return buf
