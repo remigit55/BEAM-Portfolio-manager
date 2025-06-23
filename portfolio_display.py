@@ -502,7 +502,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     target_allocations = {
         "Minières": 0.41,
         "Asie": 0.25,
-        "Energie": 0.25, # Changed from "Énergie" to "Energie"
+        "Energie": 0.25,
         "Matériaux": 0.01,
         "Devises": 0.08,
         "Crypto": 0.00,
