@@ -9,25 +9,24 @@ import numpy as np
 from utils import safe_escape, format_fr
 
 # Import des fonctions de récupération de données.
-# Assurez-vous que data_fetcher.py existe et contient ces fonctions.
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 
-# --- Fonction de conversion de devise (déplacée ici pour être globale) ---
+# --- Fonction de conversion de devise ---
 def convertir(val, source_devise, devise_cible, fx_rates):
     """
     Convertit une valeur d'une devise source vers la devise cible en utilisant les taux de change fournis.
-    Retourne la valeur originale si le taux de change est manquant ou nul.
+    Retourne la valeur originale et un taux de 1.0 si le taux de change est manquant ou nul.
+    Retourne la valeur convertie et le taux utilisé.
     """
     if pd.isnull(val):
-        return np.nan
+        return np.nan, np.nan # Retourne NaN pour la valeur et le taux si la valeur est NaN
 
     source_devise = str(source_devise).upper()
     devise_cible = str(devise_cible).upper()
     
     if source_devise == devise_cible:
-        return val
+        return val, 1.0 # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    # Clé de taux de change attendue dans fx_rates est 'SOURCE/CIBLE'
     fx_key = f"{source_devise}/{devise_cible}"
     raw_taux = fx_rates.get(fx_key)
     
@@ -38,11 +37,11 @@ def convertir(val, source_devise, devise_cible, fx_rates):
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
         # Si le taux est manquant ou nul, la conversion est impossible/non fiable.
-        # DEBUG: Si cela se produit, c'est une cause potentielle du problème.
-        # st.warning(f"DEBUG: Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
-        return val # Retourne la valeur non convertie
+        # Retourne la valeur non convertie et un indicateur de taux manquant (ex: np.nan ou 0)
+        # st.warning(f"Taux de change {fx_key} manquant ou nul pour la conversion de {val} {source_devise}. Retourne la valeur non convertie.")
+        return val, np.nan # Retourne la valeur originale et un taux NaN pour indiquer l'absence de conversion
         
-    return val / taux_scalar
+    return val * taux_scalar, taux_scalar # Retourne la valeur convertie ET le taux utilisé
 
 
 def afficher_portefeuille():
@@ -137,20 +136,25 @@ def afficher_portefeuille():
 
     df["Devise"] = df["Devise"].fillna(devise_cible).astype(str).str.upper()
 
-    # DEBUG: Avant conversion
-    # st.write("DEBUG: DataFrame avant conversion des valeurs d'acquisition:")
-    # st.dataframe(df[["Ticker", "Quantité", "Acquisition", "Valeur Acquisition", "Devise"]].head())
-
     # Conversion des valeurs à la devise cible
-    df["Valeur_conv"] = df.apply(lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), axis=1)
-    df["Valeur_Actuelle_conv"] = df.apply(lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates), axis=1)
-    df["Valeur_H52_conv"] = df.apply(lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates), axis=1)
-    df["Valeur_LT_conv"] = df.apply(lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), axis=1)
+    # MODIFICATION ICI : la fonction `convertir` retourne maintenant le taux utilisé aussi
+    df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
+        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), 
+        axis=1, result_type='expand' # Utilisez 'expand' pour étendre la série retournée en colonnes
+    )
+    df[['Valeur_Actuelle_conv', 'Taux_FX_Actuel']] = df.apply(
+        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates), 
+        axis=1, result_type='expand'
+    )
+    df[['Valeur_H52_conv', 'Taux_FX_H52']] = df.apply(
+        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates), 
+        axis=1, result_type='expand'
+    )
+    df[['Valeur_LT_conv', 'Taux_FX_LT']] = df.apply(
+        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), 
+        axis=1, result_type='expand'
+    )
 
-    # DEBUG: Après conversion
-    # st.write("DEBUG: DataFrame après conversion des valeurs d'acquisition (colonne Valeur_conv):")
-    # st.dataframe(df[["Ticker", "Valeur Acquisition", "Devise", "Valeur_conv"]].head())
-    # st.write(f"DEBUG: Somme de Valeur_conv: {df['Valeur_conv'].sum()}")
 
     # Calcul des totaux globaux convertis
     total_valeur = df["Valeur_conv"].sum()
@@ -171,15 +175,17 @@ def afficher_portefeuille():
         ("Quantité", 0), ("Acquisition", 4), ("Valeur Acquisition", 2), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Valeur_H52", 2), ("Valeur_Actuelle", 2),
         ("Objectif_LT", 4), ("Valeur_LT", 2), ("Gain/Perte", 2),
-        ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2)
+        ("Momentum (%)", 2), ("Z-Score", 2), ("Gain/Perte (%)", 2),
+        # Ajout des nouvelles colonnes de débogage
+        ("Taux_FX_Acquisition", 6) # Taux de change, plus de décimales pour la précision
     ]:
         if col_name in df.columns:
             if col_name in ["Valeur Acquisition", "Valeur_H52", "Valeur_Actuelle", "Valeur_LT", "Gain/Perte"]:
-                # Afficher les colonnes formatées avec la devise cible pour le tableau principal
-                # Même si "Valeur Acquisition" est calculée en devise d'origine, son formatage pour l'affichage peut être en devise cible ici
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + f" {devise_cible}")
             elif col_name == "Gain/Perte (%)" or col_name == "Momentum (%)":
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) + " %")
+            elif col_name == "Taux_FX_Acquisition": # Formatage spécifique pour le taux de change
+                df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places) if pd.notna(x) else "N/A")
             else:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: format_fr(x, dec_places))
 
@@ -187,16 +193,22 @@ def afficher_portefeuille():
     # Définition des colonnes à afficher et de leurs libellés
     cols = [
         ticker_col, "shortName", "Catégorie", "Devise",
-        "Quantité_fmt", "Acquisition_fmt", "Valeur Acquisition_fmt", # Note: Valeur Acquisition_fmt est maintenant en devise cible pour l'affichage
+        "Quantité_fmt", "Acquisition_fmt", 
+        "Valeur Acquisition", # La valeur numérique d'origine pour le débogage (avant conversion)
+        "Valeur Acquisition_fmt", # La valeur convertie et formatée
+        "Taux_FX_Acquisition_fmt", # Le taux de change appliqué
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
         "Last Price", "Momentum (%)_fmt", "Z-Score_fmt",
         "Signal", "Action", "Justification"
     ]
     labels = [
-        "Ticker", "Nom", "Catégorie", "Devise",
-        "Quantité", "Prix d'Acquisition", "Valeur Acquisition",
-        "Prix Actuel", "Valeur Actuelle", "Gain/Perte", "Gain/Perte (%)",
+        "Ticker", "Nom", "Catégorie", "Devise Source", # Renommé pour plus de clarté
+        "Quantité", "Prix d'Acquisition (Source)", # Renommé
+        "Valeur Acquisition (Source)", # Nouvelle colonne de débogage
+        f"Valeur Acquisition ({devise_cible})", # Libellé plus précis
+        "Taux FX (Source/Cible)", # Nouvelle colonne de débogage
+        "Prix Actuel", f"Valeur Actuelle ({devise_cible})", "Gain/Perte", "Gain/Perte (%)",
         "Haut 52 Semaines", "Valeur H52", "Objectif LT", "Valeur LT",
         "Dernier Prix", "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
@@ -205,7 +217,12 @@ def afficher_portefeuille():
     existing_cols_in_df = []
     existing_labels = []
     for i, col_name in enumerate(cols):
-        if col_name == ticker_col and ticker_col is not None:
+        # Pour les colonnes de débogage qui n'ont pas de suffixe _fmt
+        if col_name in ["Valeur Acquisition", "Taux_FX_Acquisition"]: # Ces colonnes numériques seront utilisées directement
+            if col_name in df.columns:
+                existing_cols_in_df.append(col_name) # Ajouter la colonne numérique non formatée
+                existing_labels.append(labels[i])
+        elif col_name == ticker_col and ticker_col is not None:
             if ticker_col in df.columns:
                 existing_cols_in_df.append(ticker_col)
                 existing_labels.append(labels[i])
@@ -214,7 +231,7 @@ def afficher_portefeuille():
             if f"{base_col_name}_fmt" in df.columns: 
                 existing_cols_in_df.append(f"{base_col_name}_fmt")
                 existing_labels.append(labels[i])
-            elif base_col_name in df.columns: 
+            elif base_col_name in df.columns: # Fallback if _fmt was not created
                 existing_cols_in_df.append(base_col_name)
                 existing_labels.append(labels[i])
         elif col_name in df.columns: 
@@ -241,21 +258,23 @@ def afficher_portefeuille():
             try:
                 idx = existing_labels.index(sort_col_label)
                 original_col_name = existing_cols_in_df[idx]
+                # Si c'est une colonne _fmt, utiliser la colonne numérique d'origine pour le tri
                 if original_col_name.endswith("_fmt"):
                     original_col_name = original_col_name[:-4] 
             except ValueError:
                 pass
 
+            # Utiliser la colonne originale du df pour le tri si elle est numérique
             if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
                 df_disp = df_disp.sort_values(
-                    by=sort_col_label,
+                    by=sort_col_label, # Tri sur la colonne affichée pour l'ordre
                     ascending=(st.session_state.sort_direction == "asc"),
                     key=lambda x: pd.to_numeric(
                         x.astype(str).str.replace(r'[^\d.,-]', '', regex=True).str.replace(',', '.', regex=False),
                         errors='coerce'
                     ).fillna(-float('inf') if st.session_state.sort_direction == "asc" else float('inf'))
                 )
-            else:
+            else: # Tri alphabétique pour les autres colonnes
                 df_disp = df_disp.sort_values(
                     by=sort_col_label,
                     ascending=(st.session_state.sort_direction == "asc"),
@@ -274,13 +293,15 @@ def afficher_portefeuille():
         "Ticker": "80px",
         "Nom": "200px",
         "Catégorie": "100px",
-        "Devise": "60px",
+        "Devise Source": "60px",
+        "Valeur Acquisition (Source)": "120px", # Largeur pour la nouvelle colonne
+        "Taux FX (Source/Cible)": "100px", # Largeur pour la nouvelle colonne
         "Signal": "100px",
         "Action": "150px",
         "Justification": "200px",
     }
     
-    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification"]
+    left_aligned_labels = ["Ticker", "Nom", "Catégorie", "Signal", "Action", "Justification", "Devise Source"] # Devise Source aussi alignée à gauche
 
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1 
@@ -307,7 +328,7 @@ def afficher_portefeuille():
             position: relative;
         }}
         .portfolio-table {{
-            min-width: 2200px; /* Ajustez si nécessaire pour éviter le wrap */
+            min-width: 2500px; /* Ajustez si nécessaire pour les nouvelles colonnes */
             border-collapse: collapse;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }}
@@ -363,7 +384,14 @@ def afficher_portefeuille():
         html_code += "<tr>"
         for lbl in df_disp.columns:
             val = row[lbl]
-            val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+            # Formatage spécifique pour les colonnes numériques de débogage
+            if lbl == "Valeur Acquisition (Source)":
+                val_str = f"{format_fr(val, 2)} {row['Devise Source']}" if pd.notnull(val) else ""
+            elif lbl == "Taux FX (Source/Cible)":
+                val_str = format_fr(val, 6) if pd.notnull(val) else "N/A"
+            else:
+                val_str = safe_escape(str(val)) if pd.notnull(val) else ""
+            
             html_code += f"<td>{val_str}</td>"
         html_code += "</tr>"
 
@@ -372,9 +400,9 @@ def afficher_portefeuille():
     total_row_cells = [""] * num_cols_displayed
     
     total_cols_mapping = {
-        "Valeur Acquisition": total_valeur_str,
-        "Valeur Actuelle": total_actuelle_str,
-        "Valeur H52": total_h52_str,
+        f"Valeur Acquisition ({devise_cible})": total_valeur_str,
+        f"Valeur Actuelle ({devise_cible})": total_actuelle_str,
+        "Valeur H52": total_h52_str, # Les libellés pour H52 et LT ne sont pas changés pour les totaux
         "Valeur LT": total_lt_str
     }
 
@@ -500,28 +528,14 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
         portfolio_total_value = total_actuelle
         
-        # DEBUG: Vérification de la devise de portfolio_total_value
-        # st.write(f"DEBUG SYNT: portfolio_total_value = {portfolio_total_value} (devise cible: {devise_cible})")
-        # st.write(f"DEBUG SYNT: Type de portfolio_total_value = {type(portfolio_total_value)}")
-        # st.write(f"DEBUG SYNT: Is portfolio_total_value NaN? {pd.isna(portfolio_total_value)}")
-
-        if portfolio_total_value <= 0 or pd.isna(portfolio_total_value): # Ajout de la vérification NaN
+        if portfolio_total_value <= 0 or pd.isna(portfolio_total_value):
             st.info("La valeur totale actuelle du portefeuille est de 0 ou moins, ou non définie. Impossible de calculer la répartition par catégorie de manière significative.")
             return
 
         df['Valeur_Actuelle_conv'] = pd.to_numeric(df['Valeur_Actuelle_conv'], errors='coerce').fillna(0)
         
-        # DEBUG: Vérification des valeurs converties avant groupement
-        # st.write("DEBUG SYNT: Aperçu de df[['Devise', 'Valeur_Actuelle', 'Valeur_Actuelle_conv']] avant groupement:")
-        # st.dataframe(df[['Devise', 'Valeur_Actuelle', 'Valeur_Actuelle_conv']].head())
-        # st.write(f"DEBUG SYNT: Somme des Valeur_Actuelle_conv dans df: {df['Valeur_Actuelle_conv'].sum()} (devrait être total_actuelle)")
-
         category_values = df.groupby('Catégorie')['Valeur_Actuelle_conv'].sum()
         
-        # DEBUG: Vérification des sommes par catégorie
-        # st.write("DEBUG SYNT: Valeurs actuelles par catégorie (déjà converties):")
-        # st.dataframe(category_values)
-
         results_data = []
 
         all_relevant_categories = sorted(list(set(target_allocations.keys()) | set(category_values.index.tolist())))
@@ -530,7 +544,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             target_pct = target_allocations.get(category, 0.0) 
             current_value_cat = category_values.get(category, 0.0) 
             
-            # Assurez-vous que current_value_cat est bien un nombre, même si la catégorie est absente
             if pd.isna(current_value_cat):
                 current_value_cat = 0.0
 
@@ -538,36 +551,25 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
             deviation_pct = current_pct - target_pct
             
-            # CALCUL CORRECT DE L'AJUSTEMENT NÉCESSAIRE
-            # Toutes ces valeurs devraient être dans la devise cible
             target_value_for_category = target_pct * portfolio_total_value
             
             value_to_adjust = target_value_for_category - current_value_cat
             
-            # DEBUG: Vérification des composants du calcul d'ajustement
-            # st.write(f"DEBUG SYNT: Catégorie: {category}")
-            # st.write(f"DEBUG SYNT:   target_pct: {target_pct}")
-            # st.write(f"DEBUG SYNT:   current_value_cat: {current_value_cat} ({devise_cible})")
-            # st.write(f"DEBUG SYNT:   portfolio_total_value: {portfolio_total_value} ({devise_cible})")
-            # st.write(f"DEBUG SYNT:   target_value_for_category: {target_value_for_category} ({devise_cible})")
-            # st.write(f"DEBUG SYNT:   value_to_adjust (Ajustement Nécessaire): {value_to_adjust} ({devise_cible})")
-
             valeur_pour_atteindre_objectif_str = ""
             if pd.notna(value_to_adjust):
                 valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}"
             
             results_data.append({
                 "Catégorie": category,
-                "Valeur Actuelle": current_value_cat, # Garder numérique pour le tri et le calcul
-                "Part Actuelle (%)": current_pct * 100, # Garder numérique pour le tri
+                "Valeur Actuelle": current_value_cat,
+                "Part Actuelle (%)": current_pct * 100,
                 "Cible (%)": target_pct * 100,
                 "Écart à l'objectif (%)": deviation_pct * 100,
-                "Ajustement Nécessaire": value_to_adjust # Garder numérique pour le tri
+                "Ajustement Nécessaire": value_to_adjust
             })
 
         df_allocation = pd.DataFrame(results_data)
         
-        # Tri initial du DataFrame par 'Part Actuelle (%)'
         df_allocation = df_allocation.sort_values(by='Part Actuelle (%)', ascending=False)
         
         # Formatage des colonnes pour l'affichage dans le HTML
@@ -608,7 +610,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         if st.session_state.sort_column_cat:
             sort_col_label_cat = st.session_state.sort_column_cat
             if sort_col_label_cat in df_disp_cat.columns:
-                # Trouver la colonne numérique correspondante pour le tri
                 original_col_for_sort = None
                 if sort_col_label_cat == "Valeur Actuelle":
                     original_col_for_sort = "Valeur Actuelle"
@@ -619,15 +620,15 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 elif sort_col_label_cat == "Écart à l'objectif (%)":
                     original_col_for_sort = "Écart à l'objectif (%)"
                 elif sort_col_label_cat == f"Ajustement Nécessaire":
-                    original_col_for_sort = "Ajustement Nécessaire"
+                    original_col_for_for_sort = "Ajustement Nécessaire"
                 
                 if original_col_for_sort and pd.api.types.is_numeric_dtype(df_allocation[original_col_for_sort]):
                     df_disp_cat = df_allocation.sort_values(
                         by=original_col_for_sort,
                         ascending=(st.session_state.sort_direction_cat == "asc")
-                    )[cols_to_display] # Sélectionner les colonnes formatées après le tri
-                    df_disp_cat.columns = labels_for_display # Réappliquer les labels d'affichage
-                else: # Tri alphabétique pour les colonnes non numériques ou si la colonne originale n'est pas trouvée
+                    )[cols_to_display]
+                    df_disp_cat.columns = labels_for_display
+                else: 
                     df_disp_cat = df_disp_cat.sort_values(
                         by=sort_col_label_cat,
                         ascending=(st.session_state.sort_direction_cat == "asc"),
@@ -665,14 +666,14 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             .scroll-wrapper-cat {{
                 overflow-x: auto !important;
                 overflow-y: auto;
-                max-height: 400px; /* Ajusté pour ce tableau */
+                max-height: 400px;
                 max-width: none !important;
                 width: auto;
                 display: block;
                 position: relative;
             }}
             .category-table {{
-                min-width: 800px; /* Ajustez si nécessaire */
+                min-width: 800px;
                 border-collapse: collapse;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }}
