@@ -122,7 +122,7 @@ def afficher_parametres_globaux():
     st.markdown("#### Informations sur les Données")
 
     if "last_yfinance_update" in st.session_state and st.session_state["last_yfinance_update"]:
-        st.info(f"Dernière mise à jour des données yfinance : **{st.session_state['last_yfinance_update']}**")
+        st.write(f"Dernière mise à jour des données yfinance : **{st.session_state['last_yfinance_update']}**")
     else:
         st.info("Aucune donnée yfinance n'a été chargée pour le moment.")
 
