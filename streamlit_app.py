@@ -96,7 +96,7 @@ for key, default in {
     "sort_column": None,
     "sort_direction": "asc",
     "last_devise_cible_for_fx_update": "EUR",
-    "last_update_time_fx": datetime.datetime.min,
+    "last_update_time_fx": datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc),
     "total_valeur": None,
     "total_actuelle": None,
     "total_h52": None,
