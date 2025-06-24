@@ -135,6 +135,14 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
         st.session_state.url_data_loaded = True
 
+# --- NOUVEAU BLOC DE VÉRIFICATION APRÈS L'INITIALISATION ---
+# C'est la ligne la plus importante pour résoudre le TypeError.
+# On s'assure que last_update_time_fx est toujours un datetime timezone-aware avant toute utilisation.
+if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
+   st.session_state.last_update_time_fx.tzinfo is None:
+    st.session_state.last_update_time_fx = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+# --- FIN NOUVEAU BLOC ---
+
 # Actualisation automatique des taux de change
 # Obtenir l'heure actuelle en UTC
 current_time_utc = datetime.datetime.now(datetime.timezone.utc) # <-- Utilise datetime.timezone.utc
