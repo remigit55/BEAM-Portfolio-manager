@@ -116,9 +116,10 @@ def afficher_parametres_globaux():
     st.markdown("#### Autres Réglages")
     st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
 
-
     st.markdown("---")
-    st.write("### Informations sur les Données")
+    
+    # --- 5. Informations sur les Données ---
+    st.markdown("#### Informations sur les Données")
 
     if "last_yfinance_update" in st.session_state and st.session_state["last_yfinance_update"]:
         st.info(f"Dernière mise à jour des données yfinance : **{st.session_state['last_yfinance_update']}**")
