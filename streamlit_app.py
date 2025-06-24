@@ -98,6 +98,7 @@ for key, default in {
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
     "url_data_loaded": False,
+    "last_yfinance_update": None,
     "target_allocations": {
         "Minières": 0.41,
         "Asie": 0.25,
