@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import pytz
 import html
 import streamlit.components.v1 as components
 from data_fetcher import fetch_fx_rates
