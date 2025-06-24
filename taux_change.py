@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import pytz
+import pytz # Make sure this is imported
 import html
 import streamlit.components.v1 as components
 from data_fetcher import fetch_fx_rates
@@ -29,6 +29,37 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
 
     df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
     df_fx = df_fx.sort_values(by="Devise source")
+
+    st.markdown("#### Taux de Change Actuels")
+    st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier ou toutes les 60 secondes, ou lors d'un changement de devise cible.")
+
+    # --- Start of Timezone Adjustment for FX rates ---
+    last_fx_update_time = st.session_state.get("last_update_time_fx")
+
+    if last_fx_update_time and last_fx_update_time != datetime.datetime.min:
+        try:
+            # Ensure last_fx_update_time is timezone-aware
+            if last_fx_update_time.tzinfo is None:
+                # Assume UTC if datetime object is naive
+                utc_aware_time = last_fx_update_time.replace(tzinfo=datetime.timezone.utc)
+            else:
+                utc_aware_time = last_fx_update_time
+
+            paris_tz = pytz.timezone('Europe/Paris')
+            local_time = utc_aware_time.astimezone(paris_tz)
+            formatted_time = local_time.strftime("%d/%m/%Y à %H:%M:%S")
+            st.markdown(f"_Dernière mise à jour des taux de change : **{formatted_time}**_")
+        except pytz.UnknownTimeZoneError:
+            st.warning("Erreur de fuseau horaire 'Europe/Paris'. Affichage de l'heure UTC.")
+            st.markdown(f"_Dernière mise à jour des taux de change : **{last_fx_update_time.strftime('%d/%m/%Y à %H:%M:%S')} UTC**_")
+        except Exception as e:
+            # Catch any other potential errors during time formatting
+            st.warning(f"Erreur lors du formatage de l'heure de mise à jour des taux de change : {e}")
+            st.markdown(f"_Dernière mise à jour des taux de change (format brut) : **{last_fx_update_time.strftime('%d/%m/%Y à %H:%M:%S')}**_")
+    else:
+        st.info("_Les taux de change n'ont pas encore été mis à jour._")
+    # --- End of Timezone Adjustment for FX rates ---
+
 
     html_code = f"""
     <style>
@@ -59,4 +90,6 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
     </div>
     """
     components.html(html_code, height=250, scrolling=True)
-    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
+
+    # The line below was removed as the timestamp display is now handled above this HTML block
+    # st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
