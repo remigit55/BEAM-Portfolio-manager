@@ -208,7 +208,7 @@ def main():
             afficher_transactions()
 
     with onglets[5]:
-         if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
+        if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
             with st.spinner("Mise à jour manuelle des devises..."):
                 devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
                 try:
