@@ -20,9 +20,15 @@ from data_fetcher import fetch_fx_rates
 from data_loader import load_data, save_data
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
+from streamlit_autorefresh import st_autorefresh
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
+
+# Configuration de l'actualisation automatique pour les données
+# Le script entier sera relancé toutes les 60 secondes (60000 millisecondes)
+# N'oubliez pas que cela relance TOUTE l'application Streamlit.
+st_autorefresh(interval=60 * 1000, key="data_refresh_timer")
 
 # Thème personnalisé
 PRIMARY_COLOR = "#363636"
