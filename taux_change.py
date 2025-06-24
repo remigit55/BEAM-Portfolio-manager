@@ -61,7 +61,7 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
       </table>
     </div>
     """
-    components.html(html_code, height=300, scrolling=True)
+    components.html(html_code, height=400, scrolling=True)
 
     # --- Start of Timezone Adjustment for FX rates ---
     last_fx_update_time = st.session_state.get("last_update_time_fx")
