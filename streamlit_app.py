@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,6 +7,7 @@ import base64
 from io import BytesIO
 import os
 import yfinance as yf
+import pytz # Assurez-vous que pytz est importé ici pour datetime.timezone.utc
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
@@ -16,14 +15,18 @@ from performance import display_performance_history
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change
-from data_fetcher import fetch_fx_rates
+from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data # Assurez-vous que ces fonctions ont les @st.cache_data(ttl=...)
 from data_loader import load_data, save_data
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
-from streamlit_autorefresh import st_autorefresh
+from streamlit_autorefresh import st_autorefresh # <-- Assurez-vous que c'est là
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
+
+# --- Debugging: Confirmation du rechargement de l'application ---
+# Ce message va s'actualiser à chaque fois que st_autorefresh relance l'application
+st.sidebar.write(f"Script rechargé à : {datetime.datetime.now().strftime('%H:%M:%S')}")
 
 # Configuration de l'actualisation automatique pour les données
 # Le script entier sera relancé toutes les 60 secondes (60000 millisecondes)
@@ -87,6 +90,7 @@ st.markdown(
 )
 
 # Initialisation des variables de session
+# Assurez-vous que toutes les variables sont initialisées AVANT d'être utilisées.
 for key, default in {
     "df": None,
     "fx_rates": None,
@@ -96,6 +100,7 @@ for key, default in {
     "sort_column": None,
     "sort_direction": "asc",
     "last_devise_cible_for_fx_update": "EUR",
+    # Initialise last_update_time_fx avec une date ancienne et timezone-aware (UTC)
     "last_update_time_fx": datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc),
     "total_valeur": None,
     "total_actuelle": None,
@@ -104,7 +109,7 @@ for key, default in {
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
     "url_data_loaded": False,
-    "last_yfinance_update": None,
+    "last_yfinance_update": None, # La valeur sera définie dans portfolio_display.py
     "target_allocations": {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -118,7 +123,17 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# Chargement initial des données
+# --- NOUVEAU BLOC DE VÉRIFICATION DE LA COHÉRENCE DE last_update_time_fx ---
+# Cela garantit que last_update_time_fx est TOUJOURS un datetime timezone-aware
+# avant d'être utilisé dans les comparaisons de temps.
+if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
+   st.session_state.last_update_time_fx.tzinfo is None:
+    st.session_state.last_update_time_fx = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+# --- FIN NOUVEAU BLOC ---
+
+
+# Chargement initial des données depuis Google Sheets
+# Cette logique ne devrait s'exécuter qu'une seule fois au tout début ou après un "Clear Cache"
 if st.session_state.df is None and not st.session_state.url_data_loaded:
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/kw?gjd0=1844300862&single=true&output=csv"
     try:
@@ -129,41 +144,43 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
             st.session_state.uploaded_file_id = "initial_url_load"
             st.session_state._last_processed_file_id = "initial_url_load"
             st.success("Portefeuille chargé depuis Google Sheets.")
-            st.session_state.last_update_time_fx = datetime.datetime.min
-            st.rerun()
+            # Laisser last_update_time_fx à sa valeur initiale (très ancienne) pour forcer une 1ère MAJ des FX
+            st.rerun() # Pour rafraîchir l'application avec les données chargées
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement initial du portefeuille depuis l'URL : {e}")
-        st.session_state.url_data_loaded = True
+        st.session_state.url_data_loaded = True # Marquer comme tenté pour ne pas recharger en boucle
 
-# --- NOUVEAU BLOC DE VÉRIFICATION APRÈS L'INITIALISATION ---
-# C'est la ligne la plus importante pour résoudre le TypeError.
-# On s'assure que last_update_time_fx est toujours un datetime timezone-aware avant toute utilisation.
-if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
-   st.session_state.last_update_time_fx.tzinfo is None:
-    st.session_state.last_update_time_fx = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
-# --- FIN NOUVEAU BLOC ---
+# --- Logique d'Actualisation des Taux de Change ---
+# Cette section s'exécutera à chaque relancement du script (par st_autorefresh ou interaction utilisateur)
+current_time_utc = datetime.datetime.now(datetime.timezone.utc)
 
-# Actualisation automatique des taux de change
-# Obtenir l'heure actuelle en UTC
-current_time_utc = datetime.datetime.now(datetime.timezone.utc) # <-- Utilise datetime.timezone.utc
-
-if (st.session_state.last_update_time_fx is None or st.session_state.last_update_time_fx == datetime.datetime.min) or \
-   (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
-   ((current_time_utc - st.session_state.last_update_time_fx).total_seconds() >= 60): # <-- Utilise current_time_utc
+# Condition pour déclencher la mise à jour des taux de change
+# La logique est: mettre à jour si c'est la 1ère fois, si un nouveau fichier a été uploadé,
+# ou si plus de 60 secondes se sont écoulées depuis la dernière mise à jour.
+if st.session_state.last_update_time_fx is None or \
+   st.session_state.last_update_time_fx == datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc) or \
+   (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None) and st.session_state.get("uploaded_file_id") is not None) or \
+   ((current_time_utc - st.session_state.last_update_time_fx).total_seconds() >= 60):
 
     devise_cible_to_use = st.session_state.get("devise_cible", "EUR")
 
     with st.spinner(f"Mise à jour automatique des devises pour {devise_cible_to_use}..."):
         try:
+            # Appel à fetch_fx_rates qui est décoré avec @st.cache_data(ttl=60)
             st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
-            # Stocke l'heure de la mise à jour EN UTC
-            st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc) # <-- Stocke en UTC
+            # Met à jour l'horodatage en UTC APRÈS la récupération réussie
+            st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
             st.session_state.last_devise_cible_for_currency_update = devise_cible_to_use
+            # st.success("Taux de change mis à jour automatiquement.") # Peut être trop verbeux pour une actualisation toutes les minutes
         except Exception as e:
-            st.error(f"Erreur lors de la mise à jour des taux de change : {e}")
+            st.error(f"Erreur lors de la mise à jour automatique des taux de change : {e}")
 
+    # Met à jour l'ID du dernier fichier traité pour éviter de recharger les FX inutilement
+    # si le même fichier est re-sélectionné sans changement réel
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
+# --- Fin Logique d'Actualisation des Taux de Change ---
+
 
 # Fonction principale de l'application
 def main():
@@ -225,6 +242,7 @@ def main():
             afficher_transactions()
 
     with onglets[5]:
+        # Le bouton d'actualisation manuelle est maintenant géré dans afficher_tableau_taux_change
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
     with onglets[6]:
