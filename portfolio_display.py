@@ -51,16 +51,6 @@ def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_ca
         return 0
 
 
-
-
-
-
-
-
-
-
-
-
 # --- Fonction de conversion de devise ---
 def convertir(val, source_devise, devise_cible, fx_rates):
     """
@@ -167,7 +157,7 @@ def afficher_portefeuille():
             if ticker not in st.session_state.momentum_results_cache:
                 st.session_state.momentum_results_cache[ticker] = fetch_momentum_data(ticker)
 
-        st.session_state["last_yfinance_update"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.session_state["last_yfinance_update"] = datetime.datetime.now().strftime("%d/%m/%Y - %H:%M:%S")
         
         df["shortName"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
         df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("currentPrice", np.nan))
