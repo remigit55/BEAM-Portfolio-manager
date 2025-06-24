@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import streamlit.components.v1 as components
 import datetime
+import pytz
 
 # Import des fonctions utilitaires
 from utils import safe_escape, format_fr
