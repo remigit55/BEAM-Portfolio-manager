@@ -59,18 +59,4 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
     </div>
     """
     components.html(html_code, height=250, scrolling=True)
-    # Définir le fuseau horaire cible (par exemple, Paris pour l'heure française)
-    # Utilise 'Europe/Paris' pour inclure la gestion de l'heure d'été/hiver
-        try:
-            paris_tz = pytz.timezone('Europe/Paris')
-            # Convertir l'heure UTC en heure locale de Paris
-            local_time = utc_now.astimezone(paris_tz)
-            # Formater pour l'affichage français (jour/mois/année à HH:MM:SS)
-            st.session_state["last_yfinance_update"] = local_time.strftime("%d/%m/%Y à %H:%M:%S")
-        except pytz.UnknownTimeZoneError:
-            st.warning("Erreur de fuseau horaire 'Europe/Paris'. Affichage en UTC.")
-            st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
-
-
-            st.session_state["last_yfinance_update"] = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M:%S")
-        
+    st.markdown(f"_Dernière mise à jour : {datetime.datetime.now().strftime('%H:%M:%S')}_")
