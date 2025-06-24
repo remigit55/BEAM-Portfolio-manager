@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import streamlit.components.v1 as components
+import datetime
 
 # Import des fonctions utilitaires
 from utils import safe_escape, format_fr
@@ -805,3 +806,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     else:
         st.info("Le DataFrame de votre portefeuille n'est pas disponible ou est vide. Veuillez importer votre portefeuille.")
+
+
+
