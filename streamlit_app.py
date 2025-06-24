@@ -225,18 +225,6 @@ def main():
             afficher_transactions()
 
     with onglets[5]:
-        if st.button("Actualiser les taux", key="manual_fx_refresh_btn_tab"):
-            with st.spinner("Mise à jour manuelle des devises..."):
-                devise_cible_for_manual_update = st.session_state.get("devise_cible", "EUR")
-                try:
-                    st.session_state.fx_rates = fetch_fx_rates(devise_cible_for_manual_update)
-                    st.session_state.last_update_time_fx = datetime.datetime.now()
-                    st.session_state.last_devise_cible_for_currency_update = devise_cible_for_manual_update
-                    st.success(f"Taux de change actualisés pour {devise_cible_for_manual_update}.")
-                except Exception as e:
-                    st.error(f"Erreur lors de la mise à jour manuelle des taux de change : {e}")
-                st.rerun()
-
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
     with onglets[6]:
