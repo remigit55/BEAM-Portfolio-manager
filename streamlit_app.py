@@ -24,10 +24,6 @@ from streamlit_autorefresh import st_autorefresh # <-- Assurez-vous que c'est l�
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
-# --- Debugging: Confirmation du rechargement de l'application ---
-# Ce message va s'actualiser à chaque fois que st_autorefresh relance l'application
-st.sidebar.write(f"Script rechargé à : {datetime.datetime.now().strftime('%H:%M:%S')}")
-
 # Configuration de l'actualisation automatique pour les données
 # Le script entier sera relancé toutes les 60 secondes (60000 millisecondes)
 # N'oubliez pas que cela relance TOUTE l'application Streamlit.
