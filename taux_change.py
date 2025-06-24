@@ -30,6 +30,21 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
     st.markdown("#### Taux de Change Actuels")
     st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier ou toutes les 60 secondes, ou lors d'un changement de devise cible.")
 
+
+    # --- BOUTON D'ACTUALISATION MANUELLE (NOUVEL EMPLACEMENT) ---
+    if st.button("Actualiser les taux", key="manual_fx_refresh_btn_in_tab"): # Clé différente pour éviter les conflits
+        with st.spinner("Mise à jour manuelle des devises..."):
+            # Pas besoin de définir devise_cible_for_manual_update ici, utilisez simplement devise_cible
+            try:
+                st.session_state.fx_rates = fetch_fx_rates(devise_cible) # Utilisez devise_cible passée en argument
+                st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
+                st.session_state.last_devise_cible_for_currency_update = devise_cible # Mettez à jour ici aussi si nécessaire
+                st.success(f"Taux de change actualisés pour {devise_cible}.")
+            except Exception as e:
+                st.error(f"Erreur lors de la mise à jour manuelle des taux de change : {e}")
+            st.rerun() # Pour rafraîchir l'affichage après la mise à jour manuelle
+    # --- FIN BOUTON ---
+    
     df_fx = pd.DataFrame(list(fx_rates.items()), columns=["Devise source", f"Taux vers {devise_cible}"])
     df_fx = df_fx.sort_values(by="Devise source")
 
