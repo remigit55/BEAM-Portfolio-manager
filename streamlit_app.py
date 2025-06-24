@@ -136,17 +136,20 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
         st.session_state.url_data_loaded = True
 
 # Actualisation automatique des taux de change
-current_time = datetime.datetime.now()
-if (st.session_state.last_update_time_fx == None or st.session_state.last_update_time_fx == datetime.datetime.min) or \
+# Obtenir l'heure actuelle en UTC
+current_time_utc = datetime.datetime.now(datetime.timezone.utc) # <-- Utilise datetime.timezone.utc
+
+if (st.session_state.last_update_time_fx is None or st.session_state.last_update_time_fx == datetime.datetime.min) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None)) or \
-   ((current_time - st.session_state.last_update_time_fx).total_seconds() >= 60):
+   ((current_time_utc - st.session_state.last_update_time_fx).total_seconds() >= 60): # <-- Utilise current_time_utc
 
     devise_cible_to_use = st.session_state.get("devise_cible", "EUR")
 
     with st.spinner(f"Mise à jour automatique des devises pour {devise_cible_to_use}..."):
         try:
             st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
-            st.session_state.last_update_time_fx = datetime.datetime.now()
+            # Stocke l'heure de la mise à jour EN UTC
+            st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc) # <-- Stocke en UTC
             st.session_state.last_devise_cible_for_currency_update = devise_cible_to_use
         except Exception as e:
             st.error(f"Erreur lors de la mise à jour des taux de change : {e}")
