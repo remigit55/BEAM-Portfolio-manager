@@ -52,14 +52,8 @@ def display_performance_history():
         .period-buttons-container {
             display: flex;
             flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: 5px;
+            gap: 1rem;
             margin-bottom: 1rem;
-        }
-        .period-buttons-container div.stButton {
-            margin: 0 !important;
-            height: auto;
-            width: 20px;
         }
         .period-button {
             background: none;
@@ -78,14 +72,6 @@ def display_performance_history():
             margin: 0 8px 0 0;
             padding: 2px 6px;
             cursor: pointer;
-        }
-        .period-buttons-container button:hover {
-            text-decoration: none !important;
-        }
-        .period-buttons-container button.selected {
-            font-weight: bold !important;
-            color: var(--secondary-color) !important;
-            text-decoration: none !important;
         }
         div.stButton > button:hover {
             text-decoration: underline;
