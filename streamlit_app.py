@@ -254,9 +254,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-if st.button("Réinitialiser la session"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
-
