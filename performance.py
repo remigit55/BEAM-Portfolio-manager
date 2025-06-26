@@ -46,41 +46,26 @@ def display_performance_history():
         st.error(f"Erreur lors de la récupération des données pour {selected_ticker} : {builtins.str(e)}")
         return
 
-    # Tableau des derniers cours de clôture pour tous les tickers
-    st.subheader("Derniers cours de clôture pour tous les tickers")
-
-    results = {}
+    # Construction du tableau récapitulatif des derniers cours convertis
+    rows = []
+    
     for ticker in tickers:
-        try:
-            df = yf.download(ticker, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), progress=False)
-            if not df.empty and "Close" in df.columns:
-                last_value = df["Close"].dropna().iloc[-1]
-                results[ticker] = last_value
-            else:
-                st.warning(f"{ticker} : aucune donnée de clôture disponible.")
-                results[ticker] = None
-        except Exception as e:
-            st.warning(f"{ticker} : erreur de récupération ({builtins.str(e)})")
-            results[ticker] = None
-
-    df_prices = pd.DataFrame.from_dict(results, orient='index', columns=["Dernier cours"])
-    df_prices.index.name = "Ticker"
-    df_prices = df_prices.reset_index()
-    df_prices["Dernier cours"] = df_prices["Dernier cours"].apply(lambda x: format_fr(x) if pd.notnull(x) else "N/A")
-
-    st.dataframe(df_prices, use_container_width=True)
-
-
-for ticker in tickers:
-    try:
-        df = yf.download(ticker, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), progress=False)
-        st.write(f"Données pour {ticker} : {df.shape}")  # Affiche la taille du DataFrame
-        if not df.empty and "Close" in df.columns:
-            last_value = df["Close"].dropna().iloc[-1]
-            results[ticker] = last_value
-        else:
-            st.warning(f"{ticker} : aucune donnée de clôture disponible.")
-            results[ticker] = None
-    except Exception as e:
-        st.warning(f"{ticker} : erreur de récupération ({builtins.str(e)})")
-        results[ticker] = None
+        # Devise source : extraite du dataframe si possible
+        source_currency = "USD"
+        if "Devise" in st.session_state.df.columns:
+            source_currency_row = st.session_state.df[st.session_state.df["Ticker"] == ticker]
+            if not source_currency_row.empty and pd.notna(source_currency_row["Devise"].iloc[0]):
+                source_currency = source_currency_row["Devise"].iloc[0]
+    
+        df_ticker = fetch_stock_history_converted(ticker, start_date, end_date, source_currency, target_currency)
+        if not df_ticker.empty and "Close" in df_ticker.columns:
+            last_close = df_ticker["Close"].iloc[-1]
+            rows.append({"Ticker": ticker, "Devise": source_currency, f"Close ({target_currency})": round(last_close, 2)})
+    
+    # Affichage du tableau s'il y a des données
+    if rows:
+        df_prices = pd.DataFrame(rows)
+        st.markdown("### Derniers cours convertis")
+        st.dataframe(df_prices)
+    else:
+        st.info("Aucune donnée de prix disponible pour les tickers sélectionnés.")
