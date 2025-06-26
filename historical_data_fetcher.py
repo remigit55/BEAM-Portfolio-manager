@@ -19,19 +19,32 @@ def fetch_stock_history(Ticker, start_date, end_date):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
-        # Appel isolé à yf.download
+        # Appel isolé à yf.download avec gestion des colonnes multi-indexées
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")
         
         # Vérification et extraction de Close
         if not data.empty:
-            if 'Close' in data.columns:
-                close_data = data['Close'].rename(Ticker)
-                st.write(f"Cours de clôture pour {Ticker} : {close_data.shape}, Premières valeurs : {close_data.head().to_dict()}")
-                return close_data
+            # Gestion des colonnes multi-indexées
+            if isinstance(data.columns, pd.MultiIndex):
+                st.write(f"Colonnes multi-indexées détectées pour {Ticker}")
+                close_data = data[('Close', Ticker)] if ('Close', Ticker) in data.columns else None
+                if close_data is not None:
+                    close_data = close_data.rename(Ticker)
+                    st.write(f"Cours de clôture pour {Ticker} : {close_data.shape}, Premières valeurs : {close_data.head().to_dict()}")
+                    return close_data
+                else:
+                    st.warning(f"Colonne ('Close', '{Ticker}') absente. Colonnes disponibles : {data.columns.tolist()}")
+                    return pd.Series(dtype='float64')
             else:
-                st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {data.columns.tolist()}")
-                return pd.Series(dtype='float64')
+                # Cas avec colonnes simples
+                if 'Close' in data.columns:
+                    close_data = data['Close'].rename(Ticker)
+                    st.write(f"Cours de clôture pour {Ticker} : {close_data.shape}, Premières valeurs : {close_data.head().to_dict()}")
+                    return close_data
+                else:
+                    st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {data.columns.tolist()}")
+                    return pd.Series(dtype='float64')
         else:
             st.warning(f"Aucune donnée valide pour {Ticker} : DataFrame vide.")
             return pd.Series(dtype='float64')
