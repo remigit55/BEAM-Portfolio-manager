@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
-from historical_data_fetcher import fetch_stock_history, get_all_historical_data
+from historical_data_fetcher import fetch_stock_history
 from utils import format_fr
 
 def display_performance_history():
@@ -15,6 +15,9 @@ def display_performance_history():
     Affiche la performance historique d'un ticker et un tableau des derniers cours de clôture.
     """
     st.subheader("Performance Historique")
+
+    # Vérification du conflit avec str()
+    st.write(f"Type de str : {type(builtins.str)}")  # Diagnostic pour str()
 
     # Récupération des tickers disponibles dans le portefeuille
     tickers = []
@@ -26,23 +29,21 @@ def display_performance_history():
         st.selectbox("Sélectionnez un symbole boursier", options=["Aucun ticker disponible"], index=0, disabled=True)
         return
 
+    st.write(f"Tickers disponibles : {tickers}")  # Diagnostic
+
     # Choix du ticker et de la période
     selected_ticker = st.selectbox("Sélectionnez un symbole boursier du portefeuille", options=tickers, index=0)
-    days_range = st.slider("Nombre de jours d'historique à afficher", min_value=30, max_value=3650, value=365)
-
-    # Devises (par défaut pour la conversion, ajustez selon vos besoins)
-    source_currency = "USD"  # Devise des données boursières
-    target_currency = "EUR"  # Devise cible
-    currencies = [source_currency] * len(tickers)  # Suppose que tous les tickers sont en USD, ajustez si nécessaire
+    days_range = st.slider("Nombre de jours d'historique à afficher", min_value=1, max_value=365, value=30)
 
     # Dates à utiliser
     start_date = datetime.now() - timedelta(days=days_range)
-    end_date = (datetime.now() - BDay(0)).to_pydatetime()  # Dernier jour ouvré
+    end_date = (datetime.now() - BDay(1)).to_pydatetime()  # Dernier jour ouvré avant aujourd'hui
     st.write(f"Période : {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}")  # Diagnostic
 
     # Graphique pour le ticker sélectionné
     try:
         data = fetch_stock_history(selected_ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
+        st.write(f"Données pour {selected_ticker} : {data.shape}, Vide : {data.empty}")  # Diagnostic
         if not data.empty:
             st.line_chart(data, use_container_width=True)
         else:
@@ -57,7 +58,7 @@ def display_performance_history():
     for ticker in tickers:
         try:
             df = fetch_stock_history(ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            st.write(f"Données pour {ticker} : {df.shape}")  # Diagnostic
+            st.write(f"Données pour {ticker} : {df.shape}, Vide : {df.empty}")  # Diagnostic
             if not df.empty and not df.dropna().empty:
                 last_value = df.dropna().iloc[-1]
                 results[ticker] = last_value
@@ -79,7 +80,7 @@ def display_performance_history():
     st.write(f"DataFrame df_prices : {df_prices}")  # Diagnostic
     st.dataframe(df_prices, use_container_width=True)
 
-    # Test de connexion Yahoo Finance (section de débogage)
+    # Test de connexion Yahoo Finance
     if st.button("Lancer le test de connexion Yahoo Finance"):
         try:
             data = yf.download(
