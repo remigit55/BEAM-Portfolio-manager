@@ -51,14 +51,14 @@ def display_performance_history():
         <style>
         .period-buttons-container {
             display: flex;
-            justify-content: flex-start;
+            flex-wrap: wrap;
             gap: 5px;
             margin-bottom: 1rem;
         }
         .period-button {
             background: none;
             border: none;
-            padding: 2px 6px;
+            padding: 0;
             font-size: 1rem;
             color: inherit;
             cursor: pointer;
@@ -66,6 +66,15 @@ def display_performance_history():
         .period-button.selected {
             color: var(--secondary-color);
             font-weight: bold;
+        }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        div.stButton > button:hover {
+            text-decoration: underline;
         }
         </style>
     """, unsafe_allow_html=True)
