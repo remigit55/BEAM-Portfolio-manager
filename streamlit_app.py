@@ -12,6 +12,7 @@ import builtins
 
 if not callable(str):
     str = builtins.str
+    builtins.str = str
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
