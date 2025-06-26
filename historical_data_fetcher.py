@@ -17,27 +17,26 @@ def fetch_stock_history(ticker, start_date, end_date, currency_source, currency_
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance (yfinance library).
     """
     try:
-        if not isinstance(Ticker, builtins.str): # Use builtins.str
-            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(ticker))})")
+        if not isinstance(ticker, builtins.str):  # <-- CORRIGÉ
+            st.warning(f"Ticker mal formé : {ticker} (type: {builtins.str(type(ticker))})")
             return pd.Series(dtype='float64')
-        
-        # This check for callable(yf.download) is good for debugging, keep it.
-        if not builtins.callable(yf.download): # Use builtins.callable
+
+        if not builtins.callable(yf.download):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
-        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        data = yf.download(ticker, start=start_date, end=end_date, progress=False)  # <-- CORRIGÉ
         if not data.empty:
-            return data['Close'].rename(ticker)
+            return data['Close'].rename(ticker)  # <-- CORRIGÉ
 
     except Exception as e:
-        # We already have builtins imported above.
         if isinstance(e, builtins.TypeError) and "'str' object is not callable" in builtins.str(e):
             st.error("⚠️ Erreur critique : la fonction native `str()` a été écrasée. Vérifiez votre code (évitez `str = ...`).")
         else:
-            st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {builtins.str(e)}")
+            st.warning(f"Impossible de récupérer l'historique pour {ticker}: {builtins.str(e)}")
 
     return pd.Series(dtype='float64')
+
 
 # The fetch_stock_history_direct_api function was causing the TypeError
 # and is not called elsewhere in the provided code. It has been removed
