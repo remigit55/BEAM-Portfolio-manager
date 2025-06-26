@@ -52,8 +52,13 @@ def display_performance_history():
         .period-buttons-container {
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            justify-content: flex-start;
+            gap: 5px;
             margin-bottom: 1rem;
+        }
+        .period-buttons-container div.stButton {
+            margin: 0 !important;
+            height: auto;
         }
         .period-button {
             background: none;
