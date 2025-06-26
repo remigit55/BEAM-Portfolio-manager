@@ -6,7 +6,9 @@ from datetime import datetime, timedelta, date, time # Import date and time
 import requests
 import json
 import streamlit as st
-import builtins # Explicitly import builtins to refer to original str()
+import builtins
+if not callable(str):
+    str = builtins.str
 
 # Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
