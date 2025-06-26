@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from historical_data_fetcher import fetch_stock_history
+from historical_data_fetcher import fetch_stock_history_converted
 from utils import format_fr
 
 def display_performance_history():
