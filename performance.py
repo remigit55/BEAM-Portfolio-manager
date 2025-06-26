@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR LIENS CLIQUABLES ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS CLIQUABLES INLINE ---
     period_options = {
         "1W": timedelta(weeks=1),
         "1M": timedelta(days=30),
@@ -46,26 +46,18 @@ def display_performance_history():
     if 'selected_ticker_table_period' not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    period_labels = list(period_options.keys())
-    selected_period = st.session_state.selected_ticker_table_period
+    st.markdown("#### Sélection de la période d'affichage des cours")
 
-    links_html = []
-    for label in period_labels:
-        if label == selected_period:
-            links_html.append(f'<span style="color: var(--secondary-color); font-weight: bold;">{label}</span>')
+    cols = st.columns(len(period_options))
+    for i, label in enumerate(period_options.keys()):
+        if st.session_state.selected_ticker_table_period == label:
+            cols[i].markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
         else:
-            links_html.append(f'<a href="?period={label}" style="text-decoration: none; color: inherit;">{label}</a>')
+            if cols[i].button(label):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
 
-    st.markdown(" | ".join(links_html), unsafe_allow_html=True)
-
-    query_params = st.query_params
-    if "period" in query_params:
-        new_period = query_params["period"]
-        if new_period in period_options:
-            st.session_state.selected_ticker_table_period = new_period
-            st.query_params.clear()
-            st.rerun()
-
+    # --- DATES DE DÉBUT ET FIN ---
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
