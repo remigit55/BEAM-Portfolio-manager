@@ -54,8 +54,6 @@ def display_performance_history():
             flex-wrap: wrap;
             gap: 1rem;
             margin-bottom: 1rem;
-            width: 100%;
-            max-width: 400px;
         }
         .period-button {
             background: none;
