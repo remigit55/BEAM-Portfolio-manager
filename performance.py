@@ -78,6 +78,9 @@ def display_performance_history():
             padding: 2px 6px;
             cursor: pointer;
         }
+        .period-buttons-container button:hover {
+            text-decoration: none !important;
+        }
         div.stButton > button:hover {
             text-decoration: underline;
         }
