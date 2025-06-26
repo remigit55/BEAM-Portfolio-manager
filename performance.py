@@ -29,7 +29,7 @@ def display_performance_history():
     target_currency = st.session_state.get("devise_cible", "EUR")
 
     try:
-        df = fetch_stock_history(selected_ticker, start_date, end_date, target_currency)
+        df = fetch_stock_history_converted(ticker, start_date, end_date, currency_source="USD", currency_target=devise_reference)
 
         if df.empty or df["Close"].isnull().all():
             st.warning(f"Aucune donnée de clôture disponible pour {selected_ticker} sur la période.")
