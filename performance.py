@@ -54,6 +54,7 @@ def display_performance_history():
             flex-wrap: wrap;
             gap: 1rem;
             margin-bottom: 1rem;
+            width: 20px;
         }
         .period-button {
             background: none;
@@ -82,7 +83,6 @@ def display_performance_history():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
