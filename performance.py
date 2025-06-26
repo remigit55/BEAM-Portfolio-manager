@@ -69,3 +69,18 @@ def display_performance_history():
     df_prices["Dernier cours"] = df_prices["Dernier cours"].apply(lambda x: format_fr(x) if pd.notnull(x) else "N/A")
 
     st.dataframe(df_prices, use_container_width=True)
+
+
+for ticker in tickers:
+    try:
+        df = yf.download(ticker, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), progress=False)
+        st.write(f"Données pour {ticker} : {df.shape}")  # Affiche la taille du DataFrame
+        if not df.empty and "Close" in df.columns:
+            last_value = df["Close"].dropna().iloc[-1]
+            results[ticker] = last_value
+        else:
+            st.warning(f"{ticker} : aucune donnée de clôture disponible.")
+            results[ticker] = None
+    except Exception as e:
+        st.warning(f"{ticker} : erreur de récupération ({builtins.str(e)})")
+        results[ticker] = None
