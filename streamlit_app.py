@@ -7,7 +7,10 @@ import base64
 from io import BytesIO
 import os
 import yfinance as yf
-import pytz # Assurez-vous que pytz est importé ici pour datetime.timezone.utc
+import pytz
+import builtins
+
+str = builtins.str 
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
@@ -25,9 +28,9 @@ from data_loader import load_data, save_data, load_portfolio_from_google_sheets 
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Configuration de l'actualisation automatique pour les données
-# Le script entier sera relancé toutes les 60 secondes (60000 millisecondes)
+# Le script entier sera relancé toutes les 600 secondes (60000 millisecondes)
 # N'oubliez pas que cela relance TOUTE l'application Streamlit.
-st_autorefresh(interval=60 * 1000, key="data_refresh_timer")
+st_autorefresh(interval=600 * 1000, key="data_refresh_timer")
 
 # Thème personnalisé
 PRIMARY_COLOR = "#363636"
