@@ -84,7 +84,7 @@ def display_performance_history():
     """, unsafe_allow_html=True)
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
-    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
+    st.markdown('<div class="period-buttons-container"; width: 50px>', unsafe_allow_html=True)
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
         if st.session_state.selected_ticker_table_period == label:
