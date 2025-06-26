@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR TEXTE CLIQUABLE ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS INLINE ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -44,67 +44,58 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
 
-    # Lire la période sélectionnée depuis les query parameters de l'URL
-    # Si 'period' est dans les query params, l'utiliser, sinon utiliser '1W' par défaut
-    query_period = st.query_params.get("period", ["1W"])[0]
-    if query_period in period_options:
-        st.session_state.selected_ticker_table_period = query_period
-    else:
-        st.session_state.selected_ticker_table_period = "1W" # Fallback si le paramètre est invalide
+    if "selected_ticker_table_period" not in st.session_state:
+        st.session_state.selected_ticker_table_period = "1W"
 
     st.markdown("""
         <style>
-        .period-links-container {
+        .period-buttons-container {
             display: flex;
             flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: 5px; /* Espacement de 5px entre les éléments cliquables */
+            gap: 1rem;
             margin-bottom: 1rem;
         }
-        .period-links-container a {
-            text-decoration: none; /* Supprime le soulignement par défaut des liens */
-            color: #000000; /* Couleur noire par défaut */
-            padding: 5px 0; /* Ajoute un peu de padding pour une meilleure zone de clic */
+        .period-button {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1rem;
+            color: inherit;
             cursor: pointer;
         }
-        .period-links-container a:hover {
-            text-decoration: none; /* Pas de soulignement au survol */
-            color: #000000; /* Reste noir au survol */
-        }
-        .period-links-container a.selected {
+        .period-button.selected {
+            color: var(--secondary-color);
             font-weight: bold;
-            color: #000000; /* Reste noir pour l'élément sélectionné */
-            text-decoration: none; /* Pas de soulignement pour l'élément sélectionné */
+        }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        div.stButton > button:hover {
+            text-decoration: underline;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-links-container">', unsafe_allow_html=True)
-    
-    # Générer les liens cliquables
-    for label in period_options:
-        is_selected = (st.session_state.selected_ticker_table_period == label)
-        # Créer l'URL avec le nouveau paramètre de période
-        current_query_params = st.query_params.to_dict()
-        current_query_params['period'] = label
-        
-        # Construire l'URL avec les nouveaux paramètres de requête
-        query_string = "&".join([f"{k}={v}" for k, v_list in current_query_params.items() for v in (v_list if isinstance(v_list, list) else [v_list])])
-        link_href = f"?{query_string}"
-        
-        # Appliquer la classe 'selected' si c'est la période active
-        selected_class = "selected" if is_selected else ""
-        
-        st.markdown(f'<a href="{link_href}" class="{selected_class}">{label}</a>', unsafe_allow_html=True)
-    
+    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
+    cols = st.columns(len(period_options))
+    for i, label in enumerate(period_options):
+        if st.session_state.selected_ticker_table_period == label:
+            with cols[i]:
+                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+        else:
+            with cols[i]:
+                if st.button(label, key=f"period_{label}"):
+                    st.session_state.selected_ticker_table_period = label
+                    st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
-
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
