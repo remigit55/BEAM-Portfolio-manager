@@ -50,30 +50,30 @@ def display_performance_history():
     if 'selected_ticker_table_period' not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W" # Période par défaut
   
-    # Utilisation de st.markdown avec du CSS pour aligner les boutons et ajouter un espacement
+     # Utilisation de st.markdown avec du CSS pour aligner les boutons et ajouter un espacement
     st.markdown("""
         <style>
-        div.stButton > button {
-            margin-right: 5px; /* Espacement de 5px à droite de chaque bouton */
-            margin-bottom: 5px; /* Pour un petit espacement vertical si les boutons s'enroulent */
+        .button-row-container {
+            display: flex;
+            flex-wrap: wrap; /* Permet aux boutons de passer à la ligne si l'espace est insuffisant */
+            justify-content: flex-start; /* Aligne les boutons à gauche */
+            gap: 5px; /* Crée un espacement de 5px entre les boutons */
+            margin-bottom: 10px; /* Ajoute un peu d'espace sous les boutons */
         }
-        div.stButton {
-            display: inline-block; /* Permet aux boutons de s'aligner sur la même ligne */
-            width: auto; /* Ajuste la largeur du conteneur du bouton à son contenu */
+        /* Assurez-vous que les boutons Streamlit n'ont pas de marges par défaut conflictuelles */
+        div.stButton > button {
+            margin: 0 !important; /* Supprime les marges par défaut des boutons Streamlit */
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Créer les boutons dans un conteneur qui les aligne horizontalement
-    # st.columns(len(period_options)) est remplacé par une approche plus directe avec st.empty()
-    # pour permettre un contrôle CSS plus fin via st.markdown.
-    button_container = st.empty()
-    with button_container.container():
-        for i, (label, period_td) in enumerate(period_options.items()):
-            # Chaque bouton est créé individuellement. Le CSS ci-dessus gère l'espacement.
-            if st.button(label, key=f"period_btn_{label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun() 
+    # Créer les boutons à l'intérieur d'un conteneur HTML avec la classe CSS définie
+    st.markdown('<div class="button-row-container">', unsafe_allow_html=True)
+    for i, (label, period_td) in enumerate(period_options.items()):
+        if st.button(label, key=f"period_btn_{label}"):
+            st.session_state.selected_ticker_table_period = label
+            st.rerun() 
+    st.markdown('</div>', unsafe_allow_html=True) # Ferme le conteneur HTML
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
