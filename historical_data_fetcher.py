@@ -6,37 +6,36 @@ from datetime import datetime, timedelta, date, time # Import date and time
 import requests
 import json
 import streamlit as st
-import builtins
-if not callable(str):
-    str = builtins.str
+import builtins # Explicitly import builtins to refer to original str()
 
 # Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
-def fetch_stock_history(ticker, start_date, end_date, currency_source, currency_target):
+def fetch_stock_history(Ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance (yfinance library).
     """
     try:
-        if not isinstance(ticker, builtins.str):  # <-- CORRIGÉ
-            st.warning(f"Ticker mal formé : {ticker} (type: {builtins.str(type(ticker))})")
+        if not isinstance(Ticker, builtins.str): # Use builtins.str
+            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker))})")
             return pd.Series(dtype='float64')
-
-        if not builtins.callable(yf.download):
+        
+        # This check for callable(yf.download) is good for debugging, keep it.
+        if not builtins.callable(yf.download): # Use builtins.callable
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
-        data = yf.download(ticker, start=start_date, end=end_date, progress=False)  # <-- CORRIGÉ
+        data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
-            return data['Close'].rename(ticker)  # <-- CORRIGÉ
+            return data['Close'].rename(Ticker)
 
     except Exception as e:
+        # We already have builtins imported above.
         if isinstance(e, builtins.TypeError) and "'str' object is not callable" in builtins.str(e):
             st.error("⚠️ Erreur critique : la fonction native `str()` a été écrasée. Vérifiez votre code (évitez `str = ...`).")
         else:
-            st.warning(f"Impossible de récupérer l'historique pour {ticker}: {builtins.str(e)}")
+            st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {builtins.str(e)}")
 
     return pd.Series(dtype='float64')
-
 
 # The fetch_stock_history_direct_api function was causing the TypeError
 # and is not called elsewhere in the provided code. It has been removed
@@ -118,29 +117,3 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
                 historical_fx[f"{currency}/{target_currency}"] = fx_series
     
     return historical_prices, historical_fx
-
-def fetch_stock_history_converted(ticker, start_date, end_date, currency_source="USD", currency_target="EUR"):
-    """
-    Récupère les cours d’un ticker et les convertit en devise cible.
-    """
-    df = yf.download(ticker, start=start_date, end=end_date, interval="1d", progress=False)
-
-    if df.empty or "Close" not in df.columns:
-        return pd.DataFrame()
-
-    df = df[["Close"]].copy()
-    df.index.name = "Date"
-
-    if currency_source != currency_target:
-        fx_ticker = f"{currency_source}{currency_target}=X"
-        fx_data = yf.download(fx_ticker, start=start_date, end=end_date, interval="1d", progress=False)
-
-        if not fx_data.empty and "Close" in fx_data.columns:
-            fx_data = fx_data[["Close"]].rename(columns={"Close": "FX"})
-            df = df.join(fx_data, how="left")
-            df.dropna(inplace=True)
-            df["Close"] = df["Close"] * df["FX"]
-            df.drop(columns=["FX"], inplace=True)
-
-    return df
-
