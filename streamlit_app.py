@@ -131,23 +131,19 @@ if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
 # Chargement initial des données depuis Google Sheets
 # Cette logique ne devrait s'exécuter qu'une seule fois au tout début ou après un "Clear Cache"
 if st.session_state.df is None and not st.session_state.url_data_loaded:
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/pub?gid=1844300862&single=true&output=csv"
-    try:
-        with st.spinner("Chargement initial du portefeuille..."):
-            df_initial = pd.read_csv(csv_url)
+    with st.spinner("Chargement initial du portefeuille depuis Google Sheets..."):
+        # Utilisation de la fonction load_portfolio_from_google_sheets de data_loader.py
+        df_initial = load_portfolio_from_google_sheets(st.session_state.google_sheets_url)
+        if df_initial is not None:
             st.session_state.df = df_initial
             st.session_state.url_data_loaded = True
             st.session_state.uploaded_file_id = "initial_url_load"
             st.session_state._last_processed_file_id = "initial_url_load"
-            st.success("Portefeuille chargé depuis Google Sheets.")
             # Laisser last_update_time_fx à sa valeur initiale (très ancienne) pour forcer une 1ère MAJ des FX
             st.rerun() # Pour rafraîchir l'application avec les données chargées
-    if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"): # THIS IS NEW
-            # The content that was here is now outside the try/except scope for the initial load
-            # and only executes on button click. This changes the application's loading behavior significantly.
-            pass # You'd need to put the loading logic inside this button's block if you want it to be manual.
-            # For example, you would move the pd.read_csv and session state updates here.
-        st.session_state.url_data_loaded = True # Marquer comme tenté pour ne pas recharger en boucle
+        else:
+            # Si le chargement initial a échoué, marquer comme tenté pour ne pas recharger en boucle
+            st.session_state.url_data_loaded = True
 
 # --- Logique d'Actualisation des Taux de Change ---
 # Cette section s'exécutera à chaque relancement du script (par st_autorefresh ou interaction utilisateur)
