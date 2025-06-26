@@ -84,16 +84,13 @@ def display_performance_history():
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
-    cols = st.columns(len(period_options))
-    for i, label in enumerate(period_options):
+    for label in period_options:
         if st.session_state.selected_ticker_table_period == label:
-            with cols[i]:
-                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+            st.markdown(f"<div class='period-button-wrapper'><span class='period-button selected'>{label}</span></div>", unsafe_allow_html=True)
         else:
-            with cols[i]:
-                if st.button(label, key=f"period_{label}"):
-                    st.session_state.selected_ticker_table_period = label
-                    st.rerun()
+            if st.button(label, key=f"period_{label}", help=f"{label}"):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
