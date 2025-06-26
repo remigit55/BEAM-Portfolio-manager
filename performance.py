@@ -59,12 +59,12 @@ def display_performance_history():
 
     st.markdown(" | ".join(links_html), unsafe_allow_html=True)
 
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params.()
     if "period" in query_params:
         new_period = query_params["period"][0]
         if new_period in period_options:
             st.session_state.selected_ticker_table_period = new_period
-            st.experimental_set_query_params()
+            st.st.query_params.()
             st.rerun()
 
     end_date_table = datetime.now().date()
