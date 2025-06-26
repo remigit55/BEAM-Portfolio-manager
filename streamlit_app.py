@@ -142,7 +142,7 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
             st.success("Portefeuille chargé depuis Google Sheets.")
             # Laisser last_update_time_fx à sa valeur initiale (très ancienne) pour forcer une 1ère MAJ des FX
             st.rerun() # Pour rafraîchir l'application avec les données chargées
-         if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"): # THIS IS NEW
+    if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"): # THIS IS NEW
             # The content that was here is now outside the try/except scope for the initial load
             # and only executes on button click. This changes the application's loading behavior significantly.
             pass # You'd need to put the loading logic inside this button's block if you want it to be manual.
