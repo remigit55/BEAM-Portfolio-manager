@@ -12,7 +12,7 @@ if not callable(str):
 
 # Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
-def fetch_stock_history(Ticker, start_date, end_date):
+def fetch_stock_history(ticker, start_date, end_date, currency_source, currency_target):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance (yfinance library).
     """
