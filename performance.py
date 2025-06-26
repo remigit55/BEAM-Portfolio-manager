@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
@@ -42,26 +43,29 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
 
-    if "selected_ticker_table_period" not in st.session_state:
+    if 'selected_ticker_table_period' not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
     st.markdown("""
         <style>
-        .period-links {
+        .period-inline {
             display: flex;
+            flex-wrap: wrap;
             gap: 12px;
             margin-bottom: 16px;
-            flex-wrap: wrap;
         }
-        .period-links a {
-            text-decoration: none;
-            color: inherit;
+        .period-inline button {
+            all: unset;
+            cursor: pointer;
             font-weight: normal;
+            color: inherit;
+            padding: 4px 6px;
+            border-radius: 4px;
         }
-        .period-links a:hover {
+        .period-inline button:hover {
             text-decoration: underline;
         }
-        .period-links .active {
+        .period-inline .active {
             color: var(--secondary-color);
             font-weight: bold;
             pointer-events: none;
@@ -69,16 +73,27 @@ def display_performance_history():
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-links">', unsafe_allow_html=True)
-    for label in period_options.keys():
-        if label == st.session_state.selected_ticker_table_period:
-            st.markdown(f'<span class="active">{label}</span>', unsafe_allow_html=True)
-        else:
-            if st.button(label, key=f"period_btn_{label}", help=f"Période {label}", use_container_width=False):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun()
+    st.markdown('<div class="period-inline">', unsafe_allow_html=True)
+    for label in period_options:
+        is_selected = (label == st.session_state.selected_ticker_table_period)
+        button_html = (
+            f'<button class="active">{label}</button>' if is_selected
+            else f"""
+                <form action="" method="post">
+                    <input type="hidden" name="period_select" value="{label}">
+                    <button type="submit">{label}</button>
+                </form>
+            """
+        )
+        st.markdown(button_html, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state.get("period_select"):
+        new_period = st.session_state.period_select
+        if new_period in period_options:
+            st.session_state.selected_ticker_table_period = new_period
+            st.session_state.period_select = None
+            st.rerun()
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
