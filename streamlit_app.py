@@ -147,8 +147,7 @@ if st.session_state.df is None and not st.session_state.url_data_loaded:
             # and only executes on button click. This changes the application's loading behavior significantly.
             pass # You'd need to put the loading logic inside this button's block if you want it to be manual.
             # For example, you would move the pd.read_csv and session state updates here.
-
-    st.session_state.url_data_loaded = True # Marquer comme tenté pour ne pas recharger en boucle
+        st.session_state.url_data_loaded = True # Marquer comme tenté pour ne pas recharger en boucle
 
 # --- Logique d'Actualisation des Taux de Change ---
 # Cette section s'exécutera à chaque relancement du script (par st_autorefresh ou interaction utilisateur)
