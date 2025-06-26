@@ -64,7 +64,7 @@ def display_performance_history():
         new_period = query_params["period"][0]
         if new_period in period_options:
             st.session_state.selected_ticker_table_period = new_period
-            st.st.query_params.()
+            st.query_params.()
             st.rerun()
 
     end_date_table = datetime.now().date()
