@@ -7,9 +7,7 @@ import builtins
 
 @st.cache_data(ttl=3600)
 def fetch_stock_history(Ticker, start_date, end_date):
-    """
-    Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
-    """
+    st.write(f"Type de str avant yf.download pour {Ticker} : {type(builtins.str)}")  # Diagnostic
     try:
         if not isinstance(Ticker, builtins.str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker))})")
@@ -20,12 +18,12 @@ def fetch_stock_history(Ticker, start_date, end_date):
             return pd.Series(dtype='float64')
 
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
-        st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")  # Diagnostic
+        st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")
         if not data.empty:
             return data['Close'].rename(Ticker)
 
     except Exception as e:
-        st.error(f"Erreur lors de la récupération pour {Ticker} : {builtins.str(e)}")  # Afficher l'erreur exacte
+        st.error(f"Erreur lors de la récupération pour {Ticker} : {e}")  # Simplifié pour éviter builtins.str
         return pd.Series(dtype='float64')
 
     return pd.Series(dtype='float64')
