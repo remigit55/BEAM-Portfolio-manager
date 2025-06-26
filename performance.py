@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
@@ -13,10 +12,6 @@ from historical_performance_calculator import reconstruct_historical_portfolio_v
 from utils import format_fr
 
 def display_performance_history():
-    """
-    Affiche la performance historique du portefeuille basée sur sa composition actuelle,
-    et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
-    """
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
         return
@@ -32,7 +27,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS CLIQUABLES INLINE ---
+    # --- SÉLECTION DE PÉRIODE PAR LIENS STYLISÉS (TEXTE CLIQUABLE)
     period_options = {
         "1W": timedelta(weeks=1),
         "1M": timedelta(days=30),
@@ -50,14 +45,20 @@ def display_performance_history():
 
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options.keys()):
-        if st.session_state.selected_ticker_table_period == label:
-            cols[i].markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+        if label == st.session_state.selected_ticker_table_period:
+            cols[i].markdown(
+                f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>",
+                unsafe_allow_html=True
+            )
         else:
-            if cols[i].button(label):
+            cols[i].markdown(
+                f"<span style='text-decoration: underline; color: #444; cursor: pointer;'>{label}</span>",
+                unsafe_allow_html=True
+            )
+            if cols[i].button(" ", key=f"fakebtn_{label}"):
                 st.session_state.selected_ticker_table_period = label
                 st.rerun()
 
-    # --- DATES DE DÉBUT ET FIN ---
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
@@ -93,4 +94,3 @@ def display_performance_history():
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
-
