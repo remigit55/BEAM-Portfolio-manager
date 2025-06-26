@@ -1,5 +1,4 @@
 # performance.py
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -47,53 +46,45 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
+    # CSS personnalisé pour aligner les boutons horizontalement avec un espacement précis
     st.markdown("""
         <style>
         .period-buttons-container {
             display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
+            flex-direction: row;
+            gap: 16px; /* Espacement entre les boutons en pixels (ajustez selon besoin) */
             margin-bottom: 1rem;
+            align-items: center;
         }
         .period-button {
             background: none;
             border: none;
-            padding: 0;
+            padding: 4px 8px;
             font-size: 1rem;
-            color: inherit;
+            color: var(--text-color, #000000);
             cursor: pointer;
+            transition: color 0.2s;
         }
-        .period-button.selected {
-            color: var(--secondary-color);
-            font-weight: bold;
-        }
-        div.stButton > button {
-            all: unset;
-            margin: 0 8px 0 0;
-            padding: 2px 6px;
-            cursor: pointer;
-        }
-        div.stButton > button:hover {
+        .period-button:hover {
             text-decoration: underline;
         }
-        .period-buttons-container button:hover {
-            text-decoration: none !important;
+        .period-button.selected {
+            color: var(--secondary-color, #1f77b4);
+            font-weight: bold;
+            text-decoration: none;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
-    cols = st.columns(len(period_options))
-    for i, label in enumerate(period_options):
+    for label in period_options:
         if st.session_state.selected_ticker_table_period == label:
-            with cols[i]:
-                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+            st.markdown(f'<button class="period-button selected">{label}</button>', unsafe_allow_html=True)
         else:
-            with cols[i]:
-                if st.button(label, key=f"period_{label}"):
-                    st.session_state.selected_ticker_table_period = label
-                    st.rerun()
+            if st.markdown(f'<button class="period-button">{label}</button>', unsafe_allow_html=True, key=f"period_{label}"):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
