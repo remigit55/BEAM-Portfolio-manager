@@ -49,27 +49,32 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        .period-span-container {
+        .period-buttons-container {
             display: flex;
             flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: 5px;
+            gap: 1rem;
             margin-bottom: 1rem;
         }
-        .period-span {
-            padding: 2px 6px;
+        .period-button {
+            background: none;
+            border: none;
+            padding: 0;
             font-size: 1rem;
             color: inherit;
             cursor: pointer;
-            border-radius: 4px;
-            user-select: none;
         }
-        .period-span:hover {
-            text-decoration: underline;
-        }
-        .period-span.selected {
+        .period-button.selected {
             color: var(--secondary-color);
             font-weight: bold;
+        }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        div.stButton > button:hover {
+            text-decoration: underline;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -122,3 +127,5 @@ def display_performance_history():
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
+
+
