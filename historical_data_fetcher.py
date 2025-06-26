@@ -10,26 +10,27 @@ def fetch_stock_history(Ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
     """
-    st.write(f"Type de str avant yf.download pour {Ticker} : {type(builtins.str)}")  # Diagnostic
+    st.write(f"Type de str avant yf.download pour {Ticker} : {type(str)}")  # Diagnostic
     try:
-        if not isinstance(Ticker, str):  # Utilisation directe de str
+        if not isinstance(Ticker, str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {type(Ticker).__name__})")
             return pd.Series(dtype='float64')
         
-        if not callable(yf.download):  # Utilisation directe de callable
+        if not callable(yf.download):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")
-        if not data.empty:
+        if not data.empty and 'Close' in data.columns:
             return data['Close'].rename(Ticker)
+        else:
+            st.warning(f"Aucune donnée valide pour {Ticker} : DataFrame vide ou colonne 'Close' manquante.")
+            return pd.Series(dtype='float64')
 
     except Exception as e:
-        st.error(f"Erreur lors de la récupération pour {Ticker} : {repr(e)}")  # Utilisation de repr pour éviter str
+        st.error(f"Erreur lors de la récupération pour {Ticker} : {repr(e)}")
         return pd.Series(dtype='float64')
-
-    return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600)
 def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_date):
@@ -81,14 +82,14 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     historical_prices = {}
     business_days = pd.bdate_range(start_date, end_date)
 
-    st.write(f"Type de str avant boucle des tickers : {type(builtins.str)}")  # Diagnostic
+    st.write(f"Type de str avant boucle des tickers : {type(str)}")  # Diagnostic
     for ticker in tickers:
         st.write(f"Traitement de {ticker} dans get_all_historical_data")
         prices = fetch_stock_history(ticker, start_date, end_date)
         if not prices.empty:
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
-        st.write(f"Type de str après traitement de {ticker} : {type(builtins.str)}")  # Diagnostic
+        st.write(f"Type de str après traitement de {ticker} : {type(str)}")  # Diagnostic
 
     historical_fx = {}
     unique_currencies = set(currencies)
