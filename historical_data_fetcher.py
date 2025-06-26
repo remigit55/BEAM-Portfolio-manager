@@ -18,7 +18,7 @@ def fetch_stock_history(ticker, start_date, end_date, currency_source, currency_
     """
     try:
         if not isinstance(Ticker, builtins.str): # Use builtins.str
-            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker))})")
+            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(ticker))})")
             return pd.Series(dtype='float64')
         
         # This check for callable(yf.download) is good for debugging, keep it.
@@ -26,9 +26,9 @@ def fetch_stock_history(ticker, start_date, end_date, currency_source, currency_
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
-        data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
+        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
         if not data.empty:
-            return data['Close'].rename(Ticker)
+            return data['Close'].rename(ticker)
 
     except Exception as e:
         # We already have builtins imported above.
