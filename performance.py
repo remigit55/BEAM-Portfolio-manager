@@ -51,13 +51,12 @@ def display_performance_history():
         <style>
         .period-span-container {
             display: flex;
-            flex-direction: row;
-            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: flex-start;
             gap: 5px;
             margin-bottom: 1rem;
         }
         .period-span {
-            display: inline-block;
             padding: 2px 6px;
             font-size: 1rem;
             color: inherit;
@@ -123,5 +122,3 @@ def display_performance_history():
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
-
-
