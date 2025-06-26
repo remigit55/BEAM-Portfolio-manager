@@ -245,6 +245,12 @@ def main():
         from parametres import afficher_parametres_globaux
         afficher_parametres_globaux()
 
+
+# Dans streamlit_app.py, après la récupération des données Yahoo
+st.write("Contenu de st.session_state.yahoo_data:")
+st.write(st.session_state.yahoo_data)
+
+    
     st.markdown("---")
 
 if __name__ == "__main__":
