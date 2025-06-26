@@ -1,6 +1,8 @@
 # data_loader.py
 import pandas as pd
 import os
+import streamlit as st # <-- Assurez-vous que streamlit est importé ici
+import io # Ajouté pour une meilleure gestion future si besoin, mais pas critique pour l'URL
 
 def load_data(uploaded_file):
     """
@@ -14,11 +16,8 @@ def load_data(uploaded_file):
     if file_extension == ".csv":
         df = pd.read_csv(uploaded_file)
     elif file_extension in [".xlsx", ".xls"]:
-        # For Excel, you might want to let the user select a sheet
-        # For simplicity, we'll just load the first sheet here.
-        # In a real app, you might use pd.read_excel(uploaded_file, sheet_name=sheet_name_input)
         df = pd.read_excel(uploaded_file)
-        sheet_name = df.columns[0] # Placeholder for sheet name if needed later
+        sheet_name = df.columns[0]
     else:
         raise ValueError("Unsupported file type. Please upload a CSV or Excel file.")
 
@@ -40,12 +39,24 @@ def save_data(df, file_path):
     else:
         st.error("Format de fichier non supporté pour la sauvegarde. Veuillez utiliser .csv ou .xlsx.")
 
-    # In a real Streamlit app, you'd generate a download link rather than saving directly
-    # Example for download (not implemented here, just for illustration):
-    # csv = df.to_csv(index=False).encode('utf-8')
-    # st.download_button(
-    #     label="Télécharger le portefeuille modifié en CSV",
-    #     data=csv,
-    #     file_name='mon_portefeuille_modifie.csv',
-    #     mime='text/csv',
-    # )
+# --- NOUVELLE FONCTION POUR CHARGEMENT DEPUIS URL (DOIT ÊTRE PRÉSENTE) ---
+def load_portfolio_from_google_sheets(url):
+    """
+    Loads portfolio data from a Google Sheets URL.
+    The URL must be a 'publish to web' CSV export link.
+    """
+    if not url:
+        st.error("L'URL Google Sheets n'est pas configurée. Veuillez la saisir dans l'onglet 'Paramètres'.")
+        return None
+
+    try:
+        df = pd.read_csv(url)
+        # Vérifier si le DataFrame est vide après chargement
+        if df.empty:
+            st.warning("Le fichier Google Sheets est vide ou ne contient pas de données.")
+            return None
+        st.success("Portefeuille chargé avec succès depuis Google Sheets.")
+        return df
+    except Exception as e:
+        st.error(f"Erreur lors du chargement depuis Google Sheets : {e}. Assurez-vous que l'URL est correcte et publiée au format CSV.")
+        return None
