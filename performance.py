@@ -2,7 +2,6 @@
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
@@ -13,6 +12,10 @@ from historical_performance_calculator import reconstruct_historical_portfolio_v
 from utils import format_fr
 
 def display_performance_history():
+    """
+    Affiche la performance historique du portefeuille basée sur sa composition actuelle,
+    et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
+    """
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
         return
@@ -39,40 +42,44 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
 
-    if 'selected_ticker_table_period' not in st.session_state:
+    if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
-
-    # Injecte du JS pour modifier la session dynamiquement via fetch
     st.markdown("""
-        <script>
-        function selectPeriod(period) {
-            fetch("/_stcore/update", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ "widget_id": "period_selector", "value": period })
-            }).then(() => window.location.reload());
+        <style>
+        .period-links {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
         }
-        </script>
+        .period-links a {
+            text-decoration: none;
+            color: inherit;
+            font-weight: normal;
+        }
+        .period-links a:hover {
+            text-decoration: underline;
+        }
+        .period-links .active {
+            color: var(--secondary-color);
+            font-weight: bold;
+            pointer-events: none;
+        }
+        </style>
     """, unsafe_allow_html=True)
 
-    # Génère les liens HTML
-    links_html = []
+    st.markdown("#### Sélection de la période d'affichage des cours")
+    st.markdown('<div class="period-links">', unsafe_allow_html=True)
     for label in period_options.keys():
         if label == st.session_state.selected_ticker_table_period:
-            links_html.append(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>")
+            st.markdown(f'<span class="active">{label}</span>', unsafe_allow_html=True)
         else:
-            links_html.append(f"<a href='#' onclick=\"selectPeriod('{label}')\" style='text-decoration: none; color: inherit;'>{label}</a>")
-    st.markdown(" | ".join(links_html), unsafe_allow_html=True)
+            if st.button(label, key=f"period_btn_{label}", help=f"Période {label}", use_container_width=False):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Widget invisible pour forcer le changement via JS
-    st.selectbox("Sélection de période (invisible)", options=list(period_options.keys()), 
-                 index=list(period_options.keys()).index(st.session_state.selected_ticker_table_period), 
-                 key="period_selector", label_visibility="collapsed")
-    st.session_state.selected_ticker_table_period = st.session_state.period_selector
-
-    # --- Récupération des cours de clôture ---
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
