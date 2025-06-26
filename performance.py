@@ -76,6 +76,9 @@ def display_performance_history():
         div.stButton > button:hover {
             text-decoration: underline;
         }
+        .period-buttons-container button:hover {
+            text-decoration: none !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
