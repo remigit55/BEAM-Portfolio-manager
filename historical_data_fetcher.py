@@ -1,39 +1,32 @@
 # historical_data_fetcher.py
-
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta, date, time # Import date and time
 import requests
-import json
 import streamlit as st
-import builtins # Explicitly import builtins to refer to original str()
+import builtins
 
-# Cache pour les données historiques des actions (valable 1h)
 @st.cache_data(ttl=3600)
 def fetch_stock_history(Ticker, start_date, end_date):
     """
-    Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance (yfinance library).
+    Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
     """
     try:
-        if not isinstance(Ticker, builtins.str): # Use builtins.str
+        if not isinstance(Ticker, builtins.str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker))})")
             return pd.Series(dtype='float64')
         
-        # This check for callable(yf.download) is good for debugging, keep it.
-        if not builtins.callable(yf.download): # Use builtins.callable
+        if not builtins.callable(yf.download):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
+        st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")  # Diagnostic
         if not data.empty:
             return data['Close'].rename(Ticker)
 
     except Exception as e:
-        # We already have builtins imported above.
-        if isinstance(e, builtins.TypeError) and "'str' object is not callable" in builtins.str(e):
-            st.error("⚠️ Erreur critique : la fonction native `str()` a été écrasée. Vérifiez votre code (évitez `str = ...`).")
-        else:
-            st.warning(f"Impossible de récupérer l'historique pour {Ticker}: {builtins.str(e)}")
+        st.error(f"Erreur lors de la récupération pour {Ticker} : {builtins.str(e)}")  # Afficher l'erreur exacte
+        return pd.Series(dtype='float64')
 
     return pd.Series(dtype='float64')
 
