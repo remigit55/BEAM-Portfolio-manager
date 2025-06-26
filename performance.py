@@ -57,25 +57,37 @@ def display_performance_history():
 
     # Tableau des derniers cours de clôture pour tous les tickers
     st.subheader("Derniers cours de clôture pour tous les tickers")
-    historical_prices, _ = get_all_historical_data(tickers, currencies, start_date, end_date, target_currency)
-    
+    try:
+        historical_prices, _ = get_all_historical_data(tickers, currencies, start_date, end_date, target_currency)
+        st.write(f"historical_prices contient {len(historical_prices)} tickers")
+    except Exception as e:
+        st.error(f"Erreur dans get_all_historical_data : {type(e).__name__} - {e}")
+        return
+
     results = {}
     for ticker in tickers:
         df = historical_prices.get(ticker, pd.Series(dtype='float64'))
         st.write(f"Données pour {ticker} : {df.shape}, Vide : {df.empty}")
         if not df.empty:
-            last_value = df.iloc[-1] if not df.dropna().empty else None
-            results[ticker] = last_value
-            st.write(f"Dernier cours pour {ticker} : {last_value}")
+            try:
+                last_value = df.iloc[-1] if not df.isna().all() else None
+                st.write(f"Dernier cours pour {ticker} : {last_value}")
+                results[ticker] = last_value
+            except Exception as e:
+                st.warning(f"Erreur lors de l'extraction du dernier cours pour {ticker} : {type(e).__name__} - {e}")
+                results[ticker] = None
         else:
             st.warning(f"{ticker} : aucune donnée de clôture disponible.")
             results[ticker] = None
 
-    st.write(f"Contenu de results avant DataFrame : {results}")
-    df_prices = pd.DataFrame.from_dict(results, orient='index', columns=["Dernier cours"])
-    df_prices.index.name = "Ticker"
-    df_prices = df_prices.reset_index()
-    df_prices["Dernier cours"] = df_prices["Dernier cours"].apply(lambda x: format_fr(x) if pd.notnull(x) else "N/A")
-
-    st.write(f"DataFrame df_prices : {df_prices.to_dict()}")
-    st.dataframe(df_prices, use_container_width=True)
+    st.write(f"Contenu de results : {results}")
+    try:
+        df_prices = pd.DataFrame.from_dict(results, orient='index', columns=["Dernier cours"])
+        df_prices.index.name = "Ticker"
+        df_prices = df_prices.reset_index()
+        st.write(f"DataFrame df_prices avant formatage : {df_prices.to_dict()}")
+        df_prices["Dernier cours"] = df_prices["Dernier cours"].apply(lambda x: format_fr(x) if pd.notnull(x) else "N/A")
+        st.write(f"DataFrame df_prices après formatage : {df_prices.to_dict()}")
+        st.dataframe(df_prices, use_container_width=True)
+    except Exception as e:
+        st.error(f"Erreur lors de la création/affichage du DataFrame : {type(e).__name__} - {e}")
