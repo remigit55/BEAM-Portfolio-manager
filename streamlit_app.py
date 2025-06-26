@@ -18,8 +18,8 @@ from taux_change import afficher_tableau_taux_change
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data # Assurez-vous que ces fonctions ont les @st.cache_data(ttl=...)
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
-from streamlit_autorefresh import st_autorefresh 
-from data_loader import load_data, save_data, load_portfolio_from_google_sheets
+from streamlit_autorefresh import st_autorefresh
+from data_loader import load_data, save_data, load_portfolio_from_google_sheets # Importation correcte et unique
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
@@ -89,6 +89,8 @@ st.markdown(
 # Assurez-vous que toutes les variables sont initialisées AVANT d'être utilisées.
 for key, default in {
     "df": None,
+    "google_sheets_url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/pub?gid=1844300862&single=true&output=csv", # Initialisation de l'URL par défaut
+    "url_data_loaded": False,
     "fx_rates": None,
     "devise_cible": "EUR",
     "ticker_data_cache": {},
@@ -104,7 +106,6 @@ for key, default in {
     "total_lt": None,
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
-    "url_data_loaded": False,
     "last_yfinance_update": None, # La valeur sera définie dans portfolio_display.py
     "target_allocations": {
         "Minières": 0.41,
