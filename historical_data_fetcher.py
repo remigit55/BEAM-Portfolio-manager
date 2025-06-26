@@ -3,14 +3,13 @@ import yfinance as yf
 import pandas as pd
 import requests
 import streamlit as st
-import builtins
 
 @st.cache_data(ttl=3600)
 def fetch_stock_history(Ticker, start_date, end_date):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
     """
-    st.write(f"Type de str avant yf.download pour {Ticker} : {type(str)}")  # Diagnostic
+    st.write(f"Type de str avant yf.download pour {Ticker} : {type(str)}")
     try:
         if not isinstance(Ticker, str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {type(Ticker).__name__})")
@@ -20,16 +19,23 @@ def fetch_stock_history(Ticker, start_date, end_date):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
+        # Appel isolé à yf.download
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         st.write(f"Données brutes pour {Ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")
+        
+        # Vérification explicite des colonnes
         if not data.empty and 'Close' in data.columns:
-            return data['Close'].rename(Ticker)
+            close_data = data['Close'].rename(Ticker)
+            st.write(f"Cours de clôture pour {Ticker} : {close_data.shape}, Premières valeurs : {close_data.head().to_dict()}")
+            return close_data
         else:
             st.warning(f"Aucune donnée valide pour {Ticker} : DataFrame vide ou colonne 'Close' manquante.")
             return pd.Series(dtype='float64')
 
     except Exception as e:
-        st.error(f"Erreur lors de la récupération pour {Ticker} : {repr(e)}")
+        # Éviter toute utilisation de str ou repr dans l'erreur
+        error_msg = f"Erreur lors de la récupération pour {Ticker} : {type(e).__name__} - {e}"
+        st.error(error_msg)
         return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600)
@@ -67,9 +73,9 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
             return pd.Series(dtype='float64')
 
     except requests.exceptions.RequestException as e:
-        st.warning(f"Erreur réseau ou HTTP pour les taux de change {base_currency}/{target_currency} : {repr(e)}")
+        st.warning(f"Erreur réseau ou HTTP pour les taux de change {base_currency}/{target_currency} : {type(e).__name__} - {e}")
     except Exception as e:
-        st.error(f"Une erreur inattendue est survenue pour les taux de change {base_currency}/{target_currency} : {repr(e)}")
+        st.error(f"Une erreur inattendue est survenue pour les taux de change {base_currency}/{target_currency} : {type(e).__name__} - {e}")
         return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600)
@@ -82,14 +88,14 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     historical_prices = {}
     business_days = pd.bdate_range(start_date, end_date)
 
-    st.write(f"Type de str avant boucle des tickers : {type(str)}")  # Diagnostic
+    st.write(f"Type de str avant boucle des tickers : {type(str)}")
     for ticker in tickers:
         st.write(f"Traitement de {ticker} dans get_all_historical_data")
         prices = fetch_stock_history(ticker, start_date, end_date)
         if not prices.empty:
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
-        st.write(f"Type de str après traitement de {ticker} : {type(str)}")  # Diagnostic
+        st.write(f"Type de str après traitement de {ticker} : {type(str)}")
 
     historical_fx = {}
     unique_currencies = set(currencies)
