@@ -49,13 +49,19 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        .period-buttons-container {
+        .period-buttons {
             display: flex;
             flex-wrap: wrap;
-            gap: 1rem;
+            justify-content: flex-start;
+            gap: 5px; /* Espacement de 5px entre les boutons */
             margin-bottom: 1rem;
         }
-        .period-button {
+        /* Cibler directement les conteneurs de boutons Streamlit à l'intérieur de notre div flex */
+        .period-buttons div.stButton {
+            margin: 0 !important; /* Supprime toute marge par défaut de Streamlit */
+            height: auto; /* Permet au conteneur du bouton de s'adapter à son contenu */
+        }
+        .period-buttons button {
             background: none;
             border: none;
             padding: 0;
@@ -63,25 +69,30 @@ def display_performance_history():
             color: inherit;
             cursor: pointer;
         }
-        .period-button.selected {
-            color: var(--secondary-color);
+        .period-buttons button.selected {
+            color: var(--secondary-color); /* Utilise la couleur secondaire définie dans le thème Streamlit */
             font-weight: bold;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
+    st.markdown('<div class="period-buttons">', unsafe_allow_html=True)
     for label in period_options:
         btn_class = "selected" if st.session_state.selected_ticker_table_period == label else ""
         if st.button(label, key=f"period_{label}"):
             st.session_state.selected_ticker_table_period = label
             st.rerun()
+        # Correction du data-testid pour correspondre au format de Streamlit
+        # Ajout de '?' pour gérer le cas où l'élément n'est pas encore rendu
+        st.markdown(f'<script>document.querySelector("button[data-testid=\"stButton-period_{label}\"]")?.classList.add("{btn_class}");</script>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
+
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
