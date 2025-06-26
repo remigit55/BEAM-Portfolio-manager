@@ -9,8 +9,6 @@ def display_performance_history():
     """
     Affiche la performance historique d’un ticker convertie dans la devise cible (ex: EUR).
     """
-    st.subheader("📈 Historique converti en devise de référence")
-
     # Extraction des tickers depuis le portefeuille
     tickers = []
     if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
