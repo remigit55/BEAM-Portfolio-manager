@@ -128,7 +128,7 @@ def display_performance_history():
     days_range_5_days_table = st.slider(
         "Nombre de jours d'historique pour les derniers cours", 
         min_value=1, 
-        max_value=30, # Limité à 30 jours pour la lisibilité du tableau
+        max_value=3650, # Limité à 3650 jours pour la lisibilité du tableau
         value=5, 
         key="days_range_5_days_table"
     )
