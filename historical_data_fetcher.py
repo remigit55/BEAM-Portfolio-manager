@@ -12,11 +12,11 @@ def fetch_stock_history(Ticker, start_date, end_date):
     """
     st.write(f"Type de str avant yf.download pour {Ticker} : {type(builtins.str)}")  # Diagnostic
     try:
-        if not isinstance(Ticker, builtins.str):
+        if not isinstance(Ticker, str):  # Utilisation directe de str
             st.warning(f"Ticker mal formé : {Ticker} (type: {type(Ticker).__name__})")
             return pd.Series(dtype='float64')
         
-        if not builtins.callable(yf.download):
+        if not callable(yf.download):  # Utilisation directe de callable
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
@@ -26,7 +26,7 @@ def fetch_stock_history(Ticker, start_date, end_date):
             return data['Close'].rename(Ticker)
 
     except Exception as e:
-        st.error(f"Erreur lors de la récupération pour {Ticker} : {repr(e)}")
+        st.error(f"Erreur lors de la récupération pour {Ticker} : {repr(e)}")  # Utilisation de repr pour éviter str
         return pd.Series(dtype='float64')
 
     return pd.Series(dtype='float64')
@@ -81,11 +81,14 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     historical_prices = {}
     business_days = pd.bdate_range(start_date, end_date)
 
+    st.write(f"Type de str avant boucle des tickers : {type(builtins.str)}")  # Diagnostic
     for ticker in tickers:
+        st.write(f"Traitement de {ticker} dans get_all_historical_data")
         prices = fetch_stock_history(ticker, start_date, end_date)
         if not prices.empty:
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
+        st.write(f"Type de str après traitement de {ticker} : {type(builtins.str)}")  # Diagnostic
 
     historical_fx = {}
     unique_currencies = set(currencies)
