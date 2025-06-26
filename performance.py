@@ -33,6 +33,7 @@ def display_performance_history():
         return
 
     # --- SÉLECTION DE PÉRIODE PAR LIENS CLIQUABLES ---
+
     period_options = {
         "1W": timedelta(weeks=1),
         "1M": timedelta(days=30),
@@ -43,57 +44,35 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
 
-    if 'selected_ticker_table_period' not in st.session_state:
+    if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    st.markdown("""
-        <style>
-        .period-inline {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .period-inline button {
-            all: unset;
-            cursor: pointer;
-            font-weight: normal;
-            color: inherit;
-            padding: 4px 6px;
-            border-radius: 4px;
-        }
-        .period-inline button:hover {
-            text-decoration: underline;
-        }
-        .period-inline .active {
-            color: var(--secondary-color);
-            font-weight: bold;
-            pointer-events: none;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="period-inline">', unsafe_allow_html=True)
-    for label in period_options:
-        is_selected = (label == st.session_state.selected_ticker_table_period)
-        button_html = (
-            f'<button class="active">{label}</button>' if is_selected
-            else f"""
-                <form action="" method="post">
-                    <input type="hidden" name="period_select" value="{label}">
-                    <button type="submit">{label}</button>
-                </form>
-            """
-        )
-        st.markdown(button_html, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if st.session_state.get("period_select"):
-        new_period = st.session_state.period_select
+    # Récupération manuelle des paramètres de requête
+    query_params = st.query_params
+    if "period" in query_params:
+        new_period = query_params["period"]
+        if isinstance(new_period, list):
+            new_period = new_period[0]
         if new_period in period_options:
             st.session_state.selected_ticker_table_period = new_period
-            st.session_state.period_select = None
+            st.query_params.clear()
             st.rerun()
+
+    # Affichage HTML propre
+    selected_period = st.session_state.selected_ticker_table_period
+    period_links = []
+    for label in period_options:
+        if label == selected_period:
+            period_links.append(
+                f'<span style="color: var(--secondary-color); font-weight: bold;">{label}</span>'
+            )
+        else:
+            period_links.append(
+                f'<a href="?period={label}" style="text-decoration: none; color: inherit;">{label}</a>'
+            )
+
+    st.markdown("#### Sélection de la période d'affichage des cours")
+    st.markdown(" | ".join(period_links), unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
