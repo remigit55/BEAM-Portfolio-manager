@@ -131,7 +131,7 @@ if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
 # Chargement initial des données depuis Google Sheets
 # Cette logique ne devrait s'exécuter qu'une seule fois au tout début ou après un "Clear Cache"
 if st.session_state.df is None and not st.session_state.url_data_loaded:
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/kw?gjd0=1844300862&single=true&output=csv"
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/pub?gid=1844300862&single=true&output=csv"
     try:
         with st.spinner("Chargement initial du portefeuille..."):
             df_initial = pd.read_csv(csv_url)
