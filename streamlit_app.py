@@ -10,7 +10,8 @@ import yfinance as yf
 import pytz
 import builtins
 
-str = builtins.str 
+if not callable(str):
+    str = builtins.str
 
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
