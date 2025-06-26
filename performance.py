@@ -18,11 +18,6 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-    # st.subheader("Performance Historique du Portefeuille") # Supprimé
-    # st.markdown(f"**Calcul de la performance pour la composition actuelle du portefeuille (sans parité des changes).**") # Supprimé
-    # st.markdown("#### Évolution de la Valeur Totale du Portefeuille") # Supprimé
-    
-    # # --- SÉLECTION DE LA PLAGE DE DATES POUR LA PERFORMANCE GLOBALE --- # Supprimé
     # today = datetime.now().date() # Supprimé
     # default_start_date_perf = today - timedelta(days=365) # Par défaut : 1 an d'historique # Supprimé
     
