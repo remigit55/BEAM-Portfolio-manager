@@ -26,6 +26,16 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
+    # Section pour le tableau des derniers cours de clôture par ticker
+
+    tickers_in_portfolio = []
+    if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
+        tickers_in_portfolio = sorted(st.session_state.df['Ticker'].dropna().unique().tolist())
+
+    if not tickers_in_portfolio:
+        st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
+        return
+
     # --- SÉLECTION DE PÉRIODE PAR BOUTONS POUR LE TABLEAU DES COURS ---
     period_options = {
         "1W": timedelta(weeks=1),
@@ -39,7 +49,7 @@ def display_performance_history():
 
     if 'selected_ticker_table_period' not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W" # Période par défaut
-
+  
     # Utilisation de st.markdown avec du CSS pour aligner les boutons et ajouter un espacement
     st.markdown("""
         <style>
@@ -55,9 +65,12 @@ def display_performance_history():
     """, unsafe_allow_html=True)
 
     # Créer les boutons dans un conteneur qui les aligne horizontalement
+    # st.columns(len(period_options)) est remplacé par une approche plus directe avec st.empty()
+    # pour permettre un contrôle CSS plus fin via st.markdown.
     button_container = st.empty()
     with button_container.container():
         for i, (label, period_td) in enumerate(period_options.items()):
+            # Chaque bouton est créé individuellement. Le CSS ci-dessus gère l'espacement.
             if st.button(label, key=f"period_btn_{label}"):
                 st.session_state.selected_ticker_table_period = label
                 st.rerun() 
@@ -65,8 +78,6 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
-
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
