@@ -5,7 +5,9 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 import yfinance as yf # Garder si vous avez des tests yfinance séparés
-import builtins # Utile pour le débogage de 'str is not callable' si ça revient
+import builtins
+if not callable(str):
+    str = builtins.str
 
 # Import des fonctions nécessaires
 from historical_data_fetcher import fetch_stock_history # Peut être utile pour un test de ticker individuel
