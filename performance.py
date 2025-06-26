@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS INLINE ---
+    # --- SÉLECTION DE PÉRIODE PAR TEXTE CLIQUABLE ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -44,48 +44,63 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
 
-    if "selected_ticker_table_period" not in st.session_state:
-        st.session_state.selected_ticker_table_period = "1W"
+    # Lire la période sélectionnée depuis les query parameters de l'URL
+    # Si 'period' est dans les query params, l'utiliser, sinon utiliser '1W' par défaut
+    query_period = st.query_params.get("period", ["1W"])[0]
+    if query_period in period_options:
+        st.session_state.selected_ticker_table_period = query_period
+    else:
+        st.session_state.selected_ticker_table_period = "1W" # Fallback si le paramètre est invalide
 
     st.markdown("""
         <style>
-        .period-buttons {
+        .period-links-container {
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-start;
-            gap: 5px; /* Espacement de 5px entre les boutons */
+            gap: 5px; /* Espacement de 5px entre les éléments cliquables */
             margin-bottom: 1rem;
         }
-        /* Cibler directement les conteneurs de boutons Streamlit à l'intérieur de notre div flex */
-        .period-buttons div.stButton {
-            margin: 0 !important; /* Supprime toute marge par défaut de Streamlit */
-            height: auto; /* Permet au conteneur du bouton de s'adapter à son contenu */
-        }
-        .period-buttons button {
-            background: none;
-            border: none;
-            padding: 0;
-            font-size: 1rem;
-            color: inherit;
+        .period-links-container a {
+            text-decoration: none; /* Supprime le soulignement par défaut des liens */
+            color: inherit; /* Utilise la couleur du texte parent */
+            padding: 5px 0; /* Ajoute un peu de padding pour une meilleure zone de clic */
             cursor: pointer;
         }
-        .period-buttons button.selected {
-            color: var(--secondary-color); /* Utilise la couleur secondaire définie dans le thème Streamlit */
+        .period-links-container a:hover {
+            text-decoration: underline; /* Souligne au survol pour indiquer la cliquabilité */
+            color: var(--primary-color); /* Change la couleur au survol si désiré */
+        }
+        .period-links-container a.selected {
             font-weight: bold;
+            color: var(--secondary-color); /* Couleur pour l'élément sélectionné */
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-buttons">', unsafe_allow_html=True)
+    st.markdown('<div class="period-links-container">', unsafe_allow_html=True)
+    
+    # Générer les liens cliquables
     for label in period_options:
-        btn_class = "selected" if st.session_state.selected_ticker_table_period == label else ""
-        if st.button(label, key=f"period_{label}"):
-            st.session_state.selected_ticker_table_period = label
-            st.rerun()
-        # Correction du data-testid pour correspondre au format de Streamlit
-        # Ajout de '?' pour gérer le cas où l'élément n'est pas encore rendu
-        st.markdown(f'<script>document.querySelector("button[data-testid=\"stButton-period_{label}\"]")?.classList.add("{btn_class}");</script>', unsafe_allow_html=True)
+        is_selected = (st.session_state.selected_ticker_table_period == label)
+        # Créer l'URL avec le nouveau paramètre de période
+        # st.experimental_set_query_params est déprécié, utiliser st.query_params directement
+        current_query_params = st.query_params.to_dict()
+        current_query_params['period'] = label
+        
+        # Construire l'URL avec les nouveaux paramètres de requête
+        # st.experimental_get_query_params() est remplacé par st.query_params
+        # et st.experimental_set_query_params() n'est plus utilisé pour le lien direct
+        # Le lien est généré pour que le navigateur le suive, ce qui déclenche un rerun.
+        query_string = "&".join([f"{k}={v}" for k, v_list in current_query_params.items() for v in (v_list if isinstance(v_list, list) else [v_list])])
+        link_href = f"?{query_string}"
+        
+        # Appliquer la classe 'selected' si c'est la période active
+        selected_class = "selected" if is_selected else ""
+        
+        st.markdown(f'<a href="{link_href}" class="{selected_class}">{label}</a>', unsafe_allow_html=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
