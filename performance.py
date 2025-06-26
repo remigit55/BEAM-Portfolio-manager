@@ -85,7 +85,7 @@ def display_performance_history():
             key=f"period_{label}",
             help=f"Sélectionner la période {label}",
             use_container_width=False,
-            type="secondary" if st.session_state.selected_ticker_table_period != label else "primary"
+            type="primary" if st.session_state.selected_ticker_table_period == label else "secondary"
         ):
             st.session_state.selected_ticker_table_period = label
             st.rerun()
