@@ -1,3 +1,5 @@
+# performance.py
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,75 +11,6 @@ import builtins
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
-
-def get_currency_pair(ticker, target_currency):
-    """
-    Détermine la paire de devises pour la conversion en fonction du ticker.
-    Retourne le symbole de la paire (par exemple, 'EURUSD=X') et un booléen indiquant si c'est une conversion inverse.
-    """
-    # Mapping simplifié des suffixes de ticker vers les devises
-    ticker_currency_map = {
-        '.HK': 'HKD',
-        '.SS': 'CNY',
-        '.AX': 'AUD',
-        '.V': 'CAD',
-        '.L': 'GBP',
-        '': 'USD'  # Par défaut pour les tickers sans suffixe
-    }
-    
-    # Déterminer la devise native à partir du suffixe du ticker
-    for suffix, currency in ticker_currency_map.items():
-        if ticker.endswith(suffix):
-            source_currency = currency
-            break
-    else:
-        source_currency = 'USD'  # Devise par défaut si aucun suffixe n'est trouvé
-    
-    if source_currency == target_currency:
-        return None, False  # Pas de conversion nécessaire
-    
-    # Construire la paire de devises (par exemple, EURUSD=X pour USD -> EUR)
-    pair = f"{target_currency}{source_currency}=X"
-    is_inverse = False
-    
-    # Si la paire inverse est nécessaire (par exemple, USDEUR=X n'existe pas, utiliser EURUSD=X et inverser)
-    try:
-        test_data = yf.download(pair, period='1d', progress=False)
-        if test_data.empty:
-            pair = f"{source_currency}{target_currency}=X"
-            is_inverse = True
-    except:
-        pair = f"{source_currency}{target_currency}=X"
-        is_inverse = True
-    
-    return pair, is_inverse
-
-def convert_to_target_currency(data, ticker, target_currency, start_date, end_date):
-    """
-    Convertit une série de cours dans la devise cible.
-    """
-    if data.empty:
-        return data
-    
-    pair, is_inverse = get_currency_pair(ticker, target_currency)
-    if not pair:
-        return data  # Pas de conversion nécessaire si la devise est la même
-    
-    try:
-        fx_data = yf.download(pair, start=start_date, end=end_date, progress=False)
-        if fx_data.empty or 'Close' not in fx_data.columns:
-            st.warning(f"Impossible de récupérer les taux de change pour {pair}. Les cours pour {ticker} restent dans la devise native.")
-            return data
-        
-        fx_rates = fx_data['Close'].reindex(data.index).ffill().bfill()
-        if is_inverse:
-            fx_rates = 1 / fx_rates
-        
-        converted_data = data * fx_rates
-        return converted_data
-    except Exception as e:
-        st.error(f"Erreur lors de la conversion des cours pour {ticker} : {type(e).__name__} - {e}")
-        return data
 
 def display_performance_history():
     """
@@ -114,49 +47,53 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    # CSS pour aligner les boutons horizontalement avec espacement précis
     st.markdown("""
         <style>
         .period-buttons-container {
             display: flex;
-            flex-direction: row;
-            gap: 16px; /* Espacement entre les boutons en pixels (ajustez selon besoin) */
+            flex-wrap: wrap;
+            gap: 1rem;
             margin-bottom: 1rem;
-            align-items: center;
         }
         .period-button {
-            padding: 4px 8px;
-            font-size: 1rem;
+            background: none;
             border: none;
-            background-color: transparent;
+            padding: 0;
+            font-size: 1rem;
+            color: inherit;
             cursor: pointer;
-            color: var(--text-color, #000000);
-            transition: color 0.2s;
         }
-        .period-button:hover {
+        .period-button.selected {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        div.stButton > button:hover {
             text-decoration: underline;
         }
-        .period-button-selected {
-            color: var(--secondary-color, #1f77b4);
-            font-weight: bold;
-            text-decoration: none;
+        .period-buttons-container button:hover {
+            text-decoration: none !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
-    for label in period_options:
-        button_class = "period-button-selected" if st.session_state.selected_ticker_table_period == label else "period-button"
-        if st.button(
-            label,
-            key=f"period_{label}",
-            help=f"Sélectionner la période {label}",
-            use_container_width=False,
-            type="primary" if st.session_state.selected_ticker_table_period == label else "secondary"
-        ):
-            st.session_state.selected_ticker_table_period = label
-            st.rerun()
+    cols = st.columns(len(period_options))
+    for i, label in enumerate(period_options):
+        if st.session_state.selected_ticker_table_period == label:
+            with cols[i]:
+                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+        else:
+            with cols[i]:
+                if st.button(label, key=f"period_{label}"):
+                    st.session_state.selected_ticker_table_period = label
+                    st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
@@ -169,20 +106,15 @@ def display_performance_history():
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
-            st.write(f"Traitement de {ticker}")
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
-            st.write(f"Données pour {ticker} : {data.shape}, Vide : {data.empty}")
             if not data.empty:
-                # Convertir les cours dans la devise cible
-                converted_data = convert_to_target_currency(data, ticker, target_currency, fetch_start_date, end_date_table)
-                filtered_data = converted_data.dropna().reindex(business_days_for_display).ffill().bfill()
+                filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 last_days_data[ticker] = filtered_data
             else:
                 last_days_data[ticker] = pd.Series(dtype='float64')
 
         df_display_prices = pd.DataFrame()
         for ticker, series in last_days_data.items():
-            st.write(f"Série pour {ticker} : {series.shape}, Vide : {series.empty}")
             if not series.empty:
                 temp_df = pd.DataFrame(series.rename("Cours").reset_index())
                 temp_df.columns = ["Date", "Cours"]
@@ -190,18 +122,11 @@ def display_performance_history():
                 df_display_prices = pd.concat([df_display_prices, temp_df])
 
         if not df_display_prices.empty:
-            st.write(f"df_display_prices : {df_display_prices.shape}, Colonnes : {df_display_prices.columns.tolist()}")
             df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours")
-            st.write(f"df_pivot avant filtrage : {df_pivot.shape}, Colonnes : {df_pivot.columns.tolist()}")
             df_pivot = df_pivot.sort_index(axis=1)
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
-            st.write(f"df_pivot après filtrage : {df_pivot.shape}, Colonnes : {df_pivot.columns.tolist()}")
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
 
-            # Formatage avec fonction lambda pour gérer chaque valeur
-            st.dataframe(
-                df_pivot.style.format(lambda x: format_fr(x, decimal_places=2) if pd.notnull(x) and isinstance(x, (int, float, np.number)) else "N/A"),
-                use_container_width=True
-            )
+            st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
