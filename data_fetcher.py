@@ -6,13 +6,23 @@ import numpy as np
 import io
 import matplotlib.pyplot as plt
 
-# Cache pour 1 minute (60 secondes)
+# Cache pour 1 minute (600 secondes)
 @st.cache_data(ttl=600)
 def fetch_fx_rates(target_currency="EUR"):
     """
     Récupère les taux de change actuels par rapport à une devise cible.
     Utilise EUR comme devise de base par défaut pour les taux de change populaires.
     """
+
+    def extract_scalar(val):
+        """Sécurise l'extraction d'une valeur unique depuis une Series ou autre."""
+        if isinstance(val, pd.Series):
+            if len(val) == 1:
+                return val.item()
+            else:
+                return np.nan
+        return val
+
     fx_rates = {}
     currencies_to_fetch = ["USD", "EUR", "GBP", "CAD", "JPY", "CHF", "HKD", "SGD", "THB", "VND", "PHP", "AUD", "CNY"]
 
@@ -24,39 +34,27 @@ def fetch_fx_rates(target_currency="EUR"):
         ticker_symbol = f"{currency}{target_currency}=X"
         try:
             data = yf.download(ticker_symbol, period="1d", interval="1h", progress=False)
-            
-            current_rate = np.nan # Initialiser comme NaN
+            current_rate = np.nan
 
-            # Traiter les données du ticker original
             if not data.empty and 'Close' in data.columns and not data['Close'].empty:
-                temp_val = data['Close'].iloc[-1]
-                # S'assurer que temp_val est un scalaire. Si c'est une Series de longueur 1, la convertir.
-                if isinstance(temp_val, pd.Series) and len(temp_val) == 1:
-                    temp_val = temp_val.item() # Forcer la conversion en scalaire
-                
+                temp_val = extract_scalar(data['Close'].iloc[-1])
                 if pd.notna(temp_val):
                     current_rate = temp_val
-            
-            # Si le taux original est toujours NaN, essayer le ticker inverse
+
             if pd.isna(current_rate):
                 st.warning(f"Impossible d'obtenir un taux valide pour {ticker_symbol}. Essai de l'inverse.")
                 ticker_symbol_inverse = f"{target_currency}{currency}=X"
                 data_inverse = yf.download(ticker_symbol_inverse, period="1d", interval="1h", progress=False)
 
                 if not data_inverse.empty and 'Close' in data_inverse.columns and not data_inverse['Close'].empty:
-                    temp_val_inverse = data_inverse['Close'].iloc[-1]
-                    # S'assurer que temp_val_inverse est un scalaire
-                    if isinstance(temp_val_inverse, pd.Series) and len(temp_val_inverse) == 1:
-                        temp_val_inverse = temp_val_inverse.item() # Forcer la conversion en scalaire
-
+                    temp_val_inverse = extract_scalar(data_inverse['Close'].iloc[-1])
                     if pd.notna(temp_val_inverse) and temp_val_inverse != 0:
                         current_rate = 1 / temp_val_inverse
                     else:
-                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (inverse vide, NaN ou zéro).")
+                        st.error(f"Taux de change pour {currency}/{target_currency} non trouvé (inverse vide, NaN ou zéro).")
                 else:
-                    st.error(f"Taux de change pour {currency}/{target_currency} non trouvé via YFinance (données inverses vides).")
-            
-            # Assigner le taux final
+                    st.error(f"Taux de change pour {currency}/{target_currency} non trouvé (données inverses vides).")
+
             if pd.notna(current_rate):
                 fx_rates[currency] = current_rate
             else:
@@ -65,11 +63,10 @@ def fetch_fx_rates(target_currency="EUR"):
         except Exception as e:
             st.error(f"Erreur lors de la récupération du taux {ticker_symbol}: {e}")
             fx_rates[currency] = None
-            
-    # S'assurer que la devise cible elle-même est 1.0
-    fx_rates[target_currency] = 1.0
 
+    fx_rates[target_currency] = 1.0
     return fx_rates
+
 
 
 @st.cache_data(ttl=600) # Cache pour 10 minutes
