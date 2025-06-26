@@ -51,14 +51,14 @@ def display_performance_history():
         <style>
         .period-buttons-container {
             display: flex;
-            justify-content: flex-start;
-            gap: 5px;
+            flex-wrap: wrap;
+            gap: 1rem;
             margin-bottom: 1rem;
         }
         .period-button {
             background: none;
             border: none;
-            padding: 2px 6px;
+            padding: 0;
             font-size: 1rem;
             color: inherit;
             cursor: pointer;
@@ -67,20 +67,30 @@ def display_performance_history():
             color: var(--secondary-color);
             font-weight: bold;
         }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
+        div.stButton > button:hover {
+            text-decoration: underline;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
-    for label in period_options:
+    cols = st.columns(len(period_options))
+    for i, label in enumerate(period_options):
         if st.session_state.selected_ticker_table_period == label:
-            if st.button(label, key=f"period_{label}", help=f"{label}"):
-                pass  # Already selected
-            st.markdown(f"<span class='period-button selected'>{label}</span>", unsafe_allow_html=True)
+            with cols[i]:
+                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
         else:
-            if st.button(label, key=f"period_{label}", help=f"{label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun()
+            with cols[i]:
+                if st.button(label, key=f"period_{label}"):
+                    st.session_state.selected_ticker_table_period = label
+                    st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
