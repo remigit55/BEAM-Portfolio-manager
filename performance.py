@@ -59,6 +59,7 @@ def display_performance_history():
         .period-buttons-container div.stButton {
             margin: 0 !important;
             height: auto;
+            width: 20px;
         }
         .period-button {
             background: none;
@@ -79,6 +80,11 @@ def display_performance_history():
             cursor: pointer;
         }
         .period-buttons-container button:hover {
+            text-decoration: none !important;
+        }
+        .period-buttons-container button.selected {
+            font-weight: bold !important;
+            color: var(--secondary-color) !important;
             text-decoration: none !important;
         }
         div.stButton > button:hover {
