@@ -63,17 +63,18 @@ def display_performance_history():
         }
         .period-links-container a {
             text-decoration: none; /* Supprime le soulignement par défaut des liens */
-            color: inherit; /* Utilise la couleur du texte parent */
+            color: #000000; /* Couleur noire par défaut */
             padding: 5px 0; /* Ajoute un peu de padding pour une meilleure zone de clic */
             cursor: pointer;
         }
         .period-links-container a:hover {
-            text-decoration: underline; /* Souligne au survol pour indiquer la cliquabilité */
-            color: var(--primary-color); /* Change la couleur au survol si désiré */
+            text-decoration: none; /* Pas de soulignement au survol */
+            color: #000000; /* Reste noir au survol */
         }
         .period-links-container a.selected {
             font-weight: bold;
-            color: var(--secondary-color); /* Couleur pour l'élément sélectionné */
+            color: #000000; /* Reste noir pour l'élément sélectionné */
+            text-decoration: none; /* Pas de soulignement pour l'élément sélectionné */
         }
         </style>
     """, unsafe_allow_html=True)
@@ -85,14 +86,10 @@ def display_performance_history():
     for label in period_options:
         is_selected = (st.session_state.selected_ticker_table_period == label)
         # Créer l'URL avec le nouveau paramètre de période
-        # st.experimental_set_query_params est déprécié, utiliser st.query_params directement
         current_query_params = st.query_params.to_dict()
         current_query_params['period'] = label
         
         # Construire l'URL avec les nouveaux paramètres de requête
-        # st.experimental_get_query_params() est remplacé par st.query_params
-        # et st.experimental_set_query_params() n'est plus utilisé pour le lien direct
-        # Le lien est généré pour que le navigateur le suive, ce qui déclenche un rerun.
         query_string = "&".join([f"{k}={v}" for k, v_list in current_query_params.items() for v in (v_list if isinstance(v_list, list) else [v_list])])
         link_href = f"?{query_string}"
         
