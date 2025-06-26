@@ -19,7 +19,8 @@ from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data #
 from data_loader import load_data, save_data
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal
-from streamlit_autorefresh import st_autorefresh # <-- Assurez-vous que c'est là
+from streamlit_autorefresh import st_autorefresh 
+from data_loader import load_data, save_data, load_portfolio_from_google_sheets
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
