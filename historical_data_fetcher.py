@@ -119,3 +119,29 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
                 historical_fx[f"{currency}/{target_currency}"] = fx_series
     
     return historical_prices, historical_fx
+
+def fetch_stock_history_converted(ticker, start_date, end_date, currency_source="USD", currency_target="EUR"):
+    """
+    Récupère les cours d’un ticker et les convertit en devise cible.
+    """
+    df = yf.download(ticker, start=start_date, end=end_date, interval="1d", progress=False)
+
+    if df.empty or "Close" not in df.columns:
+        return pd.DataFrame()
+
+    df = df[["Close"]].copy()
+    df.index.name = "Date"
+
+    if currency_source != currency_target:
+        fx_ticker = f"{currency_source}{currency_target}=X"
+        fx_data = yf.download(fx_ticker, start=start_date, end=end_date, interval="1d", progress=False)
+
+        if not fx_data.empty and "Close" in fx_data.columns:
+            fx_data = fx_data[["Close"]].rename(columns={"Close": "FX"})
+            df = df.join(fx_data, how="left")
+            df.dropna(inplace=True)
+            df["Close"] = df["Close"] * df["FX"]
+            df.drop(columns=["FX"], inplace=True)
+
+    return df
+
