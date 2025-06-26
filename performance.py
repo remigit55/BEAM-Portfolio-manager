@@ -49,32 +49,46 @@ def display_performance_history():
 
     st.markdown("""
         <style>
+        /* Conteneur flex pour aligner les boutons */
         .period-buttons-container {
             display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
+            flex-wrap: wrap; /* Permet aux boutons de passer à la ligne si l'espace est insuffisant */
+            justify-content: flex-start; /* Aligne les boutons à gauche */
+            gap: 5px; /* Espacement de 5px entre les éléments */
             margin-bottom: 1rem;
         }
-        .period-button {
-            background: none;
-            border: none;
-            padding: 0;
-            font-size: 1rem;
-            color: inherit;
+
+        /* Cible les conteneurs div générés par Streamlit pour chaque bouton */
+        .period-buttons-container div.stButton {
+            margin: 0 !important; /* Supprime toutes les marges externes par défaut de Streamlit */
+            height: auto; /* Ajuste la hauteur à son contenu */
+            /* Important: Streamlit peut ajouter des styles inline, !important est nécessaire */
+        }
+
+        /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
+        .period-buttons-container button {
+            background: none !important; /* Pas de fond */
+            border: none !important; /* Pas de bordure */
+            padding: 0 !important; /* Pas de padding interne */
+            font-size: 1rem; /* Taille de police par défaut */
+            color: #000000 !important; /* Texte noir */
             cursor: pointer;
+            text-decoration: none !important; /* Pas de soulignement */
+            box-shadow: none !important; /* Pas d'ombre */
+            /* Important: Streamlit peut ajouter des styles inline, !important est nécessaire */
         }
-        .period-button.selected {
-            color: var(--secondary-color);
-            font-weight: bold;
+
+        /* Style au survol */
+        .period-buttons-container button:hover {
+            text-decoration: underline !important; /* Souligne au survol pour indiquer la cliquabilité */
+            color: #000000 !important; /* Reste noir au survol */
         }
-        div.stButton > button {
-            all: unset;
-            margin: 0 8px 0 0;
-            padding: 2px 6px;
-            cursor: pointer;
-        }
-        div.stButton > button:hover {
-            text-decoration: underline;
+
+        /* Style du bouton sélectionné */
+        .period-buttons-container button.selected {
+            font-weight: bold !important;
+            color: #000000 !important; /* Reste noir pour l'élément sélectionné */
+            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
         }
         </style>
     """, unsafe_allow_html=True)
