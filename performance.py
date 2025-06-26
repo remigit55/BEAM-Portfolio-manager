@@ -1,13 +1,11 @@
 # performance.py
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
-import builtins
-from historical_data_fetcher import fetch_stock_history
+from historical_data_fetcher import fetch_stock_history, get_all_historical_data
 from utils import format_fr
 
 def display_performance_history():
@@ -16,8 +14,8 @@ def display_performance_history():
     """
     st.subheader("Performance Historique")
 
-    # Vérification du conflit avec str()
-    st.write(f"Type de str : {type(builtins.str)}")  # Diagnostic pour str()
+    # Diagnostic pour str
+    st.write(f"Type de str au début de display_performance_history : {type(str)}")
 
     # Récupération des tickers disponibles dans le portefeuille
     tickers = []
@@ -29,74 +27,54 @@ def display_performance_history():
         st.selectbox("Sélectionnez un symbole boursier", options=["Aucun ticker disponible"], index=0, disabled=True)
         return
 
-    st.write(f"Tickers disponibles : {tickers}")  # Diagnostic
+    st.write(f"Tickers disponibles : {tickers}")
 
     # Choix du ticker et de la période
     selected_ticker = st.selectbox("Sélectionnez un symbole boursier du portefeuille", options=tickers, index=0)
-    days_range = st.slider("Nombre de jours d'historique à afficher", min_value=1, max_value=365, value=30)
+    days_range = st.slider("Nombre de jours d'historique à afficher", min_value=1, max_value=365, value=90)
+
+    # Devises
+    source_currency = "USD"
+    target_currency = "EUR"
+    currencies = [source_currency] * len(tickers)
 
     # Dates à utiliser
     start_date = datetime.now() - timedelta(days=days_range)
-    end_date = (datetime.now() - BDay(1)).to_pydatetime()  # Dernier jour ouvré avant aujourd'hui
-    st.write(f"Période : {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}")  # Diagnostic
+    end_date = (datetime.now() - BDay(1)).to_pydatetime()
+    st.write(f"Période : {start_date.strftime('%Y-%m-%d')} à {end_date.strftime('%Y-%m-%d')}")
 
-    # Graphique pour le ticker sélectionné
+    # Graphique pour le ticker sélectionné (approche initiale)
     try:
-        data = fetch_stock_history(selected_ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-        st.write(f"Données pour {selected_ticker} : {data.shape}, Vide : {data.empty}")  # Diagnostic
-        if not data.empty:
-            st.line_chart(data, use_container_width=True)
+        data = yf.download(selected_ticker, start=start_date.strftime('%Y-%m-%d'), end=end_date.strftime('%Y-%m-%d'), progress=False)
+        st.write(f"Données brutes pour {selected_ticker} : {data.shape}, Colonnes : {data.columns.tolist() if not data.empty else 'Vide'}")
+        if not data.empty and 'Close' in data.columns:
+            st.line_chart(data['Close'], use_container_width=True)
         else:
             st.warning(f"Aucune donnée disponible pour {selected_ticker} sur la période sélectionnée.")
     except Exception as e:
-        st.error(f"Erreur lors de la récupération des données pour {selected_ticker} : {builtins.str(e)}")
+        st.error(f"Erreur lors de la récupération des données pour {selected_ticker} : {type(e).__name__} - {e}")
         return
 
     # Tableau des derniers cours de clôture pour tous les tickers
     st.subheader("Derniers cours de clôture pour tous les tickers")
+    historical_prices, _ = get_all_historical_data(tickers, currencies, start_date, end_date, target_currency)
+    
     results = {}
     for ticker in tickers:
-        try:
-            df = fetch_stock_history(ticker, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'))
-            st.write(f"Données pour {ticker} : {df.shape}, Vide : {df.empty}")  # Diagnostic
-            if not df.empty and not df.dropna().empty:
-                last_value = df.dropna().iloc[-1]
-                results[ticker] = last_value
-            else:
-                st.warning(f"{ticker} : aucune donnée de clôture disponible.")
-                results[ticker] = None
-        except Exception as e:
-            st.warning(f"{ticker} : erreur de récupération ({builtins.str(e)})")
+        df = historical_prices.get(ticker, pd.Series(dtype='float64'))
+        st.write(f"Données pour {ticker} : {df.shape}, Vide : {df.empty}")
+        if not df.empty and not df.dropna().empty:
+            last_value = df.dropna().iloc[-1]
+            results[ticker] = last_value
+        else:
+            st.warning(f"{ticker} : aucune donnée de clôture disponible.")
             results[ticker] = None
 
-    # Vérification du contenu de results
-    st.write(f"Contenu de results : {results}")  # Diagnostic
+    st.write(f"Contenu de results : {results}")
     df_prices = pd.DataFrame.from_dict(results, orient='index', columns=["Dernier cours"])
     df_prices.index.name = "Ticker"
     df_prices = df_prices.reset_index()
     df_prices["Dernier cours"] = df_prices["Dernier cours"].apply(lambda x: format_fr(x) if pd.notnull(x) else "N/A")
 
-    # Vérification du DataFrame final
-    st.write(f"DataFrame df_prices : {df_prices}")  # Diagnostic
+    st.write(f"DataFrame df_prices : {df_prices}")
     st.dataframe(df_prices, use_container_width=True)
-
-    # Test de connexion Yahoo Finance
-    if st.button("Lancer le test de connexion Yahoo Finance"):
-        try:
-            data = yf.download(
-                selected_ticker,
-                start=start_date.strftime('%Y-%m-%d'),
-                end=end_date.strftime('%Y-%m-%d'),
-                progress=False
-            )
-            if not data.empty:
-                st.success(f"✅ Données récupérées avec succès pour {selected_ticker}!")
-                st.write("Aperçu des données :")
-                st.dataframe(data.head())
-                st.write("...")
-                st.dataframe(data.tail())
-                st.write(f"Nombre total d'entrées : **{len(data)}**")
-            else:
-                st.warning(f"❌ Aucune donnée récupérée pour {selected_ticker} sur la période spécifiée.")
-        except Exception as e:
-            st.error(f"❌ Une erreur est survenue lors de la récupération des données : {builtins.str(e)}")
