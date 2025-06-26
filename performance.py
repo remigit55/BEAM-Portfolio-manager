@@ -46,7 +46,7 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    # CSS personnalisé pour aligner les boutons horizontalement avec un espacement précis
+    # CSS personnalisé pour aligner les boutons horizontalement
     st.markdown("""
         <style>
         .period-buttons-container {
@@ -57,18 +57,18 @@ def display_performance_history():
             align-items: center;
         }
         .period-button {
-            background: none;
-            border: none;
             padding: 4px 8px;
             font-size: 1rem;
-            color: var(--text-color, #000000);
+            border: none;
+            background-color: transparent;
             cursor: pointer;
+            color: var(--text-color, #000000);
             transition: color 0.2s;
         }
         .period-button:hover {
             text-decoration: underline;
         }
-        .period-button.selected {
+        .period-button-selected {
             color: var(--secondary-color, #1f77b4);
             font-weight: bold;
             text-decoration: none;
@@ -79,12 +79,16 @@ def display_performance_history():
     st.markdown("##### Cours de Clôture des Derniers Jours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
     for label in period_options:
-        if st.session_state.selected_ticker_table_period == label:
-            st.markdown(f'<button class="period-button selected">{label}</button>', unsafe_allow_html=True)
-        else:
-            if st.markdown(f'<button class="period-button">{label}</button>', unsafe_allow_html=True, key=f"period_{label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun()
+        button_class = "period-button-selected" if st.session_state.selected_ticker_table_period == label else "period-button"
+        if st.button(
+            label,
+            key=f"period_{label}",
+            help=f"Sélectionner la période {label}",
+            use_container_width=False,
+            type="secondary" if st.session_state.selected_ticker_table_period != label else "primary"
+        ):
+            st.session_state.selected_ticker_table_period = label
+            st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
@@ -97,7 +101,9 @@ def display_performance_history():
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
+            st.write(f"Traitement de {ticker}")
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
+            st.write(f"Données pour {ticker} : {data.shape}, Vide : {data.empty}")
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 last_days_data[ticker] = filtered_data
@@ -106,6 +112,7 @@ def display_performance_history():
 
         df_display_prices = pd.DataFrame()
         for ticker, series in last_days_data.items():
+            st.write(f"Série pour {ticker} : {series.shape}, Vide : {series.empty}")
             if not series.empty:
                 temp_df = pd.DataFrame(series.rename("Cours").reset_index())
                 temp_df.columns = ["Date", "Cours"]
@@ -113,11 +120,18 @@ def display_performance_history():
                 df_display_prices = pd.concat([df_display_prices, temp_df])
 
         if not df_display_prices.empty:
+            st.write(f"df_display_prices : {df_display_prices.shape}, Colonnes : {df_display_prices.columns.tolist()}")
             df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours")
+            st.write(f"df_pivot avant filtrage : {df_pivot.shape}, Colonnes : {df_pivot.columns.tolist()}")
             df_pivot = df_pivot.sort_index(axis=1)
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
+            st.write(f"df_pivot après filtrage : {df_pivot.shape}, Colonnes : {df_pivot.columns.tolist()}")
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
 
-            st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
+            # Formatage avec fonction lambda pour gérer chaque valeur
+            st.dataframe(
+                df_pivot.style.format(lambda x: format_fr(x, decimal_places=2) if pd.notnull(x) and isinstance(x, (int, float, np.number)) else "N/A"),
+                use_container_width=True
+            )
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
