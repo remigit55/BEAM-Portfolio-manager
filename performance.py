@@ -49,16 +49,13 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        .period-buttons {
+        .period-buttons-container {
             display: flex;
             flex-wrap: wrap;
             gap: 1rem;
             margin-bottom: 1rem;
         }
-        .period-buttons form {
-            margin: 0;
-        }
-        .period-buttons button {
+        .period-button {
             background: none;
             border: none;
             padding: 0;
@@ -66,7 +63,7 @@ def display_performance_history():
             color: inherit;
             cursor: pointer;
         }
-        .period-buttons button.selected {
+        .period-button.selected {
             color: var(--secondary-color);
             font-weight: bold;
         }
@@ -74,13 +71,12 @@ def display_performance_history():
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-buttons">', unsafe_allow_html=True)
+    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
     for label in period_options:
         btn_class = "selected" if st.session_state.selected_ticker_table_period == label else ""
         if st.button(label, key=f"period_{label}"):
             st.session_state.selected_ticker_table_period = label
             st.rerun()
-        st.markdown(f'<script>document.querySelector("button[data-testid=\"period_{label}\"]").classList.add("{btn_class}");</script>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
