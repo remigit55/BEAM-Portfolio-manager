@@ -16,7 +16,7 @@ from utils import format_fr
 def display_performance_history():
     """
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
-    et un tableau des derniers cours de clôture pour tous les tickers.
+    et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
     st.subheader("Performance Historique du Portefeuille")
 
@@ -32,23 +32,25 @@ def display_performance_history():
 
     # Section pour le calcul et l'affichage de la performance globale du portefeuille
     st.markdown("#### Évolution de la Valeur Totale du Portefeuille")
-    today = datetime.now().date()
-    default_start_date = today - timedelta(days=365) # Par défaut : 1 an d'historique
     
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("Date de début", value=default_start_date, key="perf_start_date")
-    with col2:
-        end_date = st.date_input("Date de fin", value=today, key="perf_end_date")
+    # --- NOUVEAU : SÉLECTION DE LA PLAGE DE DATES POUR LA PERFORMANCE GLOBALE ---
+    today = datetime.now().date()
+    default_start_date_perf = today - timedelta(days=365) # Par défaut : 1 an d'historique
+    
+    col1_perf, col2_perf = st.columns(2)
+    with col1_perf:
+        start_date_perf = st.date_input("Date de début (Performance Portefeuille)", value=default_start_date_perf, key="perf_start_date")
+    with col2_perf:
+        end_date_perf = st.date_input("Date de fin (Performance Portefeuille)", value=today, key="perf_end_date")
 
-    if start_date >= end_date:
-        st.error("La date de début doit être antérieure à la date de fin.")
+    if start_date_perf >= end_date_perf:
+        st.error("La date de début doit être antérieure à la date de fin pour la performance du portefeuille.")
         return
 
     if st.button("Calculer Performance Historique du Portefeuille", key="calculate_portfolio_perf_btn"):
         with st.spinner("Calcul de la performance historique du portefeuille en cours... Cela peut prendre un moment si la période est longue et si de nombreuses données doivent être téléchargées."):
             df_historical_values = reconstruct_historical_portfolio_value(
-                df_current_portfolio, start_date, end_date, target_currency
+                df_current_portfolio, start_date_perf, end_date_perf, target_currency # Utilisation des nouvelles dates
             )
 
             if not df_historical_values.empty:
@@ -122,34 +124,40 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # Définir la période pour les 5 derniers jours ouvrables
+    # --- NOUVEAU : SÉLECTION DU NOMBRE DE JOURS POUR LE TABLEAU DES DERNIERS COURS ---
+    days_range_5_days_table = st.slider(
+        "Nombre de jours d'historique pour les derniers cours", 
+        min_value=1, 
+        max_value=30, # Limité à 30 jours pour la lisibilité du tableau
+        value=5, 
+        key="days_range_5_days_table"
+    )
+
     end_date_5days = datetime.now().date()
-    # Récupérer les 5 derniers jours ouvrables
-    business_days_5 = pd.bdate_range(end=end_date_5days, periods=5)
-    start_date_5days = business_days_5[0].date()
+    # Récupérer les 'days_range_5_days_table' derniers jours ouvrables
+    business_days_table = pd.bdate_range(end=end_date_5days, periods=days_range_5_days_table)
+    start_date_5days_table = business_days_table[0].date()
 
 
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_5days.strftime('%d/%m/%Y')} à {end_date_5days.strftime('%d/%m/%Y')}.")
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_5days_table.strftime('%d/%m/%Y')} à {end_date_5days.strftime('%d/%m/%Y')}.")
 
-    if st.button("Actualiser les cours des 5 derniers jours", key="refresh_5_day_prices_btn"):
-        with st.spinner("Récupération des cours des 5 derniers jours..."):
-            last_5_days_data = {}
+    if st.button("Actualiser les cours des tickers", key="refresh_5_day_prices_btn"): # Renommé le bouton
+        with st.spinner("Récupération des cours des tickers en cours..."):
+            last_days_data = {}
             for ticker in tickers_in_portfolio:
-                # Utilise fetch_stock_history pour récupérer les données pour chaque ticker
-                # On récupère un peu plus de jours pour être sûr d'avoir 5 jours ouvrables
-                data = fetch_stock_history(ticker, start_date_5days - timedelta(days=10), end_date_5days)
+                # On récupère un peu plus de jours pour être sûr d'avoir suffisamment de données
+                data = fetch_stock_history(ticker, start_date_5days_table - timedelta(days=10), end_date_5days)
                 if not data.empty:
-                    # Récupère les 5 dernières valeurs non nulles et les re-indexe sur les 5 jours ouvrables cibles
-                    last_5_values = data.dropna().reindex(business_days_5).ffill().bfill().tail(5)
-                    last_5_days_data[ticker] = last_5_values
+                    # Récupère les 'days_range_5_days_table' dernières valeurs non nulles et les re-indexe
+                    last_values = data.dropna().reindex(business_days_table).ffill().bfill().tail(days_range_5_days_table)
+                    last_days_data[ticker] = last_values
                 else:
-                    last_5_days_data[ticker] = pd.Series(dtype='float64') # Vide si pas de données
+                    last_days_data[ticker] = pd.Series(dtype='float64') # Vide si pas de données
 
             # Création d'un DataFrame pour l'affichage
             df_display_prices = pd.DataFrame()
-            for ticker, series in last_5_days_data.items():
+            for ticker, series in last_days_data.items():
                 if not series.empty:
-                    # Créer une série pour chaque ticker avec les dates comme index
                     temp_df = pd.DataFrame(series.rename("Cours").reset_index())
                     temp_df.columns = ["Date", "Cours"]
                     temp_df["Ticker"] = ticker
@@ -164,7 +172,7 @@ def display_performance_history():
                 # Renommer les colonnes de date pour un affichage plus lisible
                 df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
                 
-                st.markdown("##### Cours de Clôture des 5 Derniers Jours")
+                st.markdown("##### Cours de Clôture des Derniers Jours")
                 st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
             else:
-                st.warning("Aucun cours de clôture n'a pu être récupéré pour les 5 derniers jours.")
+                st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
