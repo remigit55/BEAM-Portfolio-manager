@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR LIENS CLIQUABLES ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS INLINE ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -47,32 +47,41 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    # Récupération manuelle des paramètres de requête
-    query_params = st.query_params
-    if "period" in query_params:
-        new_period = query_params["period"]
-        if isinstance(new_period, list):
-            new_period = new_period[0]
-        if new_period in period_options:
-            st.session_state.selected_ticker_table_period = new_period
-            st.query_params.clear()
-            st.rerun()
-
-    # Affichage HTML propre
-    selected_period = st.session_state.selected_ticker_table_period
-    period_links = []
-    for label in period_options:
-        if label == selected_period:
-            period_links.append(
-                f'<span style="color: var(--secondary-color); font-weight: bold;">{label}</span>'
-            )
-        else:
-            period_links.append(
-                f'<a href="?period={label}" style="text-decoration: none; color: inherit;">{label}</a>'
-            )
+    st.markdown("""
+        <style>
+        .period-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .period-buttons form {
+            margin: 0;
+        }
+        .period-buttons button {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1rem;
+            color: inherit;
+            cursor: pointer;
+        }
+        .period-buttons button.selected {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown(" | ".join(period_links), unsafe_allow_html=True)
+    st.markdown('<div class="period-buttons">', unsafe_allow_html=True)
+    for label in period_options:
+        btn_class = "selected" if st.session_state.selected_ticker_table_period == label else ""
+        if st.button(label, key=f"period_{label}"):
+            st.session_state.selected_ticker_table_period = label
+            st.rerun()
+        st.markdown(f'<script>document.querySelector("button[data-testid=\"period_{label}\"]").classList.add("{btn_class}");</script>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
