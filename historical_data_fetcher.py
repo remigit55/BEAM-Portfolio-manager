@@ -79,7 +79,7 @@ def fetch_historical_fx_rates(base_currency, target_currency, start_date, end_da
         st.warning(f"Erreur réseau ou HTTP pour les taux de change {base_currency}/{target_currency} : {type(e).__name__} - {e}")
     except Exception as e:
         st.error(f"Une erreur inattendue est survenue pour les taux de change {base_currency}/{target_currency} : {type(e).__name__} - {e}")
- |       return pd.Series(dtype='float64')
+        return pd.Series(dtype='float64')
 
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
     """
