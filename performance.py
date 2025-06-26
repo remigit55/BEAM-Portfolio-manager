@@ -83,6 +83,7 @@ def display_performance_history():
         </style>
     """, unsafe_allow_html=True)
 
+    st.markdown("##### Cours de Clôture des Derniers Jours")
     st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
@@ -127,7 +128,6 @@ def display_performance_history():
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
 
-            st.markdown("##### Cours de Clôture des Derniers Jours")
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
