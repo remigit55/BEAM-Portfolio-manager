@@ -28,6 +28,7 @@ def display_performance_history():
 
     try:
         df = fetch_stock_history_converted(selected_ticker, start_date, end_date, "USD", target_currency)
+
         
         if df.empty or df["Close"].isnull().all():
             st.warning(f"Aucune donnée de clôture disponible pour {selected_ticker} sur la période.")
