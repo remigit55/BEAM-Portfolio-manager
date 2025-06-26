@@ -4,6 +4,9 @@ from datetime import datetime, timedelta, date # Import date
 import numpy as np
 import streamlit as st # Nécessaire pour st.cache_data et les messages d'info/erreur
 from historical_data_fetcher import get_all_historical_data # Import la fonction pour récupérer toutes les données historiques
+import builtins
+if not callable(str):
+    str = builtins.str
 
 def calculate_daily_portfolio_value(snapshot_data, date, historical_prices, historical_fx, target_currency):
     """
