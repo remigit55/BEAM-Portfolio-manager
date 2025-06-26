@@ -24,4 +24,7 @@ def format_fr(number, decimal_places=2):
         # Fallback for non-numeric or other issues
         return str(number)
 
+def format_fr(x):
+    return f"{x:.2f}" if isinstance(x, (int, float)) else x
+
 # You might have other utility functions here as well
