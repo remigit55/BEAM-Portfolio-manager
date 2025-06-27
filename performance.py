@@ -48,28 +48,28 @@ def display_performance_history():
         st.session_state.selected_ticker_table_period = "1W"
 
     st.markdown("""
-    <style>
-    .period-span-container {
-        display: flex;
-        flex-direction: row;
-        gap: 6px;
-        padding: 0.5rem;
-        background-color: red;
-        width: fit-content;
-    }
-    .period-span {
-        padding: 3px 8px;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 1rem;
-        color: inherit;
-    }
-    .period-span.selected {
-        color: var(--secondary-color);
-        font-weight: bold;
-    }
-    </style>
-""", unsafe_allow_html=True)
+        <style>
+        .period-span-container {
+            display: flex;
+            flex-direction: row;
+            gap: 6px;
+            padding: 0.5rem;
+            background-color: red;
+            width: fit-content;
+        }
+        .period-span {
+            padding: 3px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 1rem;
+            color: inherit;
+        }
+        .period-span.selected {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 st.markdown('<div class="period-span-container">', unsafe_allow_html=True)
 for label in period_options:
