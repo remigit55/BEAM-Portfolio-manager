@@ -74,14 +74,14 @@ def display_performance_history():
         div.stButton {
             /* margin: 0 !important; */ /* Supprime les marges par défaut de Streamlit autour du bouton */
             height: auto; /* Ajuste la hauteur à son contenu */
-            width: 100%;
+            /* width: 100%; */
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
         div.stButton > button {
             background: none !important; /* Pas de fond */
              /*border: none !important;*/ /* Pas de bordure */
-            padding: 0 !important; /* Pas de padding interne */
+            /* padding: 0 !important; */ /* Pas de padding interne */
             font-size: 1rem; /* Taille de police par défaut */
             color: inherit !important; /* Utilise la couleur du texte parent */
             cursor: pointer;
