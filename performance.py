@@ -57,7 +57,8 @@ def display_performance_history():
             flex-wrap: wrap;
             align-items: center;
             width: 10px;
-            background-color: red;
+            background: none;
+            border: none;
         }
         .period-btn {
             padding: 4px 10px;
@@ -70,7 +71,7 @@ def display_performance_history():
             transition: all 0.2s ease-in-out;
         }
         .period-btn:hover {
-            background-color: #eee;
+            /* background-color: #eee; */
         }
         .period-btn.selected {
             font-weight: bold;
