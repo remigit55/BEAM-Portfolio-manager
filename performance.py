@@ -49,36 +49,7 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        .period-buttons-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-        .period-button {
-            /* background: none; */
-            /* border: none; */
-            padding: 0;
-            font-size: 1rem;
-            color: inherit;
-            cursor: pointer;
-        }
-        .period-button.selected {
-            color: var(--secondary-color);
-            font-weight: bold;
-        }
-        div.stButton > button {
-            all: unset;
-            margin: 0 8px 0 0;
-            padding: 2px 6px;
-            cursor: pointer;
-        }
-        div.stButton > button:hover {
-            text-decoration: underline;
-        }
-        .period-buttons-container button:hover {
-            text-decoration: none !important;
-        }
+        
         </style>
     """, unsafe_allow_html=True)
 
