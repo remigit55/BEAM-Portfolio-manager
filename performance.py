@@ -49,7 +49,24 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        
+        .period-buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .period-button {
+            /* background: none; */
+            /* border: none; */
+            padding: 0;
+            font-size: 1rem;
+            color: inherit;
+            cursor: pointer;
+        }
+        .period-button.selected {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
         </style>
     """, unsafe_allow_html=True)
 
