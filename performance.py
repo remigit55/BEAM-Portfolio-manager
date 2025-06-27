@@ -57,6 +57,7 @@ def display_performance_history():
             flex-wrap: wrap;
             align-items: center;
             width: 10px;
+            background-color: red;
         }
         .period-btn {
             padding: 4px 10px;
