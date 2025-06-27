@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS INLINE ---
+    # --- SÉLECTION DE PÉRIODE PAR SPAN CLIQUABLES ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -49,56 +49,49 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        .period-buttons-container {
-            /* display: flex;
-            flex-wrap: wrap; */
-            /* gap: 1rem; */
+        .outer-period-container {
+            width: 100%;
+            display: flex;
+            justify-content: flex-start;
+        }
+        .period-span-container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 5px;
             margin-bottom: 1rem;
         }
-        .period-button {
-            /* background: none; */
-            /* border: none; */
-            padding: 0;
+        .period-span {
+            display: inline-block;
+            padding: 2px 6px;
             font-size: 1rem;
             color: inherit;
             cursor: pointer;
+            border-radius: 4px;
+            user-select: none;
         }
-        .period-buttons-container div.stButton {
-            margin: 0 !important; /* Supprime les marges par défaut de Streamlit autour du bouton */
-            height: auto; /* Ajuste la hauteur à son contenu */
+        .period-span:hover {
+            text-decoration: underline;
         }
-        .period-button.selected {
+        .period-span.selected {
             color: var(--secondary-color);
             font-weight: bold;
         }
-        /* div.stButton > button {
-            all: unset;
-            margin: 0 8px 0 0;
-            padding: 2px 6px;
-            cursor: pointer;
-        }
-        div.stButton > button:hover {
-            text-decoration: underline;
-        }
-        .period-buttons-container button:hover {
-            text-decoration: none !important;
-        } */
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("##### Cours de Clôture des Derniers Jours")
-    st.markdown('<div class="period-buttons-container" style="width: 10px !important; background-color: red;">', unsafe_allow_html=True)
-    cols = st.columns(len(period_options))
-    for i, label in enumerate(period_options):
+    st.markdown("#### Sélection de la période d'affichage des cours")
+    st.markdown('<div class="outer-period-container"><div class="period-span-container">', unsafe_allow_html=True)
+
+    for label in period_options:
         if st.session_state.selected_ticker_table_period == label:
-            with cols[i]:
-                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span class='period-span selected'>{label}</span>", unsafe_allow_html=True)
         else:
-            with cols[i]:
-                if st.button(label, key=f"period_{label}"):
-                    st.session_state.selected_ticker_table_period = label
-                    st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+            if st.button(label, key=f"period_{label}"):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
+
+    st.markdown('</div></div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
@@ -131,6 +124,7 @@ def display_performance_history():
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
 
+            st.markdown("##### Cours de Clôture des Derniers Jours")
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
