@@ -73,7 +73,7 @@ def display_performance_history():
         .period-btn.selected {
             font-weight: bold;
             color: var(--secondary-color);
-            border-color: var(--secondary-color);
+            border: none;
         }
         </style>
     """, unsafe_allow_html=True)
