@@ -80,7 +80,7 @@ def display_performance_history():
             text-decoration: underline;
         }
         div.stButton > button[kind="primary"] {
-            color: var(--secondary-color, #1f77b4);
+            
             font-weight: bold;
             text-decoration: none;
         }
