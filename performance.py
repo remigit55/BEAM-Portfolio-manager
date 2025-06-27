@@ -56,15 +56,15 @@ def display_performance_history():
             margin-bottom: 1rem;
         }
         .period-button {
-            background: none;
-            border: none;
-            padding: 0;
+            /* background: none; */
+            /* border: none; */
+            /* padding: 0; */
             font-size: 1rem;
             color: inherit;
             cursor: pointer;
         }
         .period-button.selected {
-            color: var(--secondary-color);
+            /* color: var(--secondary-color); */
             font-weight: bold;
         }
         div.stButton > button {
