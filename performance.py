@@ -123,8 +123,6 @@ def display_performance_history():
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
-
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         # Fetch un peu plus de jours pour s'assurer d'avoir suffisamment de données pour la période
