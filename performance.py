@@ -98,6 +98,7 @@ def display_performance_history():
         div.stButton > button.selected {
             font-weight: bold !important;
             color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
+            background-color: var(--secondary-color) !important;
             text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
         }
         </style>
