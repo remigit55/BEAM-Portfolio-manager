@@ -55,7 +55,7 @@ def display_performance_history():
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
             /* width: 100%; */ /* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
-            width: 100px;
+            /* width: 100px; */
             /* ou une largeur maximale: */
             /* max-width: 600px; */
             margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
@@ -67,7 +67,7 @@ def display_performance_history():
             margin: 0 !important; /* Supprime la marge externe par défaut de chaque colonne */
             flex-grow: 0 !important; /* Empêche les colonnes de prendre plus d'espace qu'elles n'en ont besoin */
             width: fit-content; /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */ 
-            width: 100px;  /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */
+            width: 100%;  /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */
         }
 
         /* Cible le conteneur Streamlit de chaque bouton (le div autour du <button>) */
