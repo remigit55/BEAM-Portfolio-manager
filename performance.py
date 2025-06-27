@@ -53,7 +53,7 @@ def display_performance_history():
         div[data-testid="stColumns"] {
             gap: 5px; /* Espacement de 5px entre chaque colonne */
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
-            /* width: 100px; *//* La largeur s'adapte au contenu des colonnes */
+            width: 100px; /* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
             /* width: 400px; */
             /* ou une largeur maximale: */
