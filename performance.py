@@ -53,7 +53,7 @@ def display_performance_history():
             flex-direction: row;
             gap: 10px; /* Espacement entre les boutons (ajustez selon besoin, ex. 15px) */
             margin-bottom: 1rem;
-            align-items: left;
+            align-items: center;
         }
         div.stButton {
             margin: 0 !important;
