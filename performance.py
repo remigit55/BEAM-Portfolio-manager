@@ -79,8 +79,8 @@ def display_performance_history():
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
         div.stButton > button {
-            background: none !important; /* Pas de fond */
-             /*border: none !important;*/ /* Pas de bordure */
+            /* background: none !important; */ /* Pas de fond */
+            /* border: none !important; */ /* Pas de bordure */
             /* padding: 0 !important; */ /* Pas de padding interne */
             font-size: 1rem; /* Taille de police par défaut */
             color: inherit !important; /* Utilise la couleur du texte parent */
