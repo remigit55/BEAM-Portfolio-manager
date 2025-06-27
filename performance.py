@@ -91,7 +91,7 @@ def display_performance_history():
         /* Style au survol */
         div.stButton > button:hover {
             text-decoration: none !important; /* Pas de soulignement au survol */
-            color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
+            color: var(--secondary-color) !important; /* Couleur au survol (peut être ajustée) */
         }
         /* Style du bouton sélectionné */
         div.stButton > button.selected {
