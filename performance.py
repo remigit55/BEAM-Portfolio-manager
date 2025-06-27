@@ -52,6 +52,7 @@ def display_performance_history():
         /* Cible le conteneur principal de toutes les colonnes généré par st.columns */
         div[data-testid="stColumns"] {
             gap: 5px; /* Espacement de 5px entre chaque colonne */
+            width: 200px;
             /* width: fit-content; */ /* La largeur s'adapte au contenu des colonnes (décommenter si besoin) */
             margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
         }
