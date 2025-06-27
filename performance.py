@@ -87,7 +87,6 @@ def display_performance_history():
     """, unsafe_allow_html=True)
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
-    <div>
     st.markdown('<div class="period-buttons-container" style="width: 10px !important; background-color: red;">', unsafe_allow_html=True)
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
@@ -100,8 +99,6 @@ def display_performance_history():
                     st.session_state.selected_ticker_table_period = label
                     st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-
-    </div>
     
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
