@@ -8,6 +8,9 @@ from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
 
+# Importe le nouveau composant personnalisé
+from period_selector_component import period_selector
+
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
@@ -32,7 +35,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS ET ISOLÉS ---
+    # --- SÉLECTION DE PÉRIODE VIA COMPOSANT PERSONNALISÉ ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -47,80 +50,20 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
-    st.markdown("""
-        <style>
-        /* Conteneur spécifique pour les boutons de période */
-        .period-buttons-wrapper {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: 5px; /* Espacement de 5px entre les boutons */
-            margin-bottom: 1rem;
-            width: 100%; /* Assure que le conteneur prend toute la largeur disponible */
-        }
-
-        /* Cible les conteneurs div de Streamlit des boutons *uniquement à l'intérieur* de .period-buttons-wrapper */
-        .period-buttons-wrapper div[data-testid^="stButton"] { /* Ciblage plus spécifique */
-            margin: 0 !important; /* Supprime les marges par défaut de Streamlit */
-            height: auto; /* Ajuste la hauteur à son contenu */
-            flex-shrink: 0; /* Empêche les éléments de rétrécir */
-            flex-grow: 0; /* Empêche les éléments de s'étirer */
-            /* width: auto; */ /* Laisse la largeur s'adapter au contenu du bouton */
-        }
-        
-        /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
-        .period-buttons-wrapper button {
-            background: none !important; /* Pas de fond */
-            border: none !important; /* Pas de bordure */
-            padding: 0 !important; /* Pas de padding interne */
-            font-size: 1rem; /* Taille de police par défaut */
-            color: inherit !important; /* Utilise la couleur du texte parent */
-            cursor: pointer;
-            text-decoration: none !important; /* Pas de soulignement */
-            box-shadow: none !important; /* Pas d'ombre */
-        }
-        /* Style au survol */
-        .period-buttons-wrapper button:hover {
-            text-decoration: none !important; /* Pas de soulignement au survol */
-            color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
-        }
-        /* Style du bouton sélectionné */
-        .period-buttons-wrapper button.selected {
-            font-weight: bold !important;
-            color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
-            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
-            background-color: red;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     st.markdown("#### Sélection de la période d'affichage des cours")
     
-    # Créer le conteneur HTML unique pour ces boutons
-    st.markdown('<div class="period-buttons-wrapper">', unsafe_allow_html=True)
-    
-    # Générer les boutons stylisés comme du texte
-    for label in period_options:
-        is_selected = (st.session_state.selected_ticker_table_period == label)
-        
-        # Créer le bouton Streamlit
-        if st.button(label, key=f"period_{label}"):
-            st.session_state.selected_ticker_table_period = label
-            st.rerun()
-        
-        # Injecter du JavaScript pour ajouter la classe 'selected' au bouton actif
-        # Cible le bouton par son data-testid pour plus de robustesse
-        if is_selected:
-            st.markdown(f"""
-                <script>
-                    const button = document.querySelector('button[data-testid="stButton-period_{label}"]');
-                    if (button) {{
-                        button.classList.add('selected');
-                    }}
-                </script>
-            """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True) # Ferme le conteneur HTML
+    # Appel du composant personnalisé
+    # Il renverra la période sélectionnée lorsque l'utilisateur cliquera sur un élément
+    new_selected_period = period_selector(
+        period_options=period_options,
+        selected_period=st.session_state.selected_ticker_table_period,
+        key="period_selector_custom_component" # Clé unique pour ce composant
+    )
+
+    # Si une nouvelle période a été sélectionnée par le composant, mettre à jour l'état de session et relancer
+    if new_selected_period != st.session_state.selected_ticker_table_period:
+        st.session_state.selected_ticker_table_period = new_selected_period
+        st.rerun() 
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
