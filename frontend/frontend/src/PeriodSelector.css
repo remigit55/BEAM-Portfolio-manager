@@ -1,0 +1,39 @@
+/* Conteneur principal des éléments de période */
+.period-selector-container {
+  display: flex; /* Utilise Flexbox pour l'alignement horizontal */
+  flex-wrap: wrap; /* Permet aux éléments de passer à la ligne si l'espace est insuffisant */
+  justify-content: flex-start; /* Aligne les éléments au début (à gauche) */
+  gap: 5px; /* Espacement de 5px entre les éléments */
+  margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
+}
+
+/* Style de chaque élément de période (le texte cliquable) */
+.period-item {
+  /* Réinitialise les styles par défaut qui pourraient être hérités */
+  background: none;
+  border: none;
+  padding: 0; /* Pas de padding pour coller au texte */
+  font-size: 1rem; /* Taille de police par défaut */
+  color: inherit; /* Hérite la couleur du texte parent (thème Streamlit) */
+  cursor: pointer; /* Indique que l'élément est cliquable */
+  text-decoration: none; /* Supprime le soulignement par défaut */
+  box-shadow: none; /* Supprime l'ombre par défaut */
+
+  /* Assure une apparence de texte simple */
+  display: inline-block; /* Permet d'appliquer padding/margin si nécessaire */
+  line-height: 1; /* Ajuste la hauteur de ligne si besoin */
+  white-space: nowrap; /* Empêche le texte de s'enrouler */
+}
+
+/* Style au survol (hover) */
+.period-item:hover {
+  text-decoration: none; /* Pas de soulignement au survol */
+  color: var(--primary-color, #000000); /* Utilise la couleur primaire de Streamlit ou noir */
+}
+
+/* Style de l'élément sélectionné */
+.period-item.selected {
+  font-weight: bold; /* Texte en gras */
+  color: var(--secondary-color, #A49B6D); /* Utilise la couleur secondaire de Streamlit ou votre couleur d'accent */
+  text-decoration: none; /* Pas de soulignement pour l'élément sélectionné */
+}
