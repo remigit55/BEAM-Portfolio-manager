@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS ET ISOLÉS ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -49,23 +49,23 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        /* Conteneur flex pour aligner les boutons */
-        .period-buttons-container {
+        /* Conteneur spécifique pour les boutons de période */
+        .period-buttons-wrapper {
             display: flex;
-            flex-wrap: wrap; /* Permet aux boutons de passer à la ligne si l'espace est insuffisant */
-            justify-content: flex-start; /* Aligne les boutons à gauche */
-            gap: 5px; /* Espacement de 5px entre les éléments */
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 5px; /* Espacement de 5px entre les boutons */
             margin-bottom: 1rem;
         }
 
-        /* Cible les conteneurs div générés par Streamlit pour chaque bouton */
-        .period-buttons-container div.stButton {
-            margin: 0 !important; /* Supprime toutes les marges externes par défaut de Streamlit */
+        /* Cible les conteneurs div de Streamlit des boutons *uniquement à l'intérieur* de .period-buttons-wrapper */
+        .period-buttons-wrapper div.stButton {
+            margin: 0 !important; /* Supprime les marges par défaut de Streamlit */
             height: auto; /* Ajuste la hauteur à son contenu */
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
-        .period-buttons-container button {
+        .period-buttons-wrapper button {
             background: none !important; /* Pas de fond */
             border: none !important; /* Pas de bordure */
             padding: 0 !important; /* Pas de padding interne */
@@ -76,12 +76,12 @@ def display_performance_history():
             box-shadow: none !important; /* Pas d'ombre */
         }
         /* Style au survol */
-        .period-buttons-container button:hover {
+        .period-buttons-wrapper button:hover {
             text-decoration: none !important; /* Pas de soulignement au survol */
             color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
         }
         /* Style du bouton sélectionné */
-        .period-buttons-container button.selected {
+        .period-buttons-wrapper button.selected {
             font-weight: bold !important;
             color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
             text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
@@ -90,7 +90,9 @@ def display_performance_history():
     """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
-    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
+    
+    # Créer le conteneur HTML unique pour ces boutons
+    st.markdown('<div class="period-buttons-wrapper">', unsafe_allow_html=True)
     
     # Générer les boutons stylisés comme du texte
     for label in period_options:
