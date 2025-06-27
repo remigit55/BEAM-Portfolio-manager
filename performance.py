@@ -89,6 +89,7 @@ def display_performance_history():
             font-weight: bold !important;
             color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
             text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
+            background-color: red;
         }
         </style>
     """, unsafe_allow_html=True)
