@@ -74,6 +74,7 @@ def display_performance_history():
         div.stButton {
             margin: 0 !important; /* Supprime les marges par défaut de Streamlit autour du bouton */
             height: auto; /* Ajuste la hauteur à son contenu */
+            width: 100px;
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
