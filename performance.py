@@ -52,7 +52,7 @@ def display_performance_history():
         .period-buttons-container {
             /* display: flex;
             flex-wrap: wrap; */
-            gap: 1rem;
+            /* gap: 1rem; */
             margin-bottom: 1rem;
         }
         .period-button {
