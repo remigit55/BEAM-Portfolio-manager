@@ -50,8 +50,8 @@ def display_performance_history():
     st.markdown("""
         <style>
         .period-buttons-container {
-            display: flex;
-            flex-wrap: wrap;
+            /* display: flex;
+            flex-wrap: wrap; */
             gap: 1rem;
             margin-bottom: 1rem;
         }
@@ -67,7 +67,7 @@ def display_performance_history():
             color: var(--secondary-color);
             font-weight: bold;
         }
-        div.stButton > button {
+        /* div.stButton > button {
             all: unset;
             margin: 0 8px 0 0;
             padding: 2px 6px;
@@ -78,12 +78,12 @@ def display_performance_history():
         }
         .period-buttons-container button:hover {
             text-decoration: none !important;
-        }
+        } */
         </style>
     """, unsafe_allow_html=True)
 
     st.markdown("##### Cours de Clôture des Derniers Jours")
-    st.markdown('<div class="period-buttons-container" style="width: 400px;">', unsafe_allow_html=True)
+    st.markdown('<div class="period-buttons-container" style="width: 400px !important;">', unsafe_allow_html=True)
     cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
         if st.session_state.selected_ticker_table_period == label:
