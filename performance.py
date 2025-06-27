@@ -71,16 +71,15 @@ def display_performance_history():
         </style>
     """, unsafe_allow_html=True)
 
-st.markdown('<div class="period-span-container">', unsafe_allow_html=True)
-for label in period_options:
-    if label == st.session_state.selected_ticker_table_period:
-        st.markdown(f"<span class='period-span selected'>{label}</span>", unsafe_allow_html=True)
-    else:
-        if st.button(label, key=f"period_{label}"):
-            st.session_state.selected_ticker_table_period = label
-            st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="period-span-container">', unsafe_allow_html=True)
+    for label in period_options:
+        if label == st.session_state.selected_ticker_table_period:
+            st.markdown(f"<span class='period-span selected'>{label}</span>", unsafe_allow_html=True)
+        else:
+            if st.button(label, key=f"period_{label}"):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
