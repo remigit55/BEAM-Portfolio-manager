@@ -63,6 +63,10 @@ def display_performance_history():
             color: inherit;
             cursor: pointer;
         }
+        .period-buttons-container div.stButton {
+            margin: 0 !important; /* Supprime les marges par défaut de Streamlit autour du bouton */
+            height: auto; /* Ajuste la hauteur à son contenu */
+        }
         .period-button.selected {
             color: var(--secondary-color);
             font-weight: bold;
