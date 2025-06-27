@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
+import os # Ajouté pour le débogage
 
 # Importe le nouveau composant personnalisé
 from period_selector_component import period_selector
@@ -48,26 +49,131 @@ def display_performance_history():
     }
 
     if "selected_ticker_table_period" not in st.session_state:
-        st.session_state.selected_ticker_table_period = "1M"
+        st.session_state.selected_ticker_table_period = "1W"
+
+    st.markdown("""
+        <style>
+        /* Conteneur spécifique pour les boutons de période */
+        .period-buttons-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 5px; /* Espacement de 5px entre les boutons */
+            margin-bottom: 1rem;
+            width: 100%; /* Assure que le conteneur prend toute la largeur disponible */
+        }
+
+        /* Cible les conteneurs div de Streamlit des boutons *uniquement à l'intérieur* de .period-buttons-wrapper */
+        .period-buttons-wrapper div[data-testid^="stButton"] { /* Ciblage plus spécifique */
+            margin: 0 !important; /* Supprime les marges par défaut de Streamlit */
+            height: auto; /* Ajuste la hauteur à son contenu */
+            flex-shrink: 0; /* Empêche les éléments de rétrécir */
+            flex-grow: 0; /* Empêche les éléments de s'étirer */
+        }
+        
+        /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
+        .period-buttons-wrapper button {
+            background: none !important; /* Pas de fond */
+            border: none !important; /* Pas de bordure */
+            padding: 0 !important; /* Pas de padding interne */
+            font-size: 1rem; /* Taille de police par défaut */
+            color: inherit !important; /* Utilise la couleur du texte parent */
+            cursor: pointer;
+            text-decoration: none !important; /* Pas de soulignement */
+            box-shadow: none !important; /* Pas d'ombre */
+        }
+        /* Style au survol */
+        .period-buttons-wrapper button:hover {
+            text-decoration: none !important; /* Pas de soulignement au survol */
+            color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
+        }
+        /* Style du bouton sélectionné */
+        .period-buttons-wrapper button.selected {
+            font-weight: bold !important;
+            color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
+            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
     
-    # Appel du composant personnalisé
-    # Il renverra la période sélectionnée lorsque l'utilisateur cliquera sur un élément
-    new_selected_period = period_selector(
-        period_options=period_options,
-        selected_period=st.session_state.selected_ticker_table_period,
-        key="period_selector_custom_component" # Clé unique pour ce composant
-    )
+    # Créer le conteneur HTML unique pour ces boutons
+    st.markdown('<div class="period-buttons-wrapper">', unsafe_allow_html=True)
+    
+    # Générer les boutons stylisés comme du texte
+    for label in period_options:
+        is_selected = (st.session_state.selected_ticker_table_period == label)
+        
+        # Créer le bouton Streamlit
+        if st.button(label, key=f"period_{label}"):
+            st.session_state.selected_ticker_table_period = label
+            st.rerun()
+        
+        # Injecter du JavaScript pour ajouter la classe 'selected' au bouton actif
+        # Cible le bouton par son data-testid pour plus de robustesse
+        if is_selected:
+            st.markdown(f"""
+                <script>
+                    const button = document.querySelector('button[data-testid="stButton-period_{label}"]');
+                    if (button) {{
+                        button.classList.add('selected');
+                    }}
+                </script>
+            """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True) # Ferme le conteneur HTML
 
-    # Si une nouvelle période a été sélectionnée par le composant, mettre à jour l'état de session et relancer
-    if new_selected_period != st.session_state.selected_ticker_table_period:
-        st.session_state.selected_ticker_table_period = new_selected_period
-        st.rerun() 
+    # --- BLOC DE DÉBOGAGE POUR LE COMPOSANT PERSONNALISÉ ---
+    st.subheader("Informations de débogage du composant (à retirer plus tard)")
+    try:
+        # Vérifier si le dossier build existe et son contenu
+        component_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "build")
+        st.write(f"Chemin du composant : `{component_path}`")
+        if os.path.exists(component_path):
+            st.success(f"Le dossier 'build' existe à : `{component_path}`")
+            # Lister quelques fichiers clés pour vérifier le contenu
+            build_files = os.listdir(component_path)
+            st.write(f"Fichiers dans 'build/' : {build_files}")
+            if "index.html" in build_files:
+                st.success("`index.html` trouvé dans 'build/'.")
+            else:
+                st.error("`index.html` NON trouvé dans 'build/'.")
+            
+            static_path = os.path.join(component_path, "static")
+            if os.path.exists(static_path):
+                st.success("Le dossier 'static/' existe dans 'build/'.")
+                js_path = os.path.join(static_path, "js")
+                css_path = os.path.join(static_path, "css")
+                if os.path.exists(js_path) and os.listdir(js_path):
+                    st.success(f"Fichiers JS trouvés dans 'static/js/' : {os.listdir(js_path)[:2]}...")
+                else:
+                    st.error("Aucun fichier JS trouvé ou dossier 'static/js/' manquant.")
+                if os.path.exists(css_path) and os.listdir(css_path):
+                    st.success(f"Fichiers CSS trouvés dans 'static/css/' : {os.listdir(css_path)[:2]}...")
+                else:
+                    st.error("Aucun fichier CSS trouvé ou dossier 'static/css/' manquant.")
+            else:
+                st.error("Le dossier 'static/' n'existe PAS dans 'build/'.")
+
+        else:
+            st.error(f"Le dossier 'build' n'existe PAS à : `{component_path}`. Cela signifie qu'il n'a pas été généré ou n'a pas été poussé vers Git.")
+        
+        # Tenter d'afficher le composant avec un message d'erreur explicite
+        # (Cette partie ne produira pas l'erreur "No such component directory" directement ici,
+        # car cette erreur est levée par Streamlit au moment de la déclaration du composant.)
+        # Mais les vérifications de fichiers ci-dessus sont très révélatrices.
+
+    except Exception as e:
+        st.exception(f"Erreur lors de la vérification du composant : {e}")
+    # --- FIN DU BLOC DE DÉBOGAGE ---
+
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
+
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
