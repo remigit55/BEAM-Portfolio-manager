@@ -90,7 +90,7 @@ def display_performance_history():
         }
         /* Style au survol */
         div.stButton > button:hover {
-            background-color: var(--secondary-color) !important;
+            background-color: var(--primary-color) !important;
             text-decoration: none !important; /* Pas de soulignement au survol */
             color: var(--secondary-color) !important; /* Couleur au survol (peut être ajustée) */
         }
@@ -98,7 +98,7 @@ def display_performance_history():
         div.stButton > button.selected {
             font-weight: bold !important;
             color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
-            background-color: var(--secondary-color) !important;
+            background-color: var(--primary-color) !important;
             text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
         }
         </style>
