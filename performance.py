@@ -32,7 +32,7 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS DANS ST.COLUMNS ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS INLINE ---
 
     period_options = {
         "1W": timedelta(weeks=1),
@@ -49,92 +49,60 @@ def display_performance_history():
 
     st.markdown("""
         <style>
-        /* Cible le conteneur principal de toutes les colonnes généré par st.columns */
-        div[data-testid="stColumns"] {
-            gap: 5px; /* Espacement de 5px entre chaque colonne */
-            /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
-            /* width: 100%; */ /* La largeur s'adapte au contenu des colonnes */
-            /* ou une largeur fixe: */
-            /* width: 100px; */
-            /* ou une largeur maximale: */
-            /* max-width: 600px; */
-            margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
+        .period-buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
-
-        /* Cible chaque colonne individuelle générée par st.columns */
-        div[data-testid^="stColumn"] {
-            padding: 0 !important; /* Supprime le padding interne par défaut de chaque colonne */
-            margin: 0 !important; /* Supprime la marge externe par défaut de chaque colonne */
-            flex-grow: 0 !important; /* Empêche les colonnes de prendre plus d'espace qu'elles n'en ont besoin */
-            width: fit-content; /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */ 
-            width: 100%;  /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */
-        }
-
-        /* Cible le conteneur Streamlit de chaque bouton (le div autour du <button>) */
-        div.stButton {
-            /* margin: 0 !important; */ /* Supprime les marges par défaut de Streamlit autour du bouton */
-            height: auto; /* Ajuste la hauteur à son contenu */
-            /* width: 100px; */
-        }
-        
-        /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
-        div.stButton > button {
-            /* background: none !important; */ /* Pas de fond */
-            /* border: none !important; */ /* Pas de bordure */
-            /* padding: 0 !important; */ /* Pas de padding interne */
-            font-size: 1rem; /* Taille de police par défaut */
-            color: inherit !important; /* Utilise la couleur du texte parent */
+        .period-button {
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 1rem;
+            color: inherit;
             cursor: pointer;
-            text-decoration: none !important; /* Pas de soulignement */
-            box-shadow: none !important; /* Pas d'ombre */
         }
-        /* Style au survol */
+        .period-button.selected {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+        div.stButton > button {
+            all: unset;
+            margin: 0 8px 0 0;
+            padding: 2px 6px;
+            cursor: pointer;
+        }
         div.stButton > button:hover {
-            background-color: var(--primary-color) !important;
-            text-decoration: none !important; /* Pas de soulignement au survol */
-            color: var(--secondary-color) !important; /* Couleur au survol (peut être ajustée) */
+            text-decoration: underline;
         }
-        /* Style du bouton sélectionné */
-        div.stButton > button.selected {
-            font-weight: bold !important;
-            color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
-            background-color: var(--primary-color) !important;
-            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
+        .period-buttons-container button:hover {
+            text-decoration: none !important;
         }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
-    
-    # Utilisation de st.columns pour créer les colonnes pour chaque bouton
-    # Il n'est pas nécessaire de passer des ratios si vous voulez qu'elles s'adaptent au contenu.
-    cols = st.columns(len(period_options)) 
-    
+    st.markdown("##### Cours de Clôture des Derniers Jours")
+    st.markdown('<div class="period-buttons-container">', unsafe_allow_html=True)
+    cols = st.columns(len(period_options))
     for i, label in enumerate(period_options):
-        with cols[i]: # Place chaque bouton dans sa propre colonne
-            # Toujours créer un bouton et ajouter la classe 'selected' via JavaScript
-            if st.button(label, key=f"period_{label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun()
-            
-            # Injecter du JavaScript pour ajouter la classe 'selected' au bouton actif
-            if st.session_state.selected_ticker_table_period == label:
-                st.markdown(f"""
-                    <script>
-                        const button = document.querySelector('button[data-testid="stButton-period_{label}"]');
-                        if (button) {{
-                            button.classList.add('selected');
-                        }}
-                    </script>
-                """, unsafe_allow_html=True)
+        if st.session_state.selected_ticker_table_period == label:
+            with cols[i]:
+                st.markdown(f"<span style='color: var(--secondary-color); font-weight: bold;'>{label}</span>", unsafe_allow_html=True)
+        else:
+            with cols[i]:
+                if st.button(label, key=f"period_{label}"):
+                    st.session_state.selected_ticker_table_period = label
+                    st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
-    
+
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
-        fetch_start_date = start_date_table - timedelta(days=10) 
+        fetch_start_date = start_date_table - timedelta(days=10)
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
@@ -143,7 +111,7 @@ def display_performance_history():
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 last_days_data[ticker] = filtered_data
             else:
-                last_days_data[ticker] = pd.Series(dtype='float64') 
+                last_days_data[ticker] = pd.Series(dtype='float64')
 
         df_display_prices = pd.DataFrame()
         for ticker, series in last_days_data.items():
@@ -156,12 +124,9 @@ def display_performance_history():
         if not df_display_prices.empty:
             df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours")
             df_pivot = df_pivot.sort_index(axis=1)
-            
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
-
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
-            
-            st.markdown("##### Cours de Clôture des Derniers Jours")
+
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
