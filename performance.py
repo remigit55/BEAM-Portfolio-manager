@@ -53,7 +53,7 @@ def display_performance_history():
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
-            width: 20px;
+            width: 20px !important;
             margin-bottom: 1rem;
         }
         .period-button {
