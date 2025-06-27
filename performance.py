@@ -101,11 +101,13 @@ def display_performance_history():
                     st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+    </div>
+    
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    </div>
+    
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
