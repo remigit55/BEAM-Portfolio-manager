@@ -53,7 +53,7 @@ def display_performance_history():
         div[data-testid="stColumns"] {
             gap: 5px; /* Espacement de 5px entre chaque colonne */
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
-            /* width: fit-content; */ /* La largeur s'adapte au contenu des colonnes */
+            width: 100px; /* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
             /* width: 400px; */
             /* ou une largeur maximale: */
@@ -127,9 +127,7 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
-
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
-
+    
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=10) 
