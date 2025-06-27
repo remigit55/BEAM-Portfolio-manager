@@ -53,7 +53,7 @@ def display_performance_history():
         div[data-testid="stColumns"] {
             gap: 5px; /* Espacement de 5px entre chaque colonne */
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
-            width: 100px; /* La largeur s'adapte au contenu des colonnes */
+            /* width: 100px; *//* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
             /* width: 400px; */
             /* ou une largeur maximale: */
@@ -67,12 +67,12 @@ def display_performance_history():
             margin: 0 !important; /* Supprime la marge externe par défaut de chaque colonne */
             flex-grow: 0 !important; /* Empêche les colonnes de prendre plus d'espace qu'elles n'en ont besoin */
             width: fit-content; /* Chaque colonne s'adapte à la largeur de son contenu (le bouton) */ 
-            /*width: 100px;  Chaque colonne s'adapte à la largeur de son contenu (le bouton) */
+            /* width: 100px;  Chaque colonne s'adapte à la largeur de son contenu (le bouton) */
         }
 
         /* Cible le conteneur Streamlit de chaque bouton (le div autour du <button>) */
         div.stButton {
-            /*margin: 0 !important;*/ /* Supprime les marges par défaut de Streamlit autour du bouton */
+            /* margin: 0 !important; */ /* Supprime les marges par défaut de Streamlit autour du bouton */
             height: auto; /* Ajuste la hauteur à son contenu */
             width: 100%;
         }
