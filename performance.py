@@ -71,6 +71,8 @@ def display_performance_history():
             color: var(--text-color, #000000);
             text-align: center;
             transition: color 0.2s;
+            background: none;
+            border: none;
         }
         div.stButton > button:hover {
             text-decoration: underline;
