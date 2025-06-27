@@ -53,6 +53,8 @@ def display_performance_history():
             flex-direction: row;
             gap: 10px; /* Espacement entre les boutons (ajustez selon besoin, ex. 15px) */
             margin-bottom: 1rem;
+            background: none;
+            border: none;
             align-items: center;
         }
         div.stButton {
@@ -60,6 +62,8 @@ def display_performance_history():
             width: 60px; /* Largeur fixe des conteneurs de boutons */
             display: flex;
             justify-content: center;
+            background: none;
+            border: none;
         }
         div.stButton > button {
             width: 60px; /* Largeur fixe des boutons */
@@ -71,8 +75,6 @@ def display_performance_history():
             color: var(--text-color, #000000);
             text-align: center;
             transition: color 0.2s;
-            background: none;
-            border: none;
         }
         div.stButton > button:hover {
             text-decoration: underline;
