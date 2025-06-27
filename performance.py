@@ -59,9 +59,6 @@ def display_performance_history():
         .stButton > button {
             cursor: pointer;
         }
-        .stButton > button:hover {
-            background-color: #f0f0f0;
-        }
         .stButton > button.selected {
             font-weight: bold;
             color: var(--secondary-color);
