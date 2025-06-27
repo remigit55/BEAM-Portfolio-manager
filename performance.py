@@ -56,13 +56,16 @@ def display_performance_history():
             justify-content: flex-start;
             gap: 5px; /* Espacement de 5px entre les boutons */
             margin-bottom: 1rem;
+            width: 100%; /* Assure que le conteneur prend toute la largeur disponible */
         }
 
         /* Cible les conteneurs div de Streamlit des boutons *uniquement à l'intérieur* de .period-buttons-wrapper */
-        .period-buttons-wrapper div.stButton {
+        .period-buttons-wrapper div[data-testid^="stButton"] { /* Ciblage plus spécifique */
             margin: 0 !important; /* Supprime les marges par défaut de Streamlit */
             height: auto; /* Ajuste la hauteur à son contenu */
-            width: 400px;
+            flex-shrink: 0; /* Empêche les éléments de rétrécir */
+            flex-grow: 0; /* Empêche les éléments de s'étirer */
+            /* width: auto; */ /* Laisse la largeur s'adapter au contenu du bouton */
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
@@ -105,6 +108,7 @@ def display_performance_history():
             st.rerun()
         
         # Injecter du JavaScript pour ajouter la classe 'selected' au bouton actif
+        # Cible le bouton par son data-testid pour plus de robustesse
         if is_selected:
             st.markdown(f"""
                 <script>
