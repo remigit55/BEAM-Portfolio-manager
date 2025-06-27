@@ -90,7 +90,7 @@ def display_performance_history():
         }
         /* Style au survol */
         div.stButton > button:hover {
-            background: var(--secondary-color) !important;
+            background-color: var(--secondary-color) !important;
             text-decoration: none !important; /* Pas de soulignement au survol */
             color: var(--secondary-color) !important; /* Couleur au survol (peut être ajustée) */
         }
