@@ -50,8 +50,8 @@ def display_performance_history():
     st.markdown("""
         <style>
         .period-buttons-container {
-            display: flex;
-            flex-wrap: wrap;
+            /* display: flex; */
+            /* flex-wrap: wrap; */
             gap: 1rem;
             margin-bottom: 1rem;
         }
