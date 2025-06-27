@@ -54,7 +54,6 @@ def display_performance_history():
             flex-direction: row;
             gap: 6px;
             padding: 0.5rem;
-            background-color: red;
             width: fit-content;
         }
         .period-span {
