@@ -56,8 +56,8 @@ def display_performance_history():
             margin-bottom: 1rem;
         }
         .period-button {
-            background: none;
-            border: none;
+            /* background: none; */
+            /* border: none; */
             padding: 0;
             font-size: 1rem;
             color: inherit;
