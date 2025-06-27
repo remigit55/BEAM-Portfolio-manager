@@ -48,7 +48,7 @@ def display_performance_history():
     }
 
     if "selected_ticker_table_period" not in st.session_state:
-        st.session_state.selected_ticker_table_period = "1W"
+        st.session_state.selected_ticker_table_period = "1M"
 
     st.markdown("#### Sélection de la période d'affichage des cours")
     
