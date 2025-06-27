@@ -55,7 +55,7 @@ def display_performance_history():
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
             width: 100px; /* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
-            /* width: 400px; */
+            width: 400px;
             /* ou une largeur maximale: */
             /* max-width: 600px; */
             margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
