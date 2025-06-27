@@ -47,38 +47,53 @@ def display_performance_history():
     if "selected_ticker_table_period" not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W"
 
+    # CSS pour alignement horizontal et mise en forme
     st.markdown("""
         <style>
-        .period-span-container {
+        .period-buttons-wrapper {
             display: flex;
-            flex-direction: row;
-            gap: 6px;
-            padding: 0.5rem;
-            width: fit-content;
+            gap: 8px;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+            align-items: center;
         }
-        .period-span {
-            padding: 3px 8px;
-            cursor: pointer;
+        .period-btn {
+            padding: 4px 10px;
             border-radius: 4px;
             font-size: 1rem;
             color: inherit;
+            background-color: transparent;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
         }
-        .period-span.selected {
-            color: var(--secondary-color);
+        .period-btn:hover {
+            background-color: #eee;
+        }
+        .period-btn.selected {
             font-weight: bold;
+            color: var(--secondary-color);
+            border-color: var(--secondary-color);
         }
         </style>
     """, unsafe_allow_html=True)
-
-    st.markdown('<div class="period-span-container">', unsafe_allow_html=True)
+    
+    # Container global
+    st.markdown("#### Sélection de la période d'affichage des cours")
+    st.markdown('<div class="period-buttons-wrapper">', unsafe_allow_html=True)
+    
+    # Boutons : chaque span est un bouton visuellement, déclenché par un st.button caché
     for label in period_options:
         if label == st.session_state.selected_ticker_table_period:
-            st.markdown(f"<span class='period-span selected'>{label}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span class='period-btn selected'>{label}</span>", unsafe_allow_html=True)
         else:
-            if st.button(label, key=f"period_{label}"):
+            clicked = st.button(label, key=f"period_{label}")
+            if clicked:
                 st.session_state.selected_ticker_table_period = label
                 st.rerun()
+    
     st.markdown('</div>', unsafe_allow_html=True)
+
     
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
