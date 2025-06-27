@@ -3,8 +3,8 @@
 import streamlit.components.v1 as components
 import os
 
-# Définir si nous sommes en mode développement (pour React dev server) ou en production (pour le build)
-_RELEASE = True # Mettez à False si vous développez le composant React localement
+# DOIT ÊTRE TRUE POUR LE DÉPLOIEMENT SUR STREAMLIT CLOUD
+_RELEASE = True 
 
 if _RELEASE:
     # En production, le composant est chargé depuis le dossier 'build'
@@ -13,7 +13,7 @@ if _RELEASE:
         path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "build")
     )
 else:
-    # En développement, le composant est chargé depuis le serveur de développement React
+    # En développement local, le composant est chargé depuis le serveur de développement React
     _component_func = components.declare_component(
         "period_selector",
         url="http://localhost:3001", # Port par défaut du serveur de développement React
