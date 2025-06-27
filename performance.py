@@ -55,7 +55,7 @@ def display_performance_history():
             /* Si vous voulez contrôler la largeur totale de cette rangée de colonnes: */
             /* width: 100%; */ /* La largeur s'adapte au contenu des colonnes */
             /* ou une largeur fixe: */
-            width: 400px;
+            width: 100px;
             /* ou une largeur maximale: */
             /* max-width: 600px; */
             margin-bottom: 1rem; /* Marge en bas pour séparer du contenu suivant */
@@ -74,7 +74,7 @@ def display_performance_history():
         div.stButton {
             /* margin: 0 !important; */ /* Supprime les marges par défaut de Streamlit autour du bouton */
             height: auto; /* Ajuste la hauteur à son contenu */
-            /* width: 100%; */
+            width: 100%;
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
