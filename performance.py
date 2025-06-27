@@ -57,11 +57,6 @@ def display_performance_history():
             margin-bottom: 1rem;
         }
         .stButton > button {
-            background: white;
-            border: 1px solid #CCC;
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-size: 0.9rem;
             cursor: pointer;
         }
         .stButton > button:hover {
