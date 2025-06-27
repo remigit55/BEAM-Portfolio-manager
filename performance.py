@@ -59,11 +59,11 @@ def display_performance_history():
         }
         .period-btn {
             padding: 4px 10px;
-            border-radius: 4px;
+            /* border-radius: 4px; */
             font-size: 1rem;
             color: inherit;
-            background-color: transparent;
-            border: 1px solid transparent;
+            background: none;
+            border: none;
             cursor: pointer;
             transition: all 0.2s ease-in-out;
         }
