@@ -62,6 +62,7 @@ def display_performance_history():
         .period-buttons-wrapper div.stButton {
             margin: 0 !important; /* Supprime les marges par défaut de Streamlit */
             height: auto; /* Ajuste la hauteur à son contenu */
+            width: 400px;
         }
         
         /* Style du bouton lui-même pour qu'il ressemble à du texte cliquable */
