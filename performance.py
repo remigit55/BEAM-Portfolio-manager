@@ -72,7 +72,7 @@ def display_performance_history():
 
         /* Cible le conteneur Streamlit de chaque bouton (le div autour du <button>) */
         div.stButton {
-            margin: 0 !important; /* Supprime les marges par défaut de Streamlit autour du bouton */
+            /*margin: 0 !important;*/ /* Supprime les marges par défaut de Streamlit autour du bouton */
             height: auto; /* Ajuste la hauteur à son contenu */
             width: 100%;
         }
