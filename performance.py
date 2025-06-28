@@ -36,13 +36,13 @@ def display_performance_history():
     # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO (COMPOSANT NATIF STREAMLIT) ---
 
     period_options = {
-        "1W": timedelta(weeks=1),
-        "1M": timedelta(days=30),
-        "3M": timedelta(days=90),
-        "6M": timedelta(days=180),
-        "1Y": timedelta(days=365),
-        "5Y": timedelta(days=365 * 5),
-        "10Y": timedelta(days=365 * 10),
+        "1 Semaine": timedelta(weeks=1),
+        "1 Mois": timedelta(days=30),
+        "3 Mois": timedelta(days=90),
+        "6 Mois": timedelta(days=180),
+        "1 An": timedelta(days=365),
+        "5 Ans": timedelta(days=365 * 5),
+        "10 Ans": timedelta(days=365 * 10),
     }
     
     # Options pour le sélecteur, avec la période par défaut
@@ -50,8 +50,8 @@ def display_performance_history():
     default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1 Semaine"))
 
 
+    st.markdown("#### Sélection de la période d'affichage des cours")
     selected_label = st.radio(
-        "",
         period_labels,
         index=default_period_index,
         key="selected_ticker_table_period_radio",
@@ -102,5 +102,4 @@ def display_performance_history():
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
-
 
