@@ -18,7 +18,12 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
+    if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
+        st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
+        return
 
+    df_current_portfolio = st.session_state.df.copy()
+    target_currency = st.session_state.get("devise_cible", "EUR")
 
     tickers_in_portfolio = []
     if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
@@ -28,38 +33,139 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS POUR LE TABLEAU DES COURS ---
+    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS EN HTML/CSS/JS INLINE ---
+
     period_options = {
         "1W": timedelta(weeks=1),
-        "1M": timedelta(days=30),  # Environ 1 mois
-        "3M": timedelta(days=90),  # Environ 3 mois
-        "6M": timedelta(days=180), # Environ 6 mois
+        "1M": timedelta(days=30),
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180),
         "1Y": timedelta(days=365),
         "5Y": timedelta(days=365 * 5),
         "10Y": timedelta(days=365 * 10),
     }
 
-    if 'selected_ticker_table_period' not in st.session_state:
-        st.session_state.selected_ticker_table_period = "1W" # Période par défaut
+    if "selected_ticker_table_period" not in st.session_state:
+        st.session_state.selected_ticker_table_period = "1W"
+
+    # CSS pour styliser les "boutons-texte" et leur conteneur
+    st.markdown("""
+        <style>
+        /* Conteneur spécifique pour les éléments de période */
+        .period-buttons-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 5px; /* Espacement de 5px entre les éléments */
+            margin-bottom: 1rem;
+        }
+
+        /* Style de chaque élément de période (le texte cliquable) */
+        .period-item {
+            /* Réinitialise les styles par défaut qui pourraient être hérités */
+            background: none;
+            border: none;
+            padding: 0; /* Pas de padding pour coller au texte */
+            font-size: 1rem; /* Taille de police par défaut */
+            color: inherit; /* Hérite la couleur du texte parent (thème Streamlit) */
+            cursor: pointer; /* Indique que l'élément est cliquable */
+            text-decoration: none; /* Supprime le soulignement par défaut */
+            box-shadow: none; /* Supprime l'ombre par défaut */
+            display: inline-block; /* Permet d'appliquer padding/margin si nécessaire */
+            line-height: 1; /* Ajuste la hauteur de ligne si besoin */
+            white-space: nowrap; /* Empêche le texte de s'enrouler */
+            -webkit-tap-highlight-color: transparent; /* Supprime l'effet de surbrillance au toucher sur mobile */
+        }
+
+        /* Style au survol (hover) */
+        .period-item:hover {
+            text-decoration: none !important; /* Pas de soulignement au survol */
+            color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
+        }
+
+        /* Style de l'élément sélectionné */
+        .period-item.selected {
+            font-weight: bold !important; /* Texte en gras */
+            color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
+            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
+        }
+
+        /* Cache les boutons Streamlit natifs qui déclenchent l'action */
+        .hidden-st-button {
+            display: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("#### Sélection de la période d'affichage des cours")
     
-    # Utilisation de st.columns pour placer les boutons côte à côte
-    cols_period_buttons = st.columns(len(period_options))
-    for i, (label, period_td) in enumerate(period_options.items()):
-        with cols_period_buttons[i]:
-            if st.button(label, key=f"period_btn_{label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun() 
+    # Génération du HTML pour les éléments de période et des boutons Streamlit cachés
+    period_items_html = '<div class="period-buttons-wrapper">'
+    for label in period_options:
+        is_selected = (st.session_state.selected_ticker_table_period == label)
+        
+        # Chaque élément span aura un ID unique pour que le JS puisse le cibler
+        # et un onclick qui va "cliquer" sur un bouton Streamlit caché.
+        period_items_html += f"""
+        <span id="period_item_{label}" class="period-item {'selected' if is_selected else ''}">
+            {label}
+        </span>
+        """
+    period_items_html += '</div>'
+    
+    st.markdown(period_items_html, unsafe_allow_html=True)
+
+    # Créer les boutons Streamlit cachés qui seront cliqués par le JavaScript
+    # Ces boutons mettront à jour la session_state et déclencheront un rerun.
+    for label in period_options:
+        # Utilisez une clé unique pour chaque bouton
+        if st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}"):
+            st.session_state.selected_ticker_table_period = label
+            st.rerun()
+        # Injecter du CSS pour cacher spécifiquement ce bouton
+        st.markdown(f"""
+            <style>
+            div[data-testid="stButton-hidden_period_btn_{label}"] {{
+                display: none;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+
+
+    # JavaScript pour attacher les écouteurs d'événements aux spans
+    # et simuler un clic sur le bouton Streamlit caché correspondant.
+    js_code = """
+    <script>
+        const periodLabels = %s; // Pass period labels from Python
+        periodLabels.forEach(label => {
+            const span = document.getElementById(`period_item_${label}`);
+            if (span) {
+                span.onclick = function() {
+                    // Trouver le bouton Streamlit caché par son data-testid
+                    // Le data-testid est généré par Streamlit sous la forme "stButton-<key>"
+                    const hiddenButton = document.querySelector(`button[data-testid="stButton-hidden_period_btn_${label}"]`);
+                    if (hiddenButton) {
+                        hiddenButton.click(); // Simule un clic sur le bouton caché
+                    }
+                };
+            }
+        });
+    </script>
+    """ % (list(period_options.keys())) # Passer la liste des clés Python au JavaScript
+
+    st.markdown(js_code, unsafe_allow_html=True)
+
+    # --- FIN SÉLECTION DE PÉRIODE ---
 
     end_date_table = datetime.now().date()
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    # st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=10) 
-
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
