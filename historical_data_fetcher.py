@@ -54,12 +54,14 @@ def fetch_stock_history(Ticker, start_date, end_date):
 def fetch_historical_fx_rates(target_currency, start_date, end_date):
     """Récupère les taux de change historiques via yfinance."""
     base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] # Added EUR to base currencies
-    all_dates = pd.date_range(start=start_date - timedelta(days=10), end=end_date)
+    
+    # Utiliser pd.bdate_range pour aligner les dates avec les jours ouvrables
+    all_business_days = pd.bdate_range(start=start_date - timedelta(days=10), end=end_date)
     
     # Initialize DataFrame with default rates (1.0) for all pairs
     # Columns will be named as "SOURCETARGET" (e.g., "USDEUR")
     columns_to_create = [f"{c}{target_currency}" for c in base_currencies if c != target_currency]
-    df_fx = pd.DataFrame(1.0, index=all_dates, columns=columns_to_create)
+    df_fx = pd.DataFrame(1.0, index=all_business_days, columns=columns_to_create) # Utilisation de all_business_days
     
     for base in base_currencies:
         if base == target_currency:
@@ -70,7 +72,8 @@ def fetch_historical_fx_rates(target_currency, start_date, end_date):
         try:
             fx_data_direct = yf.download(pair_direct_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
             if not fx_data_direct.empty and 'Close' in fx_data_direct.columns:
-                df_fx[f"{base}{target_currency}"] = fx_data_direct["Close"].reindex(all_dates, method="ffill").fillna(1.0)
+                # Reindex with business days to ensure alignment
+                df_fx[f"{base}{target_currency}"] = fx_data_direct["Close"].reindex(all_business_days, method="ffill").fillna(1.0)
                 continue 
         except Exception:
             pass 
@@ -80,7 +83,8 @@ def fetch_historical_fx_rates(target_currency, start_date, end_date):
         try:
             fx_data_inverse = yf.download(pair_inverse_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
             if not fx_data_inverse.empty and 'Close' in fx_data_inverse.columns:
-                df_fx[f"{base}{target_currency}"] = (1 / fx_data_inverse["Close"]).reindex(all_dates, method="ffill").fillna(1.0)
+                # Reindex with business days to ensure alignment
+                df_fx[f"{base}{target_currency}"] = (1 / fx_data_inverse["Close"]).reindex(all_business_days, method="ffill").fillna(1.0)
                 continue 
         except Exception:
             pass 
@@ -97,8 +101,8 @@ def fetch_historical_fx_rates(target_currency, start_date, end_date):
                 if not fx_data_base_usd.empty and 'Close' in fx_data_base_usd.columns and \
                    not fx_data_target_usd.empty and 'Close' in fx_data_target_usd.columns:
                     
-                    base_usd_rates = fx_data_base_usd["Close"].reindex(all_dates, method="ffill").fillna(1.0)
-                    target_usd_rates = fx_data_target_usd["Close"].reindex(all_dates, method="ffill").fillna(1.0)
+                    base_usd_rates = fx_data_base_usd["Close"].reindex(all_business_days, method="ffill").fillna(1.0)
+                    target_usd_rates = fx_data_target_usd["Close"].reindex(all_business_days, method="ffill").fillna(1.0)
                     
                     df_fx[f"{base}{target_currency}"] = base_usd_rates * (1 / target_usd_rates)
             except Exception:
