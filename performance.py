@@ -118,7 +118,6 @@ def display_performance_history():
         "3Y": timedelta(days=365 * 3),
         "5Y": timedelta(days=365 * 5),
         "10Y": timedelta(days=365 * 10),
-        "                                                                        ": timedelta(days=365 * 10),
     }
 
     if 'selected_ticker_table_period' not in st.session_state:
