@@ -126,16 +126,8 @@ def afficher_portefeuille():
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
-    # Identifier la colonne ticker pour les débogages
-    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
 
-    # DEBUG: Afficher la valeur brute de 'Acquisition' pour HOC.L avant tout traitement numérique
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_raw = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'Acquisition' (avant conversion numérique): {hoc_row_raw.get('Acquisition', 'N/A')} (Type: {type(hoc_row_raw.get('Acquisition', None))})")
-        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'currentPrice' (avant conversion numérique): {hoc_row_raw.get('currentPrice', 'N/A')} (Type: {type(hoc_row_raw.get('currentPrice', None))})")
-
-
+    
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df.columns:
@@ -143,16 +135,6 @@ def afficher_portefeuille():
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
             # Puis convertir en numérique
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    # DEBUG: Afficher les valeurs après pd.to_numeric mais avant conversion pence-vers-livre pour HOC.L
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_after_numeric = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L après pd.to_numeric (avant conversion pence):")
-        st.write(f"  Acquisition: {hoc_row_after_numeric.get('Acquisition', 'N/A')} (Type: {type(hoc_row_after_numeric.get('Acquisition', None))})")
-        st.write(f"  currentPrice: {hoc_row_after_numeric.get('currentPrice', 'N/A')} (Type: {type(hoc_row_after_numeric.get('currentPrice', None))})")
-        st.write(f"  Devise: {hoc_row_after_numeric.get('Devise', 'N/A')}")
-        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after_numeric.get('Facteur_Ajustement_FX', 'N/A')}")
-
 
 
     # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
