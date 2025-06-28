@@ -112,15 +112,18 @@ def display_performance_history():
                 converted_data = pd.Series(index=filtered_data.index, dtype=float)
                 
                 for date_idx, price in filtered_data.items():
-                    date_as_date = date_idx.date()
+                    # Correction ici : Utiliser date_idx (Timestamp) directement pour la recherche dans l'index
+                    # date_as_date = date_idx.date() # Cette ligne n'est plus nécessaire pour la recherche d'index
                     fx_key = f"{ticker_devise}{target_currency}"
                     
                     fx_rate_for_date = 1.0
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
-                        if date_as_date in st.session_state.historical_fx_rates_df.index:
-                            fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_as_date, fx_key]
+                        # Utiliser date_idx directement pour la recherche dans l'index
+                        if date_idx in st.session_state.historical_fx_rates_df.index: 
+                            fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_idx, fx_key]
                         else:
-                            st.warning(f"FX rate for {fx_key} on {date_as_date} not found in historical_fx_rates_df. Using 1.0.")
+                            # Le message d'avertissement utilise toujours date_as_date pour la lisibilité
+                            st.warning(f"FX rate for {fx_key} on {date_idx.date()} not found in historical_fx_rates_df. Using 1.0.")
                     else:
                         st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
                     
