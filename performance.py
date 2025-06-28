@@ -40,29 +40,16 @@ def display_performance_history():
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
                 st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
-                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx), # Utilisation de bdate_range ici aussi
+                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
                                                                         columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
-            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx), # Utilisation de bdate_range ici aussi
+            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
                                                                     columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
 
     if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
         st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
         return
-
-    # --- RETRAIT DE L'AFFICHAGE DES TAUX DE CHANGE POUR LE DÉBOGAGE ---
-    # st.markdown("#### Taux de Change Historiques Récupérés (pour débogage)")
-    # if st.session_state.historical_fx_rates_df is not None and not st.session_state.historical_fx_rates_df.empty:
-    #     st.dataframe(st.session_state.historical_fx_rates_df.head())
-    #     st.write(f"Dimensions du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.shape}")
-    #     st.write(f"Colonnes du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.columns.tolist()}")
-    #     st.write(f"Index du DataFrame des taux de change (début/fin) : {st.session_state.historical_fx_rates_df.index.min().strftime('%Y-%m-%d')} à {st.session_state.historical_fx_rates_df.index.max().strftime('%Y-%m-%d')}")
-    # else:
-    #     st.info("Aucun taux de change historique n'est disponible pour l'affichage.")
-    # st.markdown("---")
-    # --- FIN DE L'AFFICHAGE DE DÉBOGAGE ---
-
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
@@ -98,7 +85,7 @@ def display_performance_history():
     st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
-        last_days_data = {}
+        all_ticker_data = [] # Pour stocker toutes les données (Date, Ticker, Cours Original, Taux, Cours Converti)
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
@@ -112,7 +99,6 @@ def display_performance_history():
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
-                converted_data = pd.Series(index=filtered_data.index, dtype=float)
                 
                 for date_idx, price in filtered_data.items():
                     fx_key = f"{ticker_devise}{target_currency}"
@@ -121,37 +107,85 @@ def display_performance_history():
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
                         if date_idx in st.session_state.historical_fx_rates_df.index: 
                             fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_idx, fx_key]
-                        else:
-                            st.warning(f"FX rate for {fx_key} on {date_idx.date()} not found in historical_fx_rates_df. Using 1.0.")
-                    else:
-                        st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
+                        # else: # Retiré pour éviter les messages d'avertissement excessifs une fois que la source est fixée
+                        #     st.warning(f"FX rate for {fx_key} on {date_idx.date()} not found in historical_fx_rates_df. Using 1.0.")
+                    # else: # Retiré pour éviter les messages d'avertissement excessifs une fois que la source est fixée
+                    #     st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
                     
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate_for_date})
-                    converted_data[date_idx] = converted_price
-                last_days_data[ticker] = converted_data
-            else:
-                last_days_data[ticker] = pd.Series(dtype='float64')
+                    
+                    all_ticker_data.append({
+                        "Date": date_idx,
+                        "Ticker": ticker,
+                        "Cours (Source)": price,
+                        "Devise Source": ticker_devise,
+                        "Taux FX": fx_rate_for_date,
+                        f"Cours ({target_currency})": converted_price
+                    })
 
-        df_display_prices = pd.DataFrame()
-        for ticker, series in last_days_data.items():
-            if not series.empty:
-                temp_df = pd.DataFrame({"Date": series.index, "Cours": series.values})
-                temp_df["Ticker"] = ticker
-                df_display_prices = pd.concat([df_display_prices, temp_df], ignore_index=True)
+        df_display_prices = pd.DataFrame(all_ticker_data)
 
         if not df_display_prices.empty:
-            df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours", dropna=False)
-            df_pivot = df_pivot.sort_index(axis=1)
-            
-            df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
+            # Créer un DataFrame pivot pour l'affichage
+            # Nous allons pivoter sur les dates pour les cours, puis ajouter les autres colonnes séparément
+            df_pivot_cours_source = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours (Source)", dropna=False)
+            df_pivot_cours_source = df_pivot_cours_source.sort_index(axis=1)
 
-            df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
+            df_pivot_taux = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Taux FX", dropna=False)
+            df_pivot_taux = df_pivot_taux.sort_index(axis=1)
+
+            df_pivot_cours_target = df_display_prices.pivot_table(index="Ticker", columns="Date", values=f"Cours ({target_currency})", dropna=False)
+            df_pivot_cours_target = df_pivot_cours_target.sort_index(axis=1)
+
+            # S'assurer que toutes les dates sont dans la plage sélectionnée
+            df_pivot_cours_source = df_pivot_cours_source.loc[:, (df_pivot_cours_source.columns >= pd.Timestamp(start_date_table)) & (df_pivot_cours_source.columns <= pd.Timestamp(end_date_table))]
+            df_pivot_taux = df_pivot_taux.loc[:, (df_pivot_taux.columns >= pd.Timestamp(start_date_table)) & (df_pivot_taux.columns <= pd.Timestamp(end_date_table))]
+            df_pivot_cours_target = df_pivot_cours_target.loc[:, (df_pivot_cours_target.columns >= pd.Timestamp(start_date_table)) & (df_pivot_cours_target.columns <= pd.Timestamp(end_date_table))]
+
+            # Renommer les colonnes de date pour un affichage plus lisible
+            df_pivot_cours_source.columns = [f"Cours ({col.strftime('%d/%m/%Y')})" for col in df_pivot_cours_source.columns]
+            df_pivot_taux.columns = [f"Taux ({col.strftime('%d/%m/%Y')})" for col in df_pivot_taux.columns]
+            df_pivot_cours_target.columns = [f"Cours Conv. ({col.strftime('%d/%m/%Y')})" for col in df_pivot_cours_target.columns]
+
+            # Concaténer les DataFrames pivotés
+            # Assurez-vous que les index sont alignés
+            df_final_display = pd.concat([
+                df_display_prices[['Ticker', 'Devise Source']].drop_duplicates().set_index('Ticker'),
+                df_pivot_cours_source,
+                df_pivot_taux,
+                df_pivot_cours_target
+            ], axis=1).reset_index()
+
+            # Trier les colonnes pour un affichage cohérent (Ticker, Devise Source, puis toutes les dates groupées)
+            # Créer un ordre de colonnes dynamique
+            sorted_columns = ['Ticker', 'Devise Source']
+            dates_ordered = sorted(list(set([col.date() for col in df_display_prices['Date']])))
             
-            st.markdown("##### Cours de Clôture des Derniers Jours")
-            st.dataframe(df_pivot.style.format(lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"),
-                          use_container_width=True)
+            for d in dates_ordered:
+                date_str = d.strftime('%d/%m/%Y')
+                sorted_columns.append(f"Cours ({date_str})")
+                sorted_columns.append(f"Taux ({date_str})")
+                sorted_columns.append(f"Cours Conv. ({date_str})")
+            
+            # Filtrer les colonnes qui existent réellement dans df_final_display
+            final_columns_to_display = [col for col in sorted_columns if col in df_final_display.columns]
+            df_final_display = df_final_display[final_columns_to_display]
+
+            # Définir le formatage pour les colonnes numériques
+            format_dict = {}
+            for col in df_final_display.columns:
+                if "Cours (" in col: # Colonnes de cours source
+                    format_dict[col] = lambda x: f"{format_fr(x, 2)}" if pd.notnull(x) else "N/A"
+                elif "Taux (" in col: # Colonnes de taux FX
+                    format_dict[col] = lambda x: f"{format_fr(x, 4)}" if pd.notnull(x) else "N/A"
+                elif "Cours Conv. (" in col: # Colonnes de cours convertis
+                    format_dict[col] = lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"
+
+            st.markdown("##### Cours de Clôture des Derniers Jours (avec conversion)")
+            st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
+
