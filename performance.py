@@ -22,6 +22,7 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
+    
 
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
@@ -29,6 +30,12 @@ def display_performance_history():
 
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
+
+    # --- DÉBOGAGE : Afficher les premières lignes du DataFrame du portefeuille ---
+    
+    st.dataframe(df_current_portfolio.head(), use_container_width=True)
+    st.markdown("---")
+    # --- FIN DÉBOGAGE ---
 
     # Initialisation ou rafraîchissement des taux de change historiques
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
@@ -67,6 +74,7 @@ def display_performance_history():
         current_selected_label = "1W"
     default_period_index = period_labels.index(current_selected_label)
 
+   
     selected_label = st.radio(
         "", 
         period_labels, 
@@ -98,8 +106,10 @@ def display_performance_history():
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                 
                 if "Quantité" in ticker_row.columns:
+                    # Convert the 'Quantité' series to numeric, coercing errors to NaN
                     numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
                     
+                    # Check if there's at least one valid numeric quantity and assign it
                     if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]):
                         quantity = numeric_quantities.iloc[0]
                     else:
@@ -186,3 +196,4 @@ def display_performance_history():
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
+
