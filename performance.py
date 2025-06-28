@@ -52,7 +52,6 @@ def display_performance_history():
 
     st.markdown("#### Sélection de la période d'affichage des cours")
     selected_label = st.radio(
-        "Choisissez une période:",
         period_labels,
         index=default_period_index,
         key="selected_ticker_table_period_radio",
