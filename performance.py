@@ -33,134 +33,39 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE PAR BOUTONS STYLISÉS EN HTML/CSS/JS INLINE ---
+    # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO (COMPOSANT NATIF STREAMLIT) ---
 
     period_options = {
-        "1W": timedelta(weeks=1),
-        "1M": timedelta(days=30),
-        "3M": timedelta(days=90),
-        "6M": timedelta(days=180),
-        "1Y": timedelta(days=365),
-        "5Y": timedelta(days=365 * 5),
-        "10Y": timedelta(days=365 * 10),
+        "1 Semaine": timedelta(weeks=1),
+        "1 Mois": timedelta(days=30),
+        "3 Mois": timedelta(days=90),
+        "6 Mois": timedelta(days=180),
+        "1 An": timedelta(days=365),
+        "5 Ans": timedelta(days=365 * 5),
+        "10 Ans": timedelta(days=365 * 10),
     }
+    
+    # Options pour le sélecteur, avec la période par défaut
+    period_labels = list(period_options.keys())
+    default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1 Semaine"))
 
-    if "selected_ticker_table_period" not in st.session_state:
-        st.session_state.selected_ticker_table_period = "1W"
-
-    # CSS pour styliser les "boutons-texte" et leur conteneur
-    # et pour cacher le conteneur des boutons Streamlit natifs
-    st.markdown("""
-        <style>
-        /* Conteneur spécifique pour les éléments de période */
-        .period-buttons-wrapper {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: 5px; /* Espacement de 5px entre les éléments */
-            margin-bottom: 1rem;
-        }
-
-        /* Style de chaque élément de période (le texte cliquable) */
-        .period-item {
-            /* Réinitialise les styles par défaut qui pourraient être hérités */
-            background: none;
-            border: none;
-            padding: 0; /* Pas de padding pour coller au texte */
-            font-size: 1rem; /* Taille de police par défaut */
-            color: inherit; /* Hérite la couleur du texte parent (thème Streamlit) */
-            cursor: pointer; /* Indique que l'élément est cliquable */
-            text-decoration: none; /* Supprime le soulignement par défaut */
-            box-shadow: none; /* Supprime l'ombre par défaut */
-            display: inline-block; /* Permet d'appliquer padding/margin si nécessaire */
-            line-height: 1; /* Ajuste la hauteur de ligne si besoin */
-            white-space: nowrap; /* Empêche le texte de s'enrouler */
-            -webkit-tap-highlight-color: transparent; /* Supprime l'effet de surbrillance au toucher sur mobile */
-        }
-
-        /* Style au survol (hover) */
-        .period-item:hover {
-            text-decoration: none !important; /* Pas de soulignement au survol */
-            color: var(--primary-color) !important; /* Couleur au survol (peut être ajustée) */
-        }
-
-        /* Style de l'élément sélectionné */
-        .period-item.selected {
-            font-weight: bold !important; /* Texte en gras */
-            color: var(--secondary-color) !important; /* Utilise la couleur secondaire définie dans le thème Streamlit */
-            text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
-        }
-
-        /* Cache le conteneur des boutons Streamlit natifs */
-        div[data-testid="stVerticalBlock"] > div > div > button[data-testid^="stButton-hidden_period_btn_"] {
-            display: none !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
     st.markdown("#### Sélection de la période d'affichage des cours")
+    selected_label = st.radio(
+        "Choisissez une période:",
+        period_labels,
+        index=default_period_index,
+        key="selected_ticker_table_period_radio",
+        horizontal=True # Affiche les options horizontalement si l'espace le permet
+    )
     
-    # Génération du HTML pour les éléments de période et des boutons Streamlit cachés
-    period_items_html = '<div class="period-buttons-wrapper">'
-    for label in period_options:
-        is_selected = (st.session_state.selected_ticker_table_period == label)
-        
-        # Chaque élément span aura un ID unique pour que le JS puisse le cibler
-        period_items_html += f"""
-        <span id="period_item_{label}" class="period-item {'selected' if is_selected else ''}">
-            {label}
-        </span>
-        """
-    period_items_html += '</div>'
-    
-    st.markdown(period_items_html, unsafe_allow_html=True)
-
-    # Créer les boutons Streamlit cachés qui seront cliqués par le JavaScript
-    # Ces boutons mettront à jour la session_state et déclencheront un rerun.
-    # Utilisation d'un st.container() pour les regrouper et les cacher plus facilement
-    # Le data-testid du container sera utilisé pour le CSS de masquage
-    hidden_buttons_container = st.container()
-    with hidden_buttons_container:
-        for label in period_options:
-            # Utilisez une clé unique pour chaque bouton
-            if st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}"):
-                st.session_state.selected_ticker_table_period = label
-                st.rerun()
-    
-    # JavaScript pour attacher les écouteurs d'événements aux spans
-    # et simuler un clic sur le bouton Streamlit caché correspondant.
-    # Le script est enveloppé dans DOMContentLoaded pour s'assurer que tous les éléments sont chargés.
-    js_code = """
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const periodLabels = %s; // Pass period labels from Python
-            periodLabels.forEach(label => {
-                const span = document.getElementById(`period_item_${label}`);
-                if (span) {
-                    span.onclick = function() {
-                        // Trouver le bouton Streamlit caché par son data-testid
-                        // Le data-testid est généré par Streamlit sous la forme "stButton-<key>"
-                        const hiddenButton = document.querySelector(`button[data-testid="stButton-hidden_period_btn_${label}"]`);
-                        if (hiddenButton) {
-                            hiddenButton.click(); // Simule un clic sur le bouton caché
-                        } else {
-                            console.warn(`Bouton caché pour ${label} non trouvé.`);
-                        }
-                    };
-                } else {
-                    console.warn(`Span pour ${label} non trouvé.`);
-                }
-            });
-        });
-    </script>
-    """ % (list(period_options.keys())) # Passer la liste des clés Python au JavaScript
-
-    st.markdown(js_code, unsafe_allow_html=True)
+    # Mettre à jour la session_state pour stocker l'étiquette sélectionnée
+    st.session_state.selected_ticker_table_period_label = selected_label
+    selected_period_td = period_options[selected_label]
 
     # --- FIN SÉLECTION DE PÉRIODE ---
 
     end_date_table = datetime.now().date()
-    selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
     st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
@@ -198,3 +103,4 @@ def display_performance_history():
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
+
