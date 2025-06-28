@@ -13,17 +13,33 @@ from portfolio_display import convertir
 
 def fetch_historical_fx_rates(target_currency, start_date, end_date):
     """Récupère les taux de change historiques via yfinance."""
-    base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP"]  # Ajoutez d'autres devises si besoin
+    base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP"]
     fx_rates = {}
     for base in base_currencies:
-        pair = f"{base}={target_currency}" if target_currency != "USD" else f"{base}USD=X"
+        # Utiliser des paires disponibles sur yfinance (e.g., HKD=X pour HKD/USD)
+        pair = f"{base}USD=X" if base != "USD" else f"USD{target_currency}=X"
         try:
             fx_data = yf.download(pair, start=start_date - timedelta(days=10), end=end_date, interval="1d")
             if not fx_data.empty:
-                fx_rates[base] = fx_data["Close"].rename(f"{base}{target_currency}")
+                # Renommer la colonne Close avec la paire de devises
+                fx_rates[f"{base}USD"] = fx_data["Close"]
+                if base == "USD" and target_currency != "USD":
+                    # Récupérer le taux USD vers la devise cible (e.g., USDEUR=X)
+                    target_pair = f"USD{target_currency}=X"
+                    target_data = yf.download(target_pair, start=start_date - timedelta(days=10), end=end_date, interval="1d")
+                    if not target_data.empty:
+                        fx_rates[f"USD{target_currency}"] = target_data["Close"]
         except Exception as e:
             st.warning(f"Échec du téléchargement des taux pour {pair}: {e}")
-    return pd.DataFrame(fx_rates) if fx_rates else pd.DataFrame()
+    # Combiner en un DataFrame, avec remplissage par 1.0 si manquant
+    df_fx = pd.DataFrame(fx_rates)
+    if df_fx.empty:
+        st.warning("Aucun taux de change récupéré. Utilisation de taux par défaut (1.0).")
+        df_fx = pd.DataFrame(index=pd.date_range(start=start_date, end=end_date), columns=[f"{c}{target_currency}" for c in base_currencies], data=1.0)
+    else:
+        # Aligner les index et interpoler les valeurs manquantes
+        df_fx = df_fx.reindex(pd.date_range(start=start_date - timedelta(days=10), end=end_date)).interpolate().ffill().bfill()
+    return df_fx
 
 def display_performance_history():
     """
@@ -42,6 +58,8 @@ def display_performance_history():
         end_date_table = datetime.now().date()
         start_date_table = end_date_table - timedelta(days=365 * 10)  # Période max pour tester
         st.session_state.fx_rates = fetch_historical_fx_rates(target_currency, start_date_table, end_date_table)
+        if st.session_state.fx_rates is None:
+            st.session_state.fx_rates = pd.DataFrame()  # Fallback vide
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
@@ -87,16 +105,14 @@ def display_performance_history():
                     date_str = date.date()
                     fx_rates = st.session_state.fx_rates
                     if not fx_rates.empty:
-                        fx_rate = fx_rates[f"{ticker_devise}{target_currency}"].get(date_str, None)
-                        if fx_rate is None and ticker_devise != target_currency:
-                            # Conversion via USD si taux direct non disponible
-                            usd_rate = fx_rates[f"{ticker_devise}USD"].get(date_str, 1.0)
+                        fx_rate = fx_rates[f"{ticker_devise}USD"].get(date_str, None)
+                        if fx_rate is not None and ticker_devise != target_currency and f"USD{target_currency}" in fx_rates.columns:
                             target_rate = fx_rates[f"USD{target_currency}"].get(date_str, 1.0)
-                            fx_rate = usd_rate * target_rate if usd_rate and target_rate else 1.0
-                        else:
-                            fx_rate = fx_rate if fx_rate else 1.0
+                            fx_rate = fx_rate * (1 / target_rate) if target_rate != 0 else 1.0  # Conversion inverse si besoin
+                        elif fx_rate is None:
+                            fx_rate = 1.0
                     else:
-                        fx_rate = 1.0  # Fallback si pas de taux
+                        fx_rate = 1.0
                     converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate})
                     converted_data[date] = converted_price
                     st.write(f"Date: {date_str}, Prix original: {price}, Prix converti: {converted_price}, Taux: {fx_rate}")
