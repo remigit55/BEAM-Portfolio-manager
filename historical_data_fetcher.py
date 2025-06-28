@@ -15,20 +15,16 @@ def fetch_stock_history(Ticker, start_date, end_date):
     Utilise builtins.str pour contourner l'écrasement potentiel de str().
     """
     try:
-        # Utilise builtins.str pour s'assurer que Ticker est bien une chaîne
         if not builtins.isinstance(Ticker, builtins.str):
             st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker).__name__)})")
             return pd.Series(dtype='float64')
         
-        # Vérifie si yf.download est appelable en utilisant builtins.callable
         if not builtins.callable(yf.download):
             st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
             return pd.Series(dtype='float64')
 
-        # Appel à yf.download
         data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
         
-        # Vérification et extraction de la colonne 'Close'
         if not data.empty:
             if builtins.isinstance(data.columns, pd.MultiIndex):
                 close_data = data[('Close', Ticker)] if ('Close', Ticker) in data.columns else None
