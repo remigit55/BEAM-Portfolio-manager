@@ -170,6 +170,14 @@ def afficher_portefeuille():
             
             # Appliquer la division seulement si le drapeau est vrai et que la valeur n'est ni NaN ni 0
             mask_to_apply_division = needs_pence_to_pound_conversion & df[price_col].notna() & (df[price_col] != 0)
+            
+            # --- DEBUG LINE ADDED ---
+            if mask_to_apply_division.any():
+                # Afficher les tickers concernés par cette conversion
+                affected_tickers = df.loc[mask_to_apply_division, ticker_col].dropna().unique().tolist()
+                st.info(f"DEBUG: Conversion pence-vers-livre appliquée pour les tickers : {affected_tickers} sur la colonne '{price_col}'.")
+            # --- END DEBUG LINE ---
+
             df.loc[mask_to_apply_division, price_col] = df.loc[mask_to_apply_division, price_col] / 100.0
     
     # Supprimer les colonnes temporaires
