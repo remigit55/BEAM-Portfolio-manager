@@ -274,17 +274,6 @@ def afficher_portefeuille():
     # Définition des configurations de colonne pour st.dataframe
     column_config = {}
     
-    # Pour les colonnes monétaires, utilisons un format qui inclut la devise cible
-    # et gère les virgules comme séparateur décimal et les espaces comme séparateur de milliers.
-    # Note: Streamlit's NumberColumn uses f-string formatting.
-    # We need to adapt the format_fr function or create custom format strings.
-    
-    # Streamlit ne gère pas directement les séparateurs de milliers personnalisés
-    # (virgule pour décimal, espace pour milliers) dans le format de NumberColumn comme `format_fr`.
-    # Il utilise le formatage de la locale par défaut ou le format Python.
-    # Pour s'assurer que les valeurs sont affichées avec les virgules,
-    # nous allons pré-formater certaines colonnes avant de les passer à st.dataframe.
-    
     # Colonnes qui nécessitent un formatage spécifique (virgule décimale, espace milliers)
     cols_to_preformat = {
         "Quantité": (0, ""), # Nombre entier
@@ -309,28 +298,18 @@ def afficher_portefeuille():
         if original_col in labels: # Check if the original column has a label defined
             display_label = labels[original_col]
             if display_label in df_display.columns:
-                # Appliquer format_fr et stocker dans une nouvelle colonne temporaire pour l'affichage
-                # On ne peut pas mettre ça directement dans column_config
-                # Donc, on formate les valeurs avant de les passer à st.dataframe
                 df_display[display_label] = df_display[display_label].apply(
                     lambda x: f"{format_fr(x, dec_places)}{suffix}" if pd.notna(x) else ""
                 )
                 # Puisque nous avons pré-formaté, ces colonnes deviennent de type 'text' pour st.dataframe
-                # Nous n'avons pas besoin de NumberColumn pour elles, juste TextColumn.
                 column_config[display_label] = st.column_config.TextColumn(
                     display_label,
-                    width="small" if suffix == "" and dec_places > 0 else "medium" # Adjust width based on content
+                    width="small" if "Actuelle" in display_label or "Acquisition" in display_label else "medium" # Adjust width based on content
                 )
-        elif original_col == "Quantité": # Specific case for quantity
-            if "Quantité" in df.columns:
-                df_display[labels["Quantité"]] = df_display[labels["Quantité"]].apply(
-                    lambda x: f"{format_fr(x, 0)}" if pd.notna(x) else ""
-                )
-                column_config[labels["Quantité"]] = st.column_config.TextColumn(
-                    labels["Quantité"], width="small"
-                )
+        # Note: 'Quantité' est déjà dans cols_to_preformat, pas besoin de le gérer séparément ici.
 
-    # Configurer les colonnes textuelles
+    # Configurer les colonnes textuelles qui n'ont pas été pré-formatées comme numériques
+    # On vérifie si la colonne existe dans df_display avant de la configurer
     if labels[ticker_col] in df_display.columns:
         column_config[labels[ticker_col]] = st.column_config.TextColumn(labels[ticker_col], width="small")
     if labels["shortName"] in df_display.columns:
