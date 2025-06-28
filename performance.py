@@ -36,7 +36,7 @@ def display_performance_history():
     # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO (COMPOSANT NATIF STREAMLIT) ---
 
     period_options = {
-        "1W": timedelta(weeks=1),
+        "1 semaine": timedelta(weeks=1),
         "1M": timedelta(days=30),
         "3M": timedelta(days=90),
         "6M": timedelta(days=180),
@@ -47,7 +47,7 @@ def display_performance_history():
     
     # Options pour le sélecteur, avec la période par défaut
     period_labels = list(period_options.keys())
-    default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1W"))
+    default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1 semaine"))
 
 
     
