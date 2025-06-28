@@ -171,10 +171,10 @@ def afficher_portefeuille():
             # Appliquer la division seulement si le drapeau est vrai et que la valeur n'est ni NaN ni 0
             mask_to_apply_division = needs_pence_to_pound_conversion & df[price_col].notna() & (df[price_col] != 0)
             
-            # --- DEBUG LINE ADDED ---
-            if mask_to_apply_division.any():
+            # --- DEBUG LINE EDITED: Use ticker_col_name instead of ticker_col ---
+            if mask_to_apply_division.any() and ticker_col_name is not None:
                 # Afficher les tickers concernés par cette conversion
-                affected_tickers = df.loc[mask_to_apply_division, ticker_col].dropna().unique().tolist()
+                affected_tickers = df.loc[mask_to_apply_division, ticker_col_name].dropna().unique().tolist()
                 st.info(f"DEBUG: Conversion pence-vers-livre appliquée pour les tickers : {affected_tickers} sur la colonne '{price_col}'.")
             # --- END DEBUG LINE ---
 
@@ -308,10 +308,10 @@ def afficher_portefeuille():
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
         "Valeur Acquisition_fmt",  # Utilise la colonne pré-formatée
-        "Valeur_Actuelle_conv",  # Valeur convertie en devise cible pour la colonne "Valeur Acquisition (EUR)"
-        "Taux_FX_Acquisition", 
-        "currentPrice", "Valeur_Actuelle_conv", "Gain/Perte", "Gain/Perte (%)",
-        "fiftyTwoWeekHigh", "Valeur_H52_conv", "Objectif_LT", "Valeur_LT_conv",
+        f"Valeur Acquisition ({devise_cible})", 
+        "Taux FX (Source/Cible)", 
+        "currentPrice", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
+        "fiftyTwoWeekHigh", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
