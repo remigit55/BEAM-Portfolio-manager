@@ -1,26 +1,162 @@
+# historical_data_fetcher.py
+
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta, date
+import requests
+import json
+import streamlit as st
+import builtins # Importe le module builtins pour accéder à la fonction str() originale
+
+@st.cache_data(ttl=3600) # Cache les données historiques des actions pour 1 heure
+def fetch_stock_history(Ticker, start_date, end_date):
+    """
+    Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance (yfinance library).
+    Utilise builtins.str pour contourner l'écrasement potentiel de str().
+    """
+    try:
+        # Utilise builtins.str pour s'assurer que Ticker est bien une chaîne
+        if not builtins.isinstance(Ticker, builtins.str):
+            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker).__name__)})")
+            return pd.Series(dtype='float64')
+        
+        # Vérifie si yf.download est appelable en utilisant builtins.callable
+        if not builtins.callable(yf.download):
+            st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
+            return pd.Series(dtype='float64')
+
+        # Appel à yf.download
+        data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
+        
+        # Vérification et extraction de la colonne 'Close'
+        if not data.empty:
+            if builtins.isinstance(data.columns, pd.MultiIndex):
+                close_data = data[('Close', Ticker)] if ('Close', Ticker) in data.columns else None
+                if close_data is not None:
+                    close_data = close_data.rename(Ticker)
+                    return close_data
+                else:
+                    st.warning(f"Colonne ('Close', '{Ticker}') absente. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
+                    return pd.Series(dtype='float64')
+            else:
+                if 'Close' in data.columns:
+                    close_data = data['Close'].rename(Ticker)
+                    return close_data
+                else:
+                    st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
+                    return pd.Series(dtype='float64')
+        else:
+            st.warning(f"Aucune donnée valide pour {Ticker} : DataFrame vide.")
+            return pd.Series(dtype='float64')
+
+    except Exception as e:
+        error_msg = f"Erreur lors de la récupération pour {Ticker} : {builtins.str(type(e).__name__)} - {builtins.str(e)}"
+        st.error(error_msg)
+        return pd.Series(dtype='float64')
+
+@st.cache_data(ttl=3600) # Cache les taux de change historiques pour 1 heure
+def fetch_historical_fx_rates(target_currency, start_date, end_date):
+    """Récupère les taux de change historiques via yfinance."""
+    base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] # Added EUR to base currencies
+    all_dates = pd.date_range(start=start_date - timedelta(days=10), end=end_date)
+    
+    # Initialize DataFrame with default rates (1.0) for all pairs
+    # Columns will be named as "SOURCETARGET" (e.g., "USDEUR")
+    columns_to_create = [f"{c}{target_currency}" for c in base_currencies if c != target_currency]
+    df_fx = pd.DataFrame(1.0, index=all_dates, columns=columns_to_create)
+    
+    for base in base_currencies:
+        if base == target_currency:
+            continue # No conversion needed for same currency
+
+        # Try direct pair
+        pair_direct_yf = f"{base}{target_currency}=X"
+        try:
+            fx_data_direct = yf.download(pair_direct_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
+            if not fx_data_direct.empty and 'Close' in fx_data_direct.columns:
+                df_fx[f"{base}{target_currency}"] = fx_data_direct["Close"].reindex(all_dates, method="ffill").fillna(1.0)
+                continue 
+        except Exception:
+            pass 
+
+        # Try inverse pair
+        pair_inverse_yf = f"{target_currency}{base}=X"
+        try:
+            fx_data_inverse = yf.download(pair_inverse_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
+            if not fx_data_inverse.empty and 'Close' in fx_data_inverse.columns:
+                df_fx[f"{base}{target_currency}"] = (1 / fx_data_inverse["Close"]).reindex(all_dates, method="ffill").fillna(1.0)
+                continue 
+        except Exception:
+            pass 
+
+        # If direct and inverse failed, try via USD (only if both base and target are not USD)
+        if base != "USD" and target_currency != "USD":
+            usd_to_base_pair_yf = f"{base}USD=X"
+            usd_to_target_pair_yf = f"{target_currency}USD=X" 
+            
+            try:
+                fx_data_base_usd = yf.download(usd_to_base_pair_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
+                fx_data_target_usd = yf.download(usd_to_target_pair_yf, start=start_date - timedelta(days=10), end=end_date, interval="1d", progress=False)
+
+                if not fx_data_base_usd.empty and 'Close' in fx_data_base_usd.columns and \
+                   not fx_data_target_usd.empty and 'Close' in fx_data_target_usd.columns:
+                    
+                    base_usd_rates = fx_data_base_usd["Close"].reindex(all_dates, method="ffill").fillna(1.0)
+                    target_usd_rates = fx_data_target_usd["Close"].reindex(all_dates, method="ffill").fillna(1.0)
+                    
+                    df_fx[f"{base}{target_currency}"] = base_usd_rates * (1 / target_usd_rates)
+            except Exception:
+                pass 
+    
+    df_fx = df_fx.interpolate(method="linear").ffill().bfill()
+    return df_fx
+
+
+@st.cache_data(ttl=3600) # Cache les données historiques globales pour 1 heure
+def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
+    """
+    Récupère l'ensemble des données historiques nécessaires :
+    - Cours des actions via Yahoo Finance
+    - Taux de change
+    """
+    historical_prices = {}
+    business_days = pd.bdate_range(start_date, end_date)
+
+    for ticker in tickers:
+        prices = fetch_stock_history(ticker, start_date, end_date)
+        if not prices.empty:
+            prices = prices.reindex(business_days).ffill().bfill()
+            historical_prices[ticker] = prices
+
+    # Use the new, robust fetch_historical_fx_rates
+    historical_fx_df = fetch_historical_fx_rates(target_currency, start_date, end_date)
+    
+    # Convert DataFrame to dictionary of Series for compatibility with existing logic
+    historical_fx = {col: historical_fx_df[col] for col in historical_fx_df.columns}
+            
+    return historical_prices, historical_fx
+```
+
+
+```python
 # performance.py
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from pandas.tseries.offsets import BDay  # Pour les jours ouvrables
+from pandas.tseries.offsets import BDay
 import yfinance as yf
-import builtins  # Pour contourner l'écrasement de str()
+import builtins
 
-# Import des fonctions nécessaires
-from historical_data_fetcher import fetch_stock_history, get_all_historical_data
+# Importe le nouveau composant personnalisé
+from period_selector_component import period_selector
+
+# Import des fonctions nécessaires depuis historical_data_fetcher
+from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates # <-- fetch_historical_fx_rates est maintenant importée de là
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
-from portfolio_display import convertir  # Importer la fonction de conversion
-
-# Fonction de test temporaire pour fetch_fx_rates
-def fetch_fx_rates_dummy(target_currency):
-    """Fonction temporaire pour tester avec des taux fixes."""
-    return {"USD": 0.8532999753952026, "EUR": 1.0, "GBP": 1.1700999736785889,
-            "CAD": 0.6233999729156494, "AUD": 0.5570999979972839,
-            "HKD": 0.10864999890327454, "CNY": 0.11892999708652496,
-            "SGD": 0.6685199737548828}  # Taux basés sur vos logs
+from portfolio_display import convertir # Assurez-vous que convertir est bien là
 
 def display_performance_history():
     """
@@ -34,13 +170,29 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
-    # Initialisation des taux de change avec une valeur par défaut pour tester
-    if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        st.write("Initialisation des taux de change (mode test)...")
-        st.session_state.fx_rates = fetch_fx_rates_dummy(target_currency)
-        st.write("Taux de change chargés :", st.session_state.fx_rates)
+    # Initialisation ou rafraîchissement des taux de change historiques
+    # Cette partie est maintenant plus simple car fetch_historical_fx_rates est mis en cache
+    # et gère sa propre robustesse.
+    if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
+        st.info("Récupération des taux de change historiques initiaux...")
+        end_date_for_fx = datetime.now().date()
+        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10) # Fetch 10 years of FX data for broader use
+        try:
+            st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
+            if st.session_state.historical_fx_rates_df.empty:
+                st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
+                # Fallback to a default DataFrame if empty, though fetch_historical_fx_rates should handle this
+                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.date_range(start=start_date_for_fx, end=end_date_for_fx),
+                                                                        columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
+        except Exception as e:
+            st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
+            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.date_range(start=start_date_for_fx, end=end_date_for_fx),
+                                                                    columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
 
-    fx_rates = st.session_state.fx_rates
+    # Vérification finale pour s'assurer que historical_fx_rates_df est un DataFrame valide
+    if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
+        st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
+        return # Exit if FX rates are not properly loaded
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
@@ -48,75 +200,117 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO ---
-    period_options = {"1W": timedelta(weeks=1), "1M": timedelta(days=30), "3M": timedelta(days=90),
-                      "6M": timedelta(days=180), "1Y": timedelta(days=365), "5Y": timedelta(days=365 * 5),
-                      "10Y": timedelta(days=365 * 10)}
-    period_labels = list(period_options.keys())
-    current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
-    if current_selected_label not in period_labels:
-        current_selected_label = "1W"
-    default_period_index = period_labels.index(current_selected_label)
+    # --- SÉLECTION DE PÉRIODE VIA COMPOSANT PERSONNALISÉ ---
 
-    selected_label = st.radio("", period_labels, index=default_period_index,
-                             key="selected_ticker_table_period_radio", horizontal=True)
-    st.session_state.selected_ticker_table_period_label = selected_label
-    selected_period_td = period_options[selected_label]
+    period_options = {
+        "1W": timedelta(weeks=1),
+        "1M": timedelta(days=30),
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180),
+        "1Y": timedelta(days=365),
+        "5Y": timedelta(days=365 * 5),
+        "10Y": timedelta(days=365 * 10),
+    }
 
-    # --- FIN SÉLECTION DE PÉRIODE ---
+    if "selected_ticker_table_period" not in st.session_state:
+        st.session_state.selected_ticker_table_period = "1W"
+
+    st.markdown("#### Sélection de la période d'affichage des cours")
+    
+    # Appel du composant personnalisé
+    new_selected_period = period_selector(
+        period_options=period_options,
+        selected_period=st.session_state.selected_ticker_table_period,
+        key="period_selector_custom_component" # Clé unique pour ce composant
+    )
+
+    # Si une nouvelle période a été sélectionnée par le composant, mettre à jour l'état de session et relancer
+    if new_selected_period != st.session_state.selected_ticker_table_period:
+        st.session_state.selected_ticker_table_period = new_selected_period
+        st.rerun() 
 
     end_date_table = datetime.now().date()
+    selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    with st.spinner("Récupération des cours des tickers en cours..."):
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+
+    with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         last_days_data = {}
-        fetch_start_date = start_date_table - timedelta(days=10)
+        # Fetch a wider range of data to ensure enough business days are available
+        fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2)) # Adjust fetch range dynamically
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
+            # Find the currency for the current ticker from the portfolio DataFrame
             if "Devise" in df_current_portfolio.columns and ticker in df_current_portfolio["Ticker"].values:
                 ticker_devise_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]["Devise"]
                 if not ticker_devise_row.empty and pd.notnull(ticker_devise_row.iloc[0]):
                     ticker_devise = str(ticker_devise_row.iloc[0]).strip().upper()
-            st.write(f"Ticker: {ticker}, Devise: {ticker_devise}")
+            
+            # st.write(f"Processing Ticker: {ticker}, Source Devise: {ticker_devise}")
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 converted_data = pd.Series(index=filtered_data.index, dtype=float)
-                for date, price in filtered_data.items():
-                    converted_price, fx_rate = convertir(price, ticker_devise, target_currency, fx_rates)
-                    if pd.isna(converted_price) or pd.isna(fx_rate):
-                        st.warning(f"Conversion échouée pour {ticker} le {date.strftime('%Y-%m-%d')}: taux manquant pour {ticker_devise}. Utilisation de la valeur originale: {price}")
-                        converted_data[date] = price
+                
+                for date_idx, price in filtered_data.items():
+                    date_as_date = date_idx.date() # Convert Timestamp to date object
+                    
+                    # Get the specific FX rate for this date and currency pair
+                    # The column name in historical_fx_rates_df is SOURCETARGET (e.g., "USDEUR")
+                    fx_key = f"{ticker_devise}{target_currency}"
+                    
+                    fx_rate_for_date = 1.0 # Default fallback
+                    # Check if the column exists in the FX DataFrame and if the date exists in its index
+                    if fx_key in st.session_state.historical_fx_rates_df.columns:
+                        if date_as_date in st.session_state.historical_fx_rates_df.index:
+                            fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_as_date, fx_key]
+                        else:
+                            # Fallback if date is not in FX index (should be rare with reindex/ffill/bfill)
+                            st.warning(f"FX rate for {fx_key} on {date_as_date} not found in historical_fx_rates_df. Using 1.0.")
                     else:
-                        converted_data[date] = converted_price
-                    st.write(f"Date: {date}, Prix original: {price}, Prix converti: {converted_price}, Taux: {fx_rate}")
+                        # This means we don't have a direct or indirect conversion for this pair.
+                        # This should ideally be handled by fetch_historical_fx_rates to create a column with 1.0s.
+                        st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
+                    
+                    if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
+                        fx_rate_for_date = 1.0 # Final fallback if specific rate is NaN or zero
+
+                    # The `convertir` function expects a dictionary of rates where key is source_devise
+                    # So, we pass a small dict with just the rate for ticker_devise
+                    converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate_for_date})
+                    converted_data[date_idx] = converted_price
+                    # st.write(f"  Date: {date_as_date}, Original Price: {price:.2f}, Converted Price: {converted_price:.2f}, Taux ({fx_key}): {fx_rate_for_date:.4f}")
                 last_days_data[ticker] = converted_data
             else:
                 last_days_data[ticker] = pd.Series(dtype='float64')
 
-        # Construction de df_display_prices
         df_display_prices = pd.DataFrame()
         for ticker, series in last_days_data.items():
             if not series.empty:
-                temp_df = pd.DataFrame({"Date": series.index, "Cours": series.values})
-                temp_df["Ticker"] = ticker
+                temp_df = pd.DataFrame({
+                    "Date": series.index,
+                    "Cours": series.values,
+                    "Ticker": ticker
+                })
                 df_display_prices = pd.concat([df_display_prices, temp_df], ignore_index=True)
-                st.write(f"Données converties pour {ticker}:", temp_df)
+                # st.write(f"Données converties pour {ticker}:", temp_df)
 
         if not df_display_prices.empty:
             df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours", dropna=False)
             df_pivot = df_pivot.sort_index(axis=1)
+            
+            # Ensure only dates within the selected display range are shown
             df_pivot = df_pivot.loc[:, (df_pivot.columns >= pd.Timestamp(start_date_table)) & (df_pivot.columns <= pd.Timestamp(end_date_table))]
 
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
-            st.write("DataFrame pivot avant formatage :", df_pivot)  # Débogage
+            
+            # st.write("DataFrame pivot avant formatage:", df_pivot)
             st.dataframe(df_pivot.style.format(lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"),
-                         use_container_width=True)
+                          use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
 
-if __name__ == "__main__":
-    display_performance_history()
