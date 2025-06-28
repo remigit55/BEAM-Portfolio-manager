@@ -19,6 +19,7 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
+    st.subheader("Performance Historique du Portefeuille")
 
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
@@ -47,6 +48,19 @@ def display_performance_history():
         st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
         return
 
+    # --- AFFICHAGE DES TAUX DE CHANGE POUR LE DÉBOGAGE ---
+    st.markdown("#### Taux de Change Historiques Récupérés (pour débogage)")
+    if st.session_state.historical_fx_rates_df is not None and not st.session_state.historical_fx_rates_df.empty:
+        st.dataframe(st.session_state.historical_fx_rates_df.head()) # Affiche les premières lignes
+        st.write(f"Dimensions du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.shape}")
+        st.write(f"Colonnes du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.columns.tolist()}")
+        st.write(f"Index du DataFrame des taux de change (début/fin) : {st.session_state.historical_fx_rates_df.index.min().strftime('%Y-%m-%d')} à {st.session_state.historical_fx_rates_df.index.max().strftime('%Y-%m-%d')}")
+    else:
+        st.info("Aucun taux de change historique n'est disponible pour l'affichage.")
+    st.markdown("---")
+    # --- FIN DE L'AFFICHAGE DE DÉBOGAGE ---
+
+
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
     if not tickers_in_portfolio:
@@ -59,12 +73,12 @@ def display_performance_history():
                       "10Y": timedelta(days=365 * 10)}
     period_labels = list(period_options.keys())
     
-    # Gérer l'état de la sélection du bouton radio
     current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
     if current_selected_label not in period_labels:
         current_selected_label = "1W"
     default_period_index = period_labels.index(current_selected_label)
 
+    st.markdown("#### Sélection de la période d'affichage des cours")
     selected_label = st.radio(
         "", 
         period_labels, 
@@ -78,7 +92,8 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-   
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
@@ -138,4 +153,3 @@ def display_performance_history():
                           use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
-
