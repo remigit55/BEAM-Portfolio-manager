@@ -15,48 +15,31 @@ def fetch_historical_fx_rates(target_currency, start_date, end_date):
     """Récupère les taux de change historiques via yfinance."""
     base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP"]
     fx_rates = {}
-    all_dates = pd.date_range(start=start_date - timedelta(days=10), end=end_date)
-    st.write(f"Attempting to fetch FX rates for target currency: {target_currency} from {start_date} to {end_date}")
-
-    # Initialize DataFrame with default rates (1.0)
-    df_fx = pd.DataFrame(1.0, index=all_dates, columns=[f"{c}{target_currency}" for c in base_currencies])
-    
     for base in base_currencies:
-        # Use available yfinance pairs (e.g., HKDUSD=X for HKD/USD)
+        # Utiliser des paires disponibles sur yfinance (e.g., HKD=X pour HKD/USD)
         pair = f"{base}USD=X" if base != "USD" else f"USD{target_currency}=X"
         try:
-            st.write(f"Fetching data for {pair}...")
             fx_data = yf.download(pair, start=start_date - timedelta(days=10), end=end_date, interval="1d")
             if not fx_data.empty:
-                st.write(f"Data fetched for {pair}: {fx_data['Close'].head()}")
+                # Renommer la colonne Close avec la paire de devises
                 fx_rates[f"{base}USD"] = fx_data["Close"]
                 if base == "USD" and target_currency != "USD":
+                    # Récupérer le taux USD vers la devise cible (e.g., USDEUR=X)
                     target_pair = f"USD{target_currency}=X"
-                    st.write(f"Fetching data for {target_pair}...")
                     target_data = yf.download(target_pair, start=start_date - timedelta(days=10), end=end_date, interval="1d")
                     if not target_data.empty:
-                        st.write(f"Data fetched for {target_pair}: {target_data['Close'].head()}")
                         fx_rates[f"USD{target_currency}"] = target_data["Close"]
-            else:
-                st.warning(f"No data retrieved for {pair}")
         except Exception as e:
-            st.error(f"Error fetching {pair}: {e}")
-
-    # Populate DataFrame with retrieved rates
-    for base in base_currencies:
-        col_name = f"{base}USD" if base != "USD" else f"USD{target_currency}"
-        if col_name in fx_rates:
-            df_fx[col_name] = fx_rates[col_name].reindex(all_dates, method="ffill").fillna(1.0)
-        if base != "USD" and f"USD{target_currency}" in fx_rates:
-            # Convert via USD to target currency
-            usd_rate = df_fx[f"{base}USD"]
-            target_rate = fx_rates[f"USD{target_currency}"].reindex(all_dates, method="ffill").fillna(1.0)
-            df_fx[f"{base}{target_currency}"] = usd_rate * (1 / target_rate)
-
-    # Interpolate and fill remaining NaN values
-    df_fx = df_fx.interpolate(method="linear").ffill().bfill()
-    st.write("FX rates DataFrame:", df_fx.head())
-    return df_fx  # Ensure a DataFrame is always returned
+            st.warning(f"Échec du téléchargement des taux pour {pair}: {e}")
+    # Combiner en un DataFrame, avec remplissage par 1.0 si manquant
+    df_fx = pd.DataFrame(fx_rates)
+    if df_fx.empty:
+        st.warning("Aucun taux de change récupéré. Utilisation de taux par défaut (1.0).")
+        df_fx = pd.DataFrame(index=pd.date_range(start=start_date, end=end_date), columns=[f"{c}{target_currency}" for c in base_currencies], data=1.0)
+    else:
+        # Aligner les index et interpoler les valeurs manquantes
+        df_fx = df_fx.reindex(pd.date_range(start=start_date - timedelta(days=10), end=end_date)).interpolate().ffill().bfill()
+    return df_fx
 
 def display_performance_history():
     """
@@ -72,14 +55,11 @@ def display_performance_history():
 
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
         st.write("Récupération des taux de change historiques...")
-        end_date_table = datetime.now().date()  # 2025-06-29
-        start_date_table = end_date_table - timedelta(days=365 * 2)  # Reduced to 2 years to test
-        try:
-            st.session_state.fx_rates = fetch_historical_fx_rates(target_currency, start_date_table, end_date_table)
-        except Exception as e:
-            st.error(f"Failed to fetch FX rates: {e}")
-            st.session_state.fx_rates = pd.DataFrame(1.0, index=pd.date_range(start=start_date_table, end=end_date_table),
-                                                   columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP"]])
+        end_date_table = datetime.now().date()
+        start_date_table = end_date_table - timedelta(days=365 * 10)  # Période max pour tester
+        st.session_state.fx_rates = fetch_historical_fx_rates(target_currency, start_date_table, end_date_table)
+        if st.session_state.fx_rates is None:
+            st.session_state.fx_rates = pd.DataFrame()  # Fallback vide
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
@@ -125,8 +105,11 @@ def display_performance_history():
                     date_str = date.date()
                     fx_rates = st.session_state.fx_rates
                     if not fx_rates.empty:
-                        fx_rate = fx_rates[f"{ticker_devise}{target_currency}"].get(date_str, 1.0)
-                        if pd.isna(fx_rate) or fx_rate == 0:
+                        fx_rate = fx_rates[f"{ticker_devise}USD"].get(date_str, None)
+                        if fx_rate is not None and ticker_devise != target_currency and f"USD{target_currency}" in fx_rates.columns:
+                            target_rate = fx_rates[f"USD{target_currency}"].get(date_str, 1.0)
+                            fx_rate = fx_rate * (1 / target_rate) if target_rate != 0 else 1.0  # Conversion inverse si besoin
+                        elif fx_rate is None:
                             fx_rate = 1.0
                     else:
                         fx_rate = 1.0
