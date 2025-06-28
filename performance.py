@@ -4,14 +4,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from pandas.tseries.offsets import BDay # Pour les jours ouvrables
+from pandas.tseries.offsets import BDay  # Pour les jours ouvrables
 import yfinance as yf
-import builtins # Pour contourner l'écrasement de str()
+import builtins  # Pour contourner l'écrasement de str()
 
 # Import des fonctions nécessaires
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
+from portfolio_display import convertir  # Importer la fonction de conversion
+from data_fetcher import fetch_fx_rates  # Importer fetch_fx_rates explicitement
 
 def display_performance_history():
     """
@@ -24,6 +26,18 @@ def display_performance_history():
 
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
+
+    # Initialisation ou mise à jour des taux de change
+    if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
+        devises_uniques = df_current_portfolio["Devise"].dropna().str.strip().str.upper().unique().tolist()
+        if not devises_uniques:
+            st.warning("Aucune devise trouvée dans le portefeuille. Utilisation de la devise cible par défaut.")
+            devises_uniques = [target_currency]
+        devises_a_fetch = list(set([target_currency.upper()] + devises_uniques))
+        st.session_state.fx_rates = fetch_fx_rates(target_currency)
+        st.write("Taux de change chargés :", st.session_state.fx_rates)  # Débogage
+
+    fx_rates = st.session_state.fx_rates
 
     tickers_in_portfolio = []
     if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
@@ -49,21 +63,18 @@ def display_performance_history():
     period_labels = list(period_options.keys())
 
     # Récupérer la période sélectionnée depuis session_state, avec "1W" comme défaut
-    # S'assurer que la valeur est valide avant de chercher son index
     current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
     if current_selected_label not in period_labels:
-        current_selected_label = "1W" # Revenir à un défaut valide si la valeur stockée est invalide
+        current_selected_label = "1W"  # Revenir à un défaut valide si la valeur stockée est invalide
 
     default_period_index = period_labels.index(current_selected_label)
 
-
-    
     selected_label = st.radio(
         "",
         period_labels,
         index=default_period_index,
         key="selected_ticker_table_period_radio",
-        horizontal=True # Affiche les options horizontalement si l'espace le permet
+        horizontal=True  # Affiche les options horizontalement si l'espace le permet
     )
     
     # Mettre à jour la session_state pour stocker l'étiquette sélectionnée
@@ -75,17 +86,34 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-    
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=10) 
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
+            # Récupérer la devise associée au ticker
+            ticker_devise = target_currency  # Par défaut, la devise cible si non trouvée
+            if "Devise" in df_current_portfolio.columns and ticker in df_current_portfolio["Ticker"].values:
+                ticker_devise_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]["Devise"]
+                if not ticker_devise_row.empty and pd.notnull(ticker_devise_row.iloc[0]):
+                    ticker_devise = str(ticker_devise_row.iloc[0]).strip().upper()
+            st.write(f"Ticker: {ticker}, Devise: {ticker_devise}")  # Débogage
+
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
-                last_days_data[ticker] = filtered_data
+                # Convertir chaque cours vers la devise cible
+                converted_data = pd.Series(index=filtered_data.index, dtype=float)
+                for date, price in filtered_data.items():
+                    converted_price, fx_rate = convertir(price, ticker_devise, target_currency, fx_rates)
+                    if pd.isna(converted_price) or pd.isna(fx_rate):
+                        st.warning(f"Conversion échouée pour {ticker} le {date.strftime('%Y-%m-%d')}: taux manquant pour {ticker_devise}. Utilisation de la valeur originale.")
+                        converted_data[date] = price
+                    else:
+                        converted_data[date] = converted_price
+                    st.write(f"Date: {date}, Prix original: {price}, Prix converti: {converted_price}, Taux: {fx_rate}")  # Débogage
+                last_days_data[ticker] = converted_data
             else:
                 last_days_data[ticker] = pd.Series(dtype='float64') 
 
@@ -105,7 +133,11 @@ def display_performance_history():
 
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
             
-            
-            st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
+            # Afficher avec formatage
+            st.dataframe(df_pivot.style.format(lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"), 
+                         use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
+
+if __name__ == "__main__":
+    display_performance_history()
