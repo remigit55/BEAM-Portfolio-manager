@@ -22,7 +22,7 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-    
+    st.subheader("Performance Historique du Portefeuille")
 
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
@@ -31,10 +31,10 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
-    # --- DÉBOGAGE : Afficher le DataFrame complet du portefeuille ---
-    
-    st.dataframe(df_current_portfolio, use_container_width=True) 
-    st.markdown("---")
+    # --- DÉBOGAGE : Afficher le DataFrame complet du portefeuille (retiré) ---
+    # st.markdown("##### Aperçu du DataFrame du Portefeuille (pour débogage - complet)")
+    # st.dataframe(df_current_portfolio, use_container_width=True) 
+    # st.markdown("---")
     # --- FIN DÉBOGAGE ---
 
     # Initialisation ou rafraîchissement des taux de change historiques
@@ -88,7 +88,8 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-    
+    st.info(f"Affichage des valeurs actuelles pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         all_ticker_data = [] 
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
@@ -97,9 +98,8 @@ def display_performance_history():
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
             quantity = 0.0 
-            fx_adjustment_factor = 1.0 # Initialiser le facteur d'ajustement FX
+            fx_adjustment_factor = 1.0 
             
-            # Find the currency, quantity, and FX adjustment factor for the current ticker
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             
             if not ticker_row.empty:
@@ -117,7 +117,6 @@ def display_performance_history():
                     st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}' dans le DataFrame du portefeuille. Utilisation de 0.")
                     quantity = 0.0
 
-                # --- NOUVEAU : Récupérer le Facteur_Ajustement_FX ---
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
                     numeric_fx_factor = pd.to_numeric(ticker_row["Facteur_Ajustement_FX"], errors='coerce')
                     if not numeric_fx_factor.empty and pd.notnull(numeric_fx_factor.iloc[0]):
@@ -126,8 +125,7 @@ def display_performance_history():
                         st.warning(f"Facteur d'ajustement FX pour le ticker '{ticker}' est vide ou invalide. Utilisation de 1.0.")
                         fx_adjustment_factor = 1.0
                 else:
-                    fx_adjustment_factor = 1.0 # Default if column is missing
-                # --- FIN NOUVEAU ---
+                    fx_adjustment_factor = 1.0 
 
             else:
                 st.warning(f"Ticker '{ticker}' non trouvé dans le DataFrame du portefeuille. Impossible de récupérer la quantité et le facteur FX. Utilisation de 0 et 1.0.")
@@ -149,11 +147,11 @@ def display_performance_history():
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
 
-                    # --- MODIFIÉ : Passer le facteur d'ajustement FX à convertir ---
-                    converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate_for_date}, fx_adjustment_factor)
-                    # --- FIN MODIFIÉ ---
+                    # --- CORRECTION ICI : Passer directement le taux scalaire ---
+                    converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    # --- FIN CORRECTION ---
                     
-                    current_value = converted_price * quantity # Calculate current value
+                    current_value = converted_price * quantity 
 
                     all_ticker_data.append({
                         "Date": date_idx,
@@ -169,7 +167,7 @@ def display_performance_history():
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             
             # --- START: Add chart for daily total ---
-            
+            st.markdown("##### Évolution Quotidienne de la Valeur Totale du Portefeuille")
             fig_total = px.line(
                 df_total_daily_value,
                 x="Date",
@@ -206,7 +204,7 @@ def display_performance_history():
                 if "Valeur Actuelle (" in col: 
                     format_dict[col] = lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"
 
-            
+            st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
