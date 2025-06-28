@@ -19,8 +19,6 @@ def display_performance_history():
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
 
-    # Section pour le tableau des derniers cours de clôture par ticker
-    st.subheader("Derniers Cours de Clôture par Ticker")
 
     tickers_in_portfolio = []
     if "df" in st.session_state and st.session_state.df is not None and "Ticker" in st.session_state.df.columns:
@@ -43,8 +41,6 @@ def display_performance_history():
 
     if 'selected_ticker_table_period' not in st.session_state:
         st.session_state.selected_ticker_table_period = "1W" # Période par défaut
-
-    st.markdown("Sélectionnez une période pour les cours des tickers :")
     
     # Utilisation de st.columns pour placer les boutons côte à côte
     cols_period_buttons = st.columns(len(period_options))
