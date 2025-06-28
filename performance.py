@@ -8,6 +8,9 @@ from pandas.tseries.offsets import BDay # Pour les jours ouvrables
 import yfinance as yf
 import builtins # Pour contourner l'écrasement de str()
 
+# Importe le nouveau composant personnalisé
+from period_selector_component import period_selector
+
 # Import des fonctions nécessaires
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
 from historical_performance_calculator import reconstruct_historical_portfolio_value
@@ -37,27 +40,27 @@ def display_performance_history():
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
                 st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
-                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.date_range(start=start_date_for_fx, end=end_date_for_fx),
+                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx), # Utilisation de bdate_range ici aussi
                                                                         columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
-            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.date_range(start=start_date_for_fx, end=end_date_for_fx),
+            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx), # Utilisation de bdate_range ici aussi
                                                                     columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
 
     if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
         st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
         return
 
-    # --- AFFICHAGE DES TAUX DE CHANGE POUR LE DÉBOGAGE ---
-    st.markdown("#### Taux de Change Historiques Récupérés (pour débogage)")
-    if st.session_state.historical_fx_rates_df is not None and not st.session_state.historical_fx_rates_df.empty:
-        st.dataframe(st.session_state.historical_fx_rates_df.head()) # Affiche les premières lignes
-        st.write(f"Dimensions du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.shape}")
-        st.write(f"Colonnes du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.columns.tolist()}")
-        st.write(f"Index du DataFrame des taux de change (début/fin) : {st.session_state.historical_fx_rates_df.index.min().strftime('%Y-%m-%d')} à {st.session_state.historical_fx_rates_df.index.max().strftime('%Y-%m-%d')}")
-    else:
-        st.info("Aucun taux de change historique n'est disponible pour l'affichage.")
-    st.markdown("---")
+    # --- RETRAIT DE L'AFFICHAGE DES TAUX DE CHANGE POUR LE DÉBOGAGE ---
+    # st.markdown("#### Taux de Change Historiques Récupérés (pour débogage)")
+    # if st.session_state.historical_fx_rates_df is not None and not st.session_state.historical_fx_rates_df.empty:
+    #     st.dataframe(st.session_state.historical_fx_rates_df.head())
+    #     st.write(f"Dimensions du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.shape}")
+    #     st.write(f"Colonnes du DataFrame des taux de change : {st.session_state.historical_fx_rates_df.columns.tolist()}")
+    #     st.write(f"Index du DataFrame des taux de change (début/fin) : {st.session_state.historical_fx_rates_df.index.min().strftime('%Y-%m-%d')} à {st.session_state.historical_fx_rates_df.index.max().strftime('%Y-%m-%d')}")
+    # else:
+    #     st.info("Aucun taux de change historique n'est disponible pour l'affichage.")
+    # st.markdown("---")
     # --- FIN DE L'AFFICHAGE DE DÉBOGAGE ---
 
 
@@ -112,17 +115,13 @@ def display_performance_history():
                 converted_data = pd.Series(index=filtered_data.index, dtype=float)
                 
                 for date_idx, price in filtered_data.items():
-                    # Correction ici : Utiliser date_idx (Timestamp) directement pour la recherche dans l'index
-                    # date_as_date = date_idx.date() # Cette ligne n'est plus nécessaire pour la recherche d'index
                     fx_key = f"{ticker_devise}{target_currency}"
                     
                     fx_rate_for_date = 1.0
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
-                        # Utiliser date_idx directement pour la recherche dans l'index
                         if date_idx in st.session_state.historical_fx_rates_df.index: 
                             fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_idx, fx_key]
                         else:
-                            # Le message d'avertissement utilise toujours date_as_date pour la lisibilité
                             st.warning(f"FX rate for {fx_key} on {date_idx.date()} not found in historical_fx_rates_df. Using 1.0.")
                     else:
                         st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
