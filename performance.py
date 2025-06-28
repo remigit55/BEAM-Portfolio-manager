@@ -50,7 +50,7 @@ def display_performance_history():
     default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1 Semaine"))
 
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
+    
     selected_label = st.radio(
         "",
         period_labels,
