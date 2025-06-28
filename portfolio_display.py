@@ -472,4 +472,4 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Configurer la colonne "Catégories" comme texte avec alignement par défaut (gauche)
         allocation_column_config["Catégories"] = st.column_config.TextColumn("Catégories", width="medium")
 
-        st.dataframe(df_allocation, use_container_width=True, column_config=allocation_column_config)
+        st.dataframe(df_allocation, use_container_width=True)
