@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import streamlit.components.v1 as components # Gardé au cas où d'autres composants HTML sont utilisés ailleurs
+import streamlit.components.v1 as components
 import datetime
 import pytz
 
@@ -237,8 +237,6 @@ def afficher_portefeuille():
     ]
 
     # Définition des colonnes à afficher et de leurs libellés
-    # Nous utilisons les noms des colonnes originales (non formatées) pour le DataFrame
-    # et nous appliquerons le formatage via .style.format(), sauf pour Valeur Acquisition (Source)
     cols_to_display = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
@@ -282,7 +280,6 @@ def afficher_portefeuille():
     df_disp.columns = final_labels  
 
     # Définition du dictionnaire de formatage pour st.dataframe.style.format
-    # Notez que "Valeur Acquisition (Source)" n'est PLUS ici car elle est pré-formatée
     format_dict_portfolio = {
         "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
         "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
@@ -306,7 +303,7 @@ def afficher_portefeuille():
     # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à gauche
     try:
         valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
-        st.write(f"DEBUG: Valeur Acquisition (Source) index pour alignement: {valeur_acquisition_source_idx}") # Debug line
+        # st.write(f"DEBUG: Valeur Acquisition (Source) index pour alignement: {valeur_acquisition_source_idx}") # Debug line - removed
         st.markdown(f"""
             <style>
             /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
@@ -320,7 +317,7 @@ def afficher_portefeuille():
             </style>
         """, unsafe_allow_html=True)
     except ValueError:
-        st.write("DEBUG: 'Valeur Acquisition (Source)' column not found for CSS alignment.") # Debug line
+        # st.write("DEBUG: 'Valeur Acquisition (Source)' column not found for CSS alignment.") # Debug line - removed
         pass
 
     # Affichage du tableau du portefeuille
@@ -489,6 +486,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         
         # Affichage du tableau de répartition par catégories
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
+
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
