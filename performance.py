@@ -45,9 +45,16 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
     
-    # Options pour le sélecteur, avec la période par défaut
+    # Options pour le sélecteur
     period_labels = list(period_options.keys())
-    default_period_index = period_labels.index(st.session_state.get("selected_ticker_table_period_label", "1W"))
+
+    # Récupérer la période sélectionnée depuis session_state, avec "1W" comme défaut
+    # S'assurer que la valeur est valide avant de chercher son index
+    current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
+    if current_selected_label not in period_labels:
+        current_selected_label = "1W" # Revenir à un défaut valide si la valeur stockée est invalide
+
+    default_period_index = period_labels.index(current_selected_label)
 
 
     st.markdown("#### Sélection de la période d'affichage des cours")
