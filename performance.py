@@ -4,9 +4,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from pandas.tseries.offsets import BDay  # Pour les jours ouvrables
+from pandas.tseries.offsets import BDay # Pour les jours ouvrables
 import yfinance as yf
-import builtins  # Pour contourner l'écrasement de str()
+import builtins # Pour contourner l'écrasement de str()
 
 # Importe le nouveau composant personnalisé
 from period_selector_component import period_selector
@@ -15,7 +15,7 @@ from period_selector_component import period_selector
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
-from portfolio_display import convertir  # Importer la fonction de conversion
+from portfolio_display import convertir # Importer la fonction de conversion
 
 def display_performance_history():
     """
@@ -35,7 +35,7 @@ def display_performance_history():
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
         st.info("Récupération des taux de change historiques initiaux...")
         end_date_for_fx = datetime.now().date()
-        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10)  # Fetch 10 years of FX data for broader use
+        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10) # Fetch 10 years of FX data for broader use
         try:
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
@@ -91,32 +91,31 @@ def display_performance_history():
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
-            quantity = 0 
+            quantity = 0.0 # Initialize as float
             
             # Find the currency and quantity for the current ticker from the portfolio DataFrame
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             
-            # --- DÉBUT DE LA CORRECTION ET DU DÉBOGAGE ---
             if not ticker_row.empty:
-                if "Devise" in ticker_row.columns and not ticker_row["Devise"].isna().all():
-                    ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper() if pd.notnull(ticker_row["Devise"].iloc[0]) else ticker_devise
+                if "Devise" in ticker_row.columns and not ticker_row["Devise"].empty and pd.notnull(ticker_row["Devise"].iloc[0]):
+                    ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                 
-                # Debug line: Check content safely
                 if "Quantité" in ticker_row.columns:
-                    quantites = ticker_row["Quantité"]
-                    st.write(f"DEBUG: Ticker '{ticker}', ticker_row['Quantité'] content: {quantites.tolist() if not quantites.empty else 'Empty'}")
-                    if not quantites.empty:
-                        quantity = pd.to_numeric(quantites.iloc[0], errors='coerce').fillna(0)
+                    # Convert the 'Quantité' series to numeric, coercing errors to NaN
+                    numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
+                    
+                    # Check if there's at least one valid numeric quantity and assign it
+                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]):
+                        quantity = numeric_quantities.iloc[0]
                     else:
-                        st.warning(f"Quantité pour le ticker '{ticker}' est vide dans le DataFrame du portefeuille. Utilisation de 0.")
-                        quantity = 0
+                        st.warning(f"Quantité pour le ticker '{ticker}' est vide ou invalide dans le DataFrame du portefeuille. Utilisation de 0.")
+                        quantity = 0.0
                 else:
                     st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}' dans le DataFrame du portefeuille. Utilisation de 0.")
-                    quantity = 0
+                    quantity = 0.0
             else:
                 st.warning(f"Ticker '{ticker}' non trouvé dans le DataFrame du portefeuille. Impossible de récupérer la quantité. Utilisation de 0.")
-                quantity = 0
-            # --- FIN DE LA CORRECTION ET DU DÉBOGAGE ---
+                quantity = 0.0
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
@@ -135,7 +134,7 @@ def display_performance_history():
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate_for_date})
                     
-                    current_value = converted_price * quantity  # Calculate current value
+                    current_value = converted_price * quantity # Calculate current value
 
                     all_ticker_data.append({
                         "Date": date_idx,
@@ -175,5 +174,3 @@ def display_performance_history():
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
 
-if __name__ == "__main__":
-    display_performance_history()
