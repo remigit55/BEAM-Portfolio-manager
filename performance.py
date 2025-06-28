@@ -91,6 +91,7 @@ def display_performance_history():
         }
 
         /* Cache les boutons Streamlit natifs qui déclenchent l'action */
+        /* Utilisation de !important pour s'assurer que cela écrase les styles par défaut de Streamlit */
         .hidden-st-button {
             display: none !important;
         }
@@ -119,14 +120,13 @@ def display_performance_history():
     # Ces boutons mettront à jour la session_state et déclencheront un rerun.
     for label in period_options:
         # Utilisez une clé unique pour chaque bouton
-        if st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}"):
-            st.session_state.selected_ticker_table_period = label
-            st.rerun()
-        # Injecter du CSS pour cacher spécifiquement ce bouton
+        # Le bouton est créé dans un div avec un data-testid spécifique
+        st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}")
+        # Injecter du CSS pour cacher spécifiquement le div conteneur de ce bouton
         st.markdown(f"""
             <style>
             div[data-testid="stButton-hidden_period_btn_{label}"] {{
-                display: none;
+                display: none !important; /* Cache le conteneur du bouton */
             }}
             </style>
         """, unsafe_allow_html=True)
@@ -134,21 +134,28 @@ def display_performance_history():
 
     # JavaScript pour attacher les écouteurs d'événements aux spans
     # et simuler un clic sur le bouton Streamlit caché correspondant.
+    # Le script est enveloppé dans DOMContentLoaded pour s'assurer que tous les éléments sont chargés.
     js_code = """
     <script>
-        const periodLabels = %s; // Pass period labels from Python
-        periodLabels.forEach(label => {
-            const span = document.getElementById(`period_item_${label}`);
-            if (span) {
-                span.onclick = function() {
-                    // Trouver le bouton Streamlit caché par son data-testid
-                    // Le data-testid est généré par Streamlit sous la forme "stButton-<key>"
-                    const hiddenButton = document.querySelector(`button[data-testid="stButton-hidden_period_btn_${label}"]`);
-                    if (hiddenButton) {
-                        hiddenButton.click(); // Simule un clic sur le bouton caché
-                    }
-                };
-            }
+        document.addEventListener('DOMContentLoaded', function() {
+            const periodLabels = %s; // Pass period labels from Python
+            periodLabels.forEach(label => {
+                const span = document.getElementById(`period_item_${label}`);
+                if (span) {
+                    span.onclick = function() {
+                        // Trouver le bouton Streamlit caché par son data-testid
+                        // Le data-testid est généré par Streamlit sous la forme "stButton-<key>"
+                        const hiddenButton = document.querySelector(`button[data-testid="stButton-hidden_period_btn_${label}"]`);
+                        if (hiddenButton) {
+                            hiddenButton.click(); // Simule un clic sur le bouton caché
+                        } else {
+                            console.warn(`Bouton caché pour ${label} non trouvé.`);
+                        }
+                    };
+                } else {
+                    console.warn(`Span pour ${label} non trouvé.`);
+                }
+            });
         });
     </script>
     """ % (list(period_options.keys())) # Passer la liste des clés Python au JavaScript
