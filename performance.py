@@ -36,7 +36,7 @@ def display_performance_history():
     # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO (COMPOSANT NATIF STREAMLIT) ---
 
     period_options = {
-        "1 Semaine": timedelta(weeks=1),
+        "1W": timedelta(weeks=1),
         "1 Mois": timedelta(days=30),
         "3 Mois": timedelta(days=90),
         "6 Mois": timedelta(days=180),
