@@ -57,9 +57,9 @@ def display_performance_history():
     default_period_index = period_labels.index(current_selected_label)
 
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
+    
     selected_label = st.radio(
-        "Choisissez une période:",
+        "",
         period_labels,
         index=default_period_index,
         key="selected_ticker_table_period_radio",
@@ -75,8 +75,7 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
-
+    
     with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=10) 
