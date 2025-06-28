@@ -82,20 +82,25 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+    st.info(f"Affichage des valeurs actuelles pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
-        all_ticker_data = [] # Pour stocker toutes les données (Date, Ticker, Cours Original, Taux, Cours Converti)
+        all_ticker_data = [] # Pour stocker toutes les données (Date, Ticker, Quantité, Cours Converti, Valeur Actuelle)
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
-            if "Devise" in df_current_portfolio.columns and ticker in df_current_portfolio["Ticker"].values:
-                ticker_devise_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]["Devise"]
-                if not ticker_devise_row.empty and pd.notnull(ticker_devise_row.iloc[0]):
-                    ticker_devise = str(ticker_devise_row.iloc[0]).strip().upper()
+            quantity = 0 # Default quantity
             
+            # Find the currency and quantity for the current ticker from the portfolio DataFrame
+            ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
+            if not ticker_row.empty:
+                if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
+                    ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
+                if "Quantité" in ticker_row.columns and pd.notnull(ticker_row["Quantité"].iloc[0]):
+                    quantity = pd.to_numeric(ticker_row["Quantité"].iloc[0], errors='coerce').fillna(0)
+
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
@@ -113,39 +118,39 @@ def display_performance_history():
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, {ticker_devise: fx_rate_for_date})
                     
+                    current_value = converted_price * quantity # Calculate current value
+
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
-                        "Devise Source": ticker_devise,
-                        f"Cours ({target_currency})": converted_price # Only include the converted price
+                        # "Devise Source": ticker_devise, # Removed as per request
+                        # "Quantité": quantity, # Removed as per request
+                        f"Valeur Actuelle ({target_currency})": current_value 
                     })
 
-        df_display_prices = pd.DataFrame(all_ticker_data)
+        df_display_values = pd.DataFrame(all_ticker_data)
 
-        if not df_display_prices.empty:
-            # Créer un DataFrame pivot pour l'affichage avec seulement les cours convertis
-            df_pivot_cours_target = df_display_prices.pivot_table(index="Ticker", columns="Date", values=f"Cours ({target_currency})", dropna=False)
-            df_pivot_cours_target = df_pivot_cours_target.sort_index(axis=1)
+        if not df_display_values.empty:
+            # Créer un DataFrame pivot pour l'affichage avec la valeur actuelle
+            df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
+            df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
 
             # S'assurer que toutes les dates sont dans la plage sélectionnée
-            df_pivot_cours_target = df_pivot_cours_target.loc[:, (df_pivot_cours_target.columns >= pd.Timestamp(start_date_table)) & (df_pivot_cours_target.columns <= pd.Timestamp(end_date_table))]
+            df_pivot_current_value = df_pivot_current_value.loc[:, (df_pivot_current_value.columns >= pd.Timestamp(start_date_table)) & (df_pivot_current_value.columns <= pd.Timestamp(end_date_table))]
 
             # Renommer les colonnes de date pour un affichage plus lisible
-            df_pivot_cours_target.columns = [f"Cours Conv. ({col.strftime('%d/%m/%Y')})" for col in df_pivot_cours_target.columns]
+            df_pivot_current_value.columns = [f"Valeur Actuelle ({col.strftime('%d/%m/%Y')})" for col in df_pivot_current_value.columns]
 
-            # Concaténer les DataFrames pivotés
-            df_final_display = pd.concat([
-                df_display_prices[['Ticker', 'Devise Source']].drop_duplicates().set_index('Ticker'),
-                df_pivot_cours_target
-            ], axis=1).reset_index()
+            # Concaténer les DataFrames pivotés avec Ticker (Devise Source et Quantité sont retirés)
+            df_final_display = df_pivot_current_value.reset_index()
 
-            # Trier les colonnes pour un affichage cohérent (Ticker, Devise Source, puis toutes les dates groupées)
-            sorted_columns = ['Ticker', 'Devise Source']
-            dates_ordered = sorted(list(set([col.date() for col in df_display_prices['Date']])))
+            # Trier les colonnes pour un affichage cohérent (Ticker, puis toutes les dates groupées)
+            sorted_columns = ['Ticker']
+            dates_ordered = sorted(list(set([col.date() for col in df_display_values['Date']])))
             
             for d in dates_ordered:
                 date_str = d.strftime('%d/%m/%Y')
-                sorted_columns.append(f"Cours Conv. ({date_str})")
+                sorted_columns.append(f"Valeur Actuelle ({date_str})")
             
             # Filtrer les colonnes qui existent réellement dans df_final_display
             final_columns_to_display = [col for col in sorted_columns if col in df_final_display.columns]
@@ -154,10 +159,12 @@ def display_performance_history():
             # Définir le formatage pour les colonnes numériques
             format_dict = {}
             for col in df_final_display.columns:
-                if "Cours Conv. (" in col: # Colonnes de cours convertis
+                if "Valeur Actuelle (" in col: # Colonnes de valeur actuelle
                     format_dict[col] = lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"
+                # Removed formatting for "Quantité" as it's no longer a direct column
 
-            st.markdown("##### Cours de Clôture des Derniers Jours (avec conversion)")
+            st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
-            st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
+            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
+
