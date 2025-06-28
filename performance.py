@@ -37,12 +37,12 @@ def display_performance_history():
 
     period_options = {
         "1W": timedelta(weeks=1),
-        "1 Mois": timedelta(days=30),
-        "3 Mois": timedelta(days=90),
-        "6 Mois": timedelta(days=180),
-        "1 An": timedelta(days=365),
-        "5 Ans": timedelta(days=365 * 5),
-        "10 Ans": timedelta(days=365 * 10),
+        "1M": timedelta(days=30),
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180),
+        "1Y": timedelta(days=365),
+        "5Y": timedelta(days=365 * 5),
+        "10Y": timedelta(days=365 * 10),
     }
     
     # Options pour le sélecteur, avec la période par défaut
