@@ -107,10 +107,6 @@ def display_performance_history():
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
                         if date_idx in st.session_state.historical_fx_rates_df.index: 
                             fx_rate_for_date = st.session_state.historical_fx_rates_df.loc[date_idx, fx_key]
-                        # else: # Retiré pour éviter les messages d'avertissement excessifs une fois que la source est fixée
-                        #     st.warning(f"FX rate for {fx_key} on {date_idx.date()} not found in historical_fx_rates_df. Using 1.0.")
-                    # else: # Retiré pour éviter les messages d'avertissement excessifs une fois que la source est fixée
-                    #     st.warning(f"FX column {fx_key} not found in historical_fx_rates_df. Using 1.0.")
                     
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
@@ -120,54 +116,35 @@ def display_performance_history():
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
-                        "Cours (Source)": price,
                         "Devise Source": ticker_devise,
-                        "Taux FX": fx_rate_for_date,
-                        f"Cours ({target_currency})": converted_price
+                        f"Cours ({target_currency})": converted_price # Only include the converted price
                     })
 
         df_display_prices = pd.DataFrame(all_ticker_data)
 
         if not df_display_prices.empty:
-            # Créer un DataFrame pivot pour l'affichage
-            # Nous allons pivoter sur les dates pour les cours, puis ajouter les autres colonnes séparément
-            df_pivot_cours_source = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours (Source)", dropna=False)
-            df_pivot_cours_source = df_pivot_cours_source.sort_index(axis=1)
-
-            df_pivot_taux = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Taux FX", dropna=False)
-            df_pivot_taux = df_pivot_taux.sort_index(axis=1)
-
+            # Créer un DataFrame pivot pour l'affichage avec seulement les cours convertis
             df_pivot_cours_target = df_display_prices.pivot_table(index="Ticker", columns="Date", values=f"Cours ({target_currency})", dropna=False)
             df_pivot_cours_target = df_pivot_cours_target.sort_index(axis=1)
 
             # S'assurer que toutes les dates sont dans la plage sélectionnée
-            df_pivot_cours_source = df_pivot_cours_source.loc[:, (df_pivot_cours_source.columns >= pd.Timestamp(start_date_table)) & (df_pivot_cours_source.columns <= pd.Timestamp(end_date_table))]
-            df_pivot_taux = df_pivot_taux.loc[:, (df_pivot_taux.columns >= pd.Timestamp(start_date_table)) & (df_pivot_taux.columns <= pd.Timestamp(end_date_table))]
             df_pivot_cours_target = df_pivot_cours_target.loc[:, (df_pivot_cours_target.columns >= pd.Timestamp(start_date_table)) & (df_pivot_cours_target.columns <= pd.Timestamp(end_date_table))]
 
             # Renommer les colonnes de date pour un affichage plus lisible
-            df_pivot_cours_source.columns = [f"Cours ({col.strftime('%d/%m/%Y')})" for col in df_pivot_cours_source.columns]
-            df_pivot_taux.columns = [f"Taux ({col.strftime('%d/%m/%Y')})" for col in df_pivot_taux.columns]
             df_pivot_cours_target.columns = [f"Cours Conv. ({col.strftime('%d/%m/%Y')})" for col in df_pivot_cours_target.columns]
 
             # Concaténer les DataFrames pivotés
-            # Assurez-vous que les index sont alignés
             df_final_display = pd.concat([
                 df_display_prices[['Ticker', 'Devise Source']].drop_duplicates().set_index('Ticker'),
-                df_pivot_cours_source,
-                df_pivot_taux,
                 df_pivot_cours_target
             ], axis=1).reset_index()
 
             # Trier les colonnes pour un affichage cohérent (Ticker, Devise Source, puis toutes les dates groupées)
-            # Créer un ordre de colonnes dynamique
             sorted_columns = ['Ticker', 'Devise Source']
             dates_ordered = sorted(list(set([col.date() for col in df_display_prices['Date']])))
             
             for d in dates_ordered:
                 date_str = d.strftime('%d/%m/%Y')
-                sorted_columns.append(f"Cours ({date_str})")
-                sorted_columns.append(f"Taux ({date_str})")
                 sorted_columns.append(f"Cours Conv. ({date_str})")
             
             # Filtrer les colonnes qui existent réellement dans df_final_display
@@ -177,15 +154,10 @@ def display_performance_history():
             # Définir le formatage pour les colonnes numériques
             format_dict = {}
             for col in df_final_display.columns:
-                if "Cours (" in col: # Colonnes de cours source
-                    format_dict[col] = lambda x: f"{format_fr(x, 2)}" if pd.notnull(x) else "N/A"
-                elif "Taux (" in col: # Colonnes de taux FX
-                    format_dict[col] = lambda x: f"{format_fr(x, 4)}" if pd.notnull(x) else "N/A"
-                elif "Cours Conv. (" in col: # Colonnes de cours convertis
+                if "Cours Conv. (" in col: # Colonnes de cours convertis
                     format_dict[col] = lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"
 
             st.markdown("##### Cours de Clôture des Derniers Jours (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
-
