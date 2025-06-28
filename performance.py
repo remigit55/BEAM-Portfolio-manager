@@ -31,12 +31,6 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
-    # --- DÉBOGAGE : Afficher le DataFrame complet du portefeuille (retiré) ---
-    # st.markdown("##### Aperçu du DataFrame du Portefeuille (pour débogage - complet)")
-    # st.dataframe(df_current_portfolio, use_container_width=True) 
-    # st.markdown("---")
-    # --- FIN DÉBOGAGE ---
-
     # Initialisation ou rafraîchissement des taux de change historiques
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
         st.info("Récupération des taux de change historiques initiaux...")
@@ -147,9 +141,8 @@ def display_performance_history():
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
 
-                    # --- CORRECTION ICI : Passer directement le taux scalaire ---
+                    # Passer directement le taux scalaire
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
-                    # --- FIN CORRECTION ---
                     
                     current_value = converted_price * quantity 
 
@@ -208,4 +201,3 @@ def display_performance_history():
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
-
