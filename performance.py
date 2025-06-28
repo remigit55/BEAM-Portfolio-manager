@@ -105,7 +105,7 @@ def display_performance_history():
 
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
             
-            st.markdown("##### Cours de Clôture des Derniers Jours")
+            
             st.dataframe(df_pivot.style.format(format_fr), use_container_width=True)
         else:
             st.warning("Aucun cours de clôture n'a pu être récupéré pour la période sélectionnée.")
