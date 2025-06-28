@@ -144,6 +144,16 @@ def afficher_portefeuille():
     # Identifier la colonne ticker
     ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
+    # DEBUG: Afficher les valeurs après pd.to_numeric mais avant conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_after_numeric = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L après pd.to_numeric (avant conversion pence):")
+        st.write(f"  Acquisition: {hoc_row_after_numeric.get('Acquisition', 'N/A')}")
+        st.write(f"  currentPrice: {hoc_row_after_numeric.get('currentPrice', 'N/A')}")
+        st.write(f"  Devise: {hoc_row_after_numeric.get('Devise', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after_numeric.get('Facteur_Ajustement_FX', 'N/A')}")
+
+
     # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
     is_lse_ticker = pd.Series(False, index=df.index)
     if ticker_col_name:
@@ -162,17 +172,6 @@ def afficher_portefeuille():
     # OU
     #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
     needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
-
-    # DEBUG: Afficher les valeurs avant la conversion pence-vers-livre pour HOC.L
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_before = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L avant conversion pence:")
-        st.write(f"  Acquisition: {hoc_row_before.get('Acquisition', 'N/A')}")
-        st.write(f"  currentPrice: {hoc_row_before.get('currentPrice', 'N/A')}")
-        st.write(f"  Devise: {hoc_row_before.get('Devise', 'N/A')}")
-        st.write(f"  Facteur_Ajustement_FX: {hoc_row_before.get('Facteur_Ajustement_FX', 'N/A')}")
-        st.write(f"  Needs pence conversion: {needs_pence_to_pound_conversion.loc[hoc_row_before.name]}")
-
 
     # Appliquer la division par 100 aux colonnes de prix concernées
     for price_col in ["Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT"]:
@@ -590,4 +589,3 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
-
