@@ -91,31 +91,30 @@ def display_performance_history():
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
-            quantity = 0 
+            quantity = 0.0 # Initialize as float
             
             # Find the currency and quantity for the current ticker from the portfolio DataFrame
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             
-            # --- DÉBUT DE LA CORRECTION ET DU DÉBOGAGE ---
             if not ticker_row.empty:
                 if "Devise" in ticker_row.columns and not ticker_row["Devise"].empty and pd.notnull(ticker_row["Devise"].iloc[0]):
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                 
-                # Debug line: Print the content of ticker_row["Quantité"] before conversion
                 if "Quantité" in ticker_row.columns:
-                    st.write(f"DEBUG: Ticker '{ticker}', ticker_row['Quantité'] content: {ticker_row['Quantité'].to_list()}")
-                    if not ticker_row["Quantité"].empty:
-                        quantity = pd.to_numeric(ticker_row["Quantité"].iloc[0], errors='coerce').fillna(0)
+                    # Nouvelle approche pour récupérer la quantité de manière plus robuste
+                    # Convertit la colonne entière en numérique, puis prend la première valeur valide
+                    numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
+                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]):
+                        quantity = numeric_quantities.iloc[0]
                     else:
-                        st.warning(f"Quantité pour le ticker '{ticker}' est vide dans le DataFrame du portefeuille. Utilisation de 0.")
-                        quantity = 0
+                        st.warning(f"Quantité pour le ticker '{ticker}' est vide ou invalide dans le DataFrame du portefeuille. Utilisation de 0.")
+                        quantity = 0.0
                 else:
                     st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}' dans le DataFrame du portefeuille. Utilisation de 0.")
-                    quantity = 0
+                    quantity = 0.0
             else:
                 st.warning(f"Ticker '{ticker}' non trouvé dans le DataFrame du portefeuille. Impossible de récupérer la quantité. Utilisation de 0.")
-                quantity = 0
-            # --- FIN DE LA CORRECTION ET DU DÉBOGAGE ---
+                quantity = 0.0
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
