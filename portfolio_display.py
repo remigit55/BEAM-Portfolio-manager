@@ -304,30 +304,28 @@ def afficher_portefeuille():
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
     # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à gauche
-    # Streamlit utilise des classes CSS générées, nous devons les cibler.
-    # La première colonne est `:nth-child(1)`, la deuxième `:nth-child(2)`, etc.
-    # Nous devons trouver l'index de "Valeur Acquisition (Source)" dans `df_disp.columns`
     try:
         valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
+        st.write(f"DEBUG: Valeur Acquisition (Source) index pour alignement: {valeur_acquisition_source_idx}") # Debug line
         st.markdown(f"""
             <style>
             /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
-            .stDataFrame table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
-                text-align: left !important; /* Changé de 'right' à 'left' */
+            div[data-testid="stDataFrame"] table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: left !important;
             }}
             /* Cible l'en-tête (th) de la colonne "Valeur Acquisition (Source)" */
-            .stDataFrame table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
-                text-align: left !important; /* Changé de 'right' à 'left' */
+            div[data-testid="stDataFrame"] table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: left !important;
             }}
             </style>
         """, unsafe_allow_html=True)
     except ValueError:
-        # La colonne n'est pas présente, pas besoin de CSS spécifique
+        st.write("DEBUG: 'Valeur Acquisition (Source)' column not found for CSS alignment.") # Debug line
         pass
 
     # Affichage du tableau du portefeuille
     st.markdown("##### Détail du Portefeuille")
-    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True) # Ajout de hide_index=True
+    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True)
 
     st.session_state.df = df  
 
@@ -492,7 +490,24 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Affichage du tableau de répartition par catégories
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
 
+        # Message de réallocation pour Minières (maintenu séparé)
+        st.markdown("#### Réallocation Minières")
+        allocations_reelles = {
+            row["Catégories"]: row["Part Actuelle (%)"] / 100
+            for _, row in df_allocation.iterrows()
+        }
+        reallocation_value = calculer_reallocation_miniere(df, allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
 
+        if reallocation_value is not None:
+            target_minieres_pct_display = format_fr(target_allocations.get('Minières', 0.0) * 100, 0)
+            if reallocation_value > 0:
+                st.info(f"Pour atteindre l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
+            elif reallocation_value < 0:
+                st.info(f"Pour maintenir l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
+            else:
+                st.info("L'allocation Minières est conforme à l'objectif.")
+        else:
+            st.info("Calcul de réallocation Minières non applicable ou données insuffisantes.")
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
