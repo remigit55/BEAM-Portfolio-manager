@@ -227,14 +227,11 @@ def afficher_portefeuille():
         0
     )
 
-    # Formatage des colonnes pour l'affichage (sans créer de nouvelles colonnes _fmt pour Streamlit)
-    # Nous allons appliquer le formatage directement lors de l'affichage avec st.dataframe
-
     # Définition des colonnes à afficher et de leurs libellés
     cols_to_display = [
         ticker_col, "shortName", "Catégories", "Devise", "Quantité", "Acquisition",
         "Valeur Acquisition",  # Valeur source
-        "Valeur_conv",         # Valeur convertie
+        "Valeur_conv",         # Valeur convertie (EUR)
         "Taux_FX_Acquisition",
         "currentPrice", "Valeur_Actuelle", "Gain/Perte", "Gain/Perte (%)",
         "fiftyTwoWeekHigh", "Valeur_H52", "Objectif_LT", "Valeur_LT",
@@ -266,86 +263,88 @@ def afficher_portefeuille():
     }
 
     # Création du DataFrame pour l'affichage avec seulement les colonnes pertinentes
-    # et leurs noms affichables.
     df_display = pd.DataFrame()
     for col in cols_to_display:
         if col == ticker_col:
             if ticker_col in df.columns:
                 df_display[labels[ticker_col]] = df[ticker_col]
         elif col in df.columns:
-            # Pour les colonnes numériques qui seront formatées, nous utilisons les valeurs brutes ici
-            # Le formatage sera appliqué par Streamlit directement.
-            if col in ["Quantité", "Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT",
-                       "Valeur Acquisition", "Valeur_conv", "Taux_FX_Acquisition",
-                       "Valeur_Actuelle", "Gain/Perte", "Gain/Perte (%)",
-                       "Valeur_H52", "Valeur_LT", "Momentum (%)", "Z-Score"]:
-                df_display[labels[col]] = df[col]
-            else:
-                df_display[labels[col]] = df[col]
+            df_display[labels[col]] = df[col]
     
-    # Définition des formats pour st.dataframe
-    # Note: Streamlit apply formatting using Python's f-string capabilities or display functions.
-    # We will pass a dictionary of formats to st.dataframe.
+    # Définition des configurations de colonne pour st.dataframe
     column_config = {}
     
-    # Helper to apply currency/percentage formatting
-    currency_cols = [
-        f"Valeur Acquisition ({devise_cible})",
-        f"Valeur Actuelle ({devise_cible})",
-        f"Gain/Perte ({devise_cible})",
-        f"Valeur H52 ({devise_cible})",
-        f"Valeur LT ({devise_cible})"
-    ]
+    # Pour les colonnes monétaires, utilisons un format qui inclut la devise cible
+    # et gère les virgules comme séparateur décimal et les espaces comme séparateur de milliers.
+    # Note: Streamlit's NumberColumn uses f-string formatting.
+    # We need to adapt the format_fr function or create custom format strings.
+    
+    # Streamlit ne gère pas directement les séparateurs de milliers personnalisés
+    # (virgule pour décimal, espace pour milliers) dans le format de NumberColumn comme `format_fr`.
+    # Il utilise le formatage de la locale par défaut ou le format Python.
+    # Pour s'assurer que les valeurs sont affichées avec les virgules,
+    # nous allons pré-formater certaines colonnes avant de les passer à st.dataframe.
+    
+    # Colonnes qui nécessitent un formatage spécifique (virgule décimale, espace milliers)
+    cols_to_preformat = {
+        "Quantité": (0, ""), # Nombre entier
+        "Acquisition": (4, ""),
+        "currentPrice": (4, ""),
+        "fiftyTwoWeekHigh": (4, ""),
+        "Objectif_LT": (4, ""),
+        "Valeur Acquisition": (2, ""), # Devise source, on met la devise plus tard
+        "Valeur_conv": (2, f" {devise_cible}"), # Devise cible
+        "Taux_FX_Acquisition": (6, ""),
+        "Valeur_Actuelle": (2, f" {devise_cible}"),
+        "Gain/Perte": (2, f" {devise_cible}"),
+        "Gain/Perte (%)": (2, " %"),
+        "Valeur_H52": (2, f" {devise_cible}"),
+        "Valeur_LT": (2, f" {devise_cible}"),
+        "Momentum (%)": (2, " %"),
+        "Z-Score": (2, "")
+    }
 
-    percentage_cols = ["Gain/Perte (%)", "Momentum (%)"]
+    # Appliquer le formatage `format_fr` aux colonnes appropriées dans df_display
+    for original_col, (dec_places, suffix) in cols_to_preformat.items():
+        if original_col in labels: # Check if the original column has a label defined
+            display_label = labels[original_col]
+            if display_label in df_display.columns:
+                # Appliquer format_fr et stocker dans une nouvelle colonne temporaire pour l'affichage
+                # On ne peut pas mettre ça directement dans column_config
+                # Donc, on formate les valeurs avant de les passer à st.dataframe
+                df_display[display_label] = df_display[display_label].apply(
+                    lambda x: f"{format_fr(x, dec_places)}{suffix}" if pd.notna(x) else ""
+                )
+                # Puisque nous avons pré-formaté, ces colonnes deviennent de type 'text' pour st.dataframe
+                # Nous n'avons pas besoin de NumberColumn pour elles, juste TextColumn.
+                column_config[display_label] = st.column_config.TextColumn(
+                    display_label,
+                    width="small" if suffix == "" and dec_places > 0 else "medium" # Adjust width based on content
+                )
+        elif original_col == "Quantité": # Specific case for quantity
+            if "Quantité" in df.columns:
+                df_display[labels["Quantité"]] = df_display[labels["Quantité"]].apply(
+                    lambda x: f"{format_fr(x, 0)}" if pd.notna(x) else ""
+                )
+                column_config[labels["Quantité"]] = st.column_config.TextColumn(
+                    labels["Quantité"], width="small"
+                )
 
-    for label in df_display.columns:
-        if label in currency_cols:
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format=f"%.2f {devise_cible}",
-                help=f"Valeur en {devise_cible}"
-            )
-        elif label in percentage_cols:
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format="%.2f %%",
-                help="Valeur en pourcentage"
-            )
-        elif label == "Taux FX (Source/Cible)":
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format="%.6f",
-                help="Taux de change appliqué"
-            )
-        elif label in ["Prix d'Acquisition (Source)", "Prix Actuel", "Haut 52 Semaines", "Objectif LT"]:
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format="%.4f",
-                help="Prix unitaire"
-            )
-        elif label == "Quantité":
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format="%d",
-                help="Quantité détenue"
-            )
-        elif label in ["Z-Score"]:
-            column_config[label] = st.column_config.NumberColumn(
-                label,
-                format="%.2f",
-                help="Score Z de momentum"
-            )
-        elif label == "Nom":
-            column_config[label] = st.column_config.TextColumn(
-                label,
-                width="large"
-            )
-        elif label in ["Justification"]:
-            column_config[label] = st.column_config.TextColumn(
-                label,
-                width="extra_large"
-            )
+    # Configurer les colonnes textuelles
+    if labels[ticker_col] in df_display.columns:
+        column_config[labels[ticker_col]] = st.column_config.TextColumn(labels[ticker_col], width="small")
+    if labels["shortName"] in df_display.columns:
+        column_config[labels["shortName"]] = st.column_config.TextColumn(labels["shortName"], width="large")
+    if labels["Catégories"] in df_display.columns:
+        column_config[labels["Catégories"]] = st.column_config.TextColumn(labels["Catégories"], width="small")
+    if labels["Devise"] in df_display.columns:
+        column_config[labels["Devise"]] = st.column_config.TextColumn(labels["Devise"], width="small")
+    if labels["Signal"] in df_display.columns:
+        column_config[labels["Signal"]] = st.column_config.TextColumn(labels["Signal"], width="small")
+    if labels["Action"] in df_display.columns:
+        column_config[labels["Action"]] = st.column_config.TextColumn(labels["Action"], width="medium")
+    if labels["Justification"] in df_display.columns:
+        column_config[labels["Justification"]] = st.column_config.TextColumn(labels["Justification"], width="large")
 
 
     st.dataframe(df_display, use_container_width=True, column_config=column_config)
@@ -353,6 +352,8 @@ def afficher_portefeuille():
     st.session_state.df = df # Ensure the original df (with calculated columns) is saved.
 
     return total_valeur, total_actuelle, total_h52, total_lt
+
+---
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
@@ -455,7 +456,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             deviation_pct = (current_pct - target_pct)
             value_to_adjust = target_value_for_category - current_value_cat
             
-            # Not formatting here, letting st.dataframe handle it later
             results_data.append({
                 "Catégories": category,
                 "Valeur Actuelle": current_value_cat,
@@ -466,31 +466,31 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             })
 
         df_allocation = pd.DataFrame(results_data)
-        # We sort by 'Part Actuelle (%)' as it's a numeric column before displaying
         df_allocation = df_allocation.sort_values(by='Part Actuelle (%)', ascending=False)
         
-        # Define column configurations for the allocation table
-        allocation_column_config = {
-            "Valeur Actuelle": st.column_config.NumberColumn(
-                f"Valeur Actuelle ({devise_cible})",
-                format=f"%.2f {devise_cible}"
-            ),
-            "Part Actuelle (%)": st.column_config.NumberColumn(
-                "Part Actuelle (%)",
-                format="%.2f %%"
-            ),
-            "Cible (%)": st.column_config.NumberColumn(
-                "Cible (%)",
-                format="%.2f %%"
-            ),
-            "Écart à l'objectif (%)": st.column_config.NumberColumn(
-                "Écart à l'objectif (%)",
-                format="%.2f %%"
-            ),
-            "Ajustement Nécessaire": st.column_config.NumberColumn(
-                f"Ajustement Nécessaire ({devise_cible})",
-                format=f"%.2f {devise_cible}"
-            )
+        # Définition des configurations de colonne pour la table d'allocation
+        allocation_column_config = {}
+
+        # Colonnes qui nécessitent un formatage spécifique pour la table d'allocation
+        cols_to_preformat_allocation = {
+            "Valeur Actuelle": (2, f" {devise_cible}"),
+            "Part Actuelle (%)": (2, " %"),
+            "Cible (%)": (2, " %"),
+            "Écart à l'objectif (%)": (2, " %"),
+            "Ajustement Nécessaire": (2, f" {devise_cible}")
         }
+
+        for col, (dec_places, suffix) in cols_to_preformat_allocation.items():
+            if col in df_allocation.columns:
+                df_allocation[col] = df_allocation[col].apply(
+                    lambda x: f"{format_fr(x, dec_places)}{suffix}" if pd.notna(x) else ""
+                )
+                allocation_column_config[col] = st.column_config.TextColumn(
+                    col,
+                    width="small" if "Catégories" not in col else "medium"
+                )
+        
+        # Configurer la colonne "Catégories" comme texte
+        allocation_column_config["Catégories"] = st.column_config.TextColumn("Catégories", width="medium")
 
         st.dataframe(df_allocation, use_container_width=True, column_config=allocation_column_config)
