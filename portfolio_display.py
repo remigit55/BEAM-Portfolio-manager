@@ -303,9 +303,31 @@ def afficher_portefeuille():
     # Filtrer le dictionnaire de formatage pour n'inclure que les colonnes réellement affichées
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
+    # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à droite
+    # Streamlit utilise des classes CSS générées, nous devons les cibler.
+    # La première colonne est `:nth-child(1)`, la deuxième `:nth-child(2)`, etc.
+    # Nous devons trouver l'index de "Valeur Acquisition (Source)" dans `df_disp.columns`
+    try:
+        valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
+        st.markdown(f"""
+            <style>
+            /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
+            .stDataFrame table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: right !important;
+            }}
+            /* Cible l'en-tête (th) de la colonne "Valeur Acquisition (Source)" */
+            .stDataFrame table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: right !important;
+            }}
+            </style>
+        """, unsafe_allow_html=True)
+    except ValueError:
+        # La colonne n'est pas présente, pas besoin de CSS spécifique
+        pass
+
     # Affichage du tableau du portefeuille
     st.markdown("##### Détail du Portefeuille")
-    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True)
+    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True) # Ajout de hide_index=True
 
     st.session_state.df = df  
 
@@ -460,7 +482,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         filtered_format_dict_category = {k: v for k, v in format_dict_category.items() if k in df_disp_cat.columns}
         
         # Affichage du tableau de répartition par catégories
-        st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True)
+        st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True) # Ajout de hide_index=True
 
         # Logique de réallocation pour Minières
         st.markdown("#### Réallocation Minières")
@@ -482,3 +504,4 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
+
