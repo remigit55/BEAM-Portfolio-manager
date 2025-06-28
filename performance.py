@@ -13,7 +13,11 @@ from historical_data_fetcher import fetch_stock_history, get_all_historical_data
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
 from portfolio_display import convertir  # Importer la fonction de conversion
-from data_fetcher import fetch_fx_rates  # Importer fetch_fx_rates explicitement
+
+# Fonction de test temporaire pour fetch_fx_rates (à remplacer par l'original si nécessaire)
+def fetch_fx_rates_dummy(target_currency):
+    """Fonction temporaire pour tester avec des taux fixes."""
+    return {"USD": 0.85, "EUR": 1.0, "GBP": 1.10}  # Exemple de taux pour EUR comme cible
 
 def display_performance_history():
     """
@@ -27,14 +31,13 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
-    # Initialisation ou mise à jour des taux de change
+    # Initialisation des taux de change avec une valeur par défaut pour tester
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        devises_uniques = df_current_portfolio["Devise"].dropna().str.strip().str.upper().unique().tolist()
-        if not devises_uniques:
-            st.warning("Aucune devise trouvée dans le portefeuille. Utilisation de la devise cible par défaut.")
-            devises_uniques = [target_currency]
-        devises_a_fetch = list(set([target_currency.upper()] + devises_uniques))
-        st.session_state.fx_rates = fetch_fx_rates(target_currency)
+        st.write("Initialisation des taux de change (mode test)...")
+        st.session_state.fx_rates = fetch_fx_rates_dummy(target_currency)  # Utilisation d'une fonction dummy
+        # Si vous avez la vraie fonction, décommentez la ligne suivante et commentez la dummy
+        # from data_fetcher import fetch_fx_rates
+        # st.session_state.fx_rates = fetch_fx_rates(target_currency)
         st.write("Taux de change chargés :", st.session_state.fx_rates)  # Débogage
 
     fx_rates = st.session_state.fx_rates
@@ -59,13 +62,11 @@ def display_performance_history():
         "10Y": timedelta(days=365 * 10),
     }
     
-    # Options pour le sélecteur
     period_labels = list(period_options.keys())
 
-    # Récupérer la période sélectionnée depuis session_state, avec "1W" comme défaut
     current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
     if current_selected_label not in period_labels:
-        current_selected_label = "1W"  # Revenir à un défaut valide si la valeur stockée est invalide
+        current_selected_label = "1W"
 
     default_period_index = period_labels.index(current_selected_label)
 
@@ -74,10 +75,9 @@ def display_performance_history():
         period_labels,
         index=default_period_index,
         key="selected_ticker_table_period_radio",
-        horizontal=True  # Affiche les options horizontalement si l'espace le permet
+        horizontal=True
     )
     
-    # Mettre à jour la session_state pour stocker l'étiquette sélectionnée
     st.session_state.selected_ticker_table_period_label = selected_label
     selected_period_td = period_options[selected_label]
 
@@ -93,7 +93,7 @@ def display_performance_history():
 
         for ticker in tickers_in_portfolio:
             # Récupérer la devise associée au ticker
-            ticker_devise = target_currency  # Par défaut, la devise cible si non trouvée
+            ticker_devise = target_currency  # Par défaut
             if "Devise" in df_current_portfolio.columns and ticker in df_current_portfolio["Ticker"].values:
                 ticker_devise_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]["Devise"]
                 if not ticker_devise_row.empty and pd.notnull(ticker_devise_row.iloc[0]):
@@ -108,14 +108,14 @@ def display_performance_history():
                 for date, price in filtered_data.items():
                     converted_price, fx_rate = convertir(price, ticker_devise, target_currency, fx_rates)
                     if pd.isna(converted_price) or pd.isna(fx_rate):
-                        st.warning(f"Conversion échouée pour {ticker} le {date.strftime('%Y-%m-%d')}: taux manquant pour {ticker_devise}. Utilisation de la valeur originale.")
+                        st.warning(f"Conversion échouée pour {ticker} le {date.strftime('%Y-%m-%d')}: taux manquant pour {ticker_devise}. Utilisation de la valeur originale: {price}")
                         converted_data[date] = price
                     else:
                         converted_data[date] = converted_price
                     st.write(f"Date: {date}, Prix original: {price}, Prix converti: {converted_price}, Taux: {fx_rate}")  # Débogage
                 last_days_data[ticker] = converted_data
             else:
-                last_days_data[ticker] = pd.Series(dtype='float64') 
+                last_days_data[ticker] = pd.Series(dtype='float64')
 
         df_display_prices = pd.DataFrame()
         for ticker, series in last_days_data.items():
@@ -124,6 +124,7 @@ def display_performance_history():
                 temp_df.columns = ["Date", "Cours"]
                 temp_df["Ticker"] = ticker
                 df_display_prices = pd.concat([df_display_prices, temp_df])
+                st.write(f"Données converties pour {ticker}:", temp_df)  # Débogage
 
         if not df_display_prices.empty:
             df_pivot = df_display_prices.pivot_table(index="Ticker", columns="Date", values="Cours")
@@ -133,7 +134,8 @@ def display_performance_history():
 
             df_pivot.columns = [col.strftime('%d/%m/%Y') for col in df_pivot.columns]
             
-            # Afficher avec formatage
+            # Vérification des données avant affichage
+            st.write("DataFrame pivot avant formatage :", df_pivot)  # Débogage
             st.dataframe(df_pivot.style.format(lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"), 
                          use_container_width=True)
         else:
