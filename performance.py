@@ -85,21 +85,29 @@ def display_performance_history():
     st.info(f"Affichage des valeurs actuelles pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
 
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
-        all_ticker_data = [] # Pour stocker toutes les données (Date, Ticker, Quantité, Cours Converti, Valeur Actuelle)
+        all_ticker_data = [] 
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
-            quantity = 0 # Default quantity
+            quantity = 0 
             
             # Find the currency and quantity for the current ticker from the portfolio DataFrame
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
+            
+            # --- DÉBUT DE LA CORRECTION ---
             if not ticker_row.empty:
-                if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
+                if "Devise" in ticker_row.columns and not ticker_row["Devise"].empty and pd.notnull(ticker_row["Devise"].iloc[0]):
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
-                if "Quantité" in ticker_row.columns and pd.notnull(ticker_row["Quantité"].iloc[0]):
+                
+                # Check if 'Quantité' column exists and is not empty for this specific ticker_row
+                if "Quantité" in ticker_row.columns and not ticker_row["Quantité"].empty:
                     quantity = pd.to_numeric(ticker_row["Quantité"].iloc[0], errors='coerce').fillna(0)
+                else:
+                    # If 'Quantité' column is missing or empty for this ticker, default to 0
+                    quantity = 0
+            # --- FIN DE LA CORRECTION ---
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
@@ -123,28 +131,21 @@ def display_performance_history():
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
-                        # "Devise Source": ticker_devise, # Removed as per request
-                        # "Quantité": quantity, # Removed as per request
                         f"Valeur Actuelle ({target_currency})": current_value 
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
 
         if not df_display_values.empty:
-            # Créer un DataFrame pivot pour l'affichage avec la valeur actuelle
             df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
             df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
 
-            # S'assurer que toutes les dates sont dans la plage sélectionnée
             df_pivot_current_value = df_pivot_current_value.loc[:, (df_pivot_current_value.columns >= pd.Timestamp(start_date_table)) & (df_pivot_current_value.columns <= pd.Timestamp(end_date_table))]
 
-            # Renommer les colonnes de date pour un affichage plus lisible
             df_pivot_current_value.columns = [f"Valeur Actuelle ({col.strftime('%d/%m/%Y')})" for col in df_pivot_current_value.columns]
 
-            # Concaténer les DataFrames pivotés avec Ticker (Devise Source et Quantité sont retirés)
             df_final_display = df_pivot_current_value.reset_index()
 
-            # Trier les colonnes pour un affichage cohérent (Ticker, puis toutes les dates groupées)
             sorted_columns = ['Ticker']
             dates_ordered = sorted(list(set([col.date() for col in df_display_values['Date']])))
             
@@ -152,16 +153,13 @@ def display_performance_history():
                 date_str = d.strftime('%d/%m/%Y')
                 sorted_columns.append(f"Valeur Actuelle ({date_str})")
             
-            # Filtrer les colonnes qui existent réellement dans df_final_display
             final_columns_to_display = [col for col in sorted_columns if col in df_final_display.columns]
             df_final_display = df_final_display[final_columns_to_display]
 
-            # Définir le formatage pour les colonnes numériques
             format_dict = {}
             for col in df_final_display.columns:
-                if "Valeur Actuelle (" in col: # Colonnes de valeur actuelle
+                if "Valeur Actuelle (" in col: 
                     format_dict[col] = lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A"
-                # Removed formatting for "Quantité" as it's no longer a direct column
 
             st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
