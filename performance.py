@@ -115,8 +115,10 @@ def display_performance_history():
         "3M": timedelta(days=90),  # Environ 3 mois
         "6M": timedelta(days=180), # Environ 6 mois
         "1Y": timedelta(days=365),
+        "3Y": timedelta(days=365 * 3),
         "5Y": timedelta(days=365 * 5),
         "10Y": timedelta(days=365 * 10),
+        "                                                                        ": timedelta(days=365 * 10),
     }
 
     if 'selected_ticker_table_period' not in st.session_state:
@@ -136,9 +138,7 @@ def display_performance_history():
     selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
-
-    with st.spinner("Récupération des cours des tickers en cours..."):
+        with st.spinner("Récupération des cours des tickers en cours..."):
         last_days_data = {}
         fetch_start_date = start_date_table - timedelta(days=10) 
 
