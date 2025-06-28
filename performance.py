@@ -101,10 +101,8 @@ def display_performance_history():
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                 
                 if "Quantité" in ticker_row.columns:
-                    # Convert the 'Quantité' series to numeric, coercing errors to NaN
                     numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
                     
-                    # Check if there's at least one valid numeric quantity and assign it
                     if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]):
                         quantity = numeric_quantities.iloc[0]
                     else:
@@ -145,6 +143,24 @@ def display_performance_history():
         df_display_values = pd.DataFrame(all_ticker_data)
 
         if not df_display_values.empty:
+            # Calculate daily total portfolio value
+            df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
+            df_total_daily_value.columns = ['Date', 'Valeur Totale']
+            
+            # --- START: Add chart for daily total ---
+            st.markdown("##### Évolution Quotidienne de la Valeur Totale du Portefeuille")
+            fig_total = px.line(
+                df_total_daily_value,
+                x="Date",
+                y="Valeur Totale",
+                title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
+                labels={"Valeur Totale": f"Valeur Totale ({target_currency})", "Date": "Date"},
+                hover_data={"Valeur Totale": ':.2f'}
+            )
+            fig_total.update_layout(hovermode="x unified")
+            st.plotly_chart(fig_total, use_container_width=True)
+            # --- END: Add chart for daily total ---
+
             df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
             df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
 
@@ -173,4 +189,3 @@ def display_performance_history():
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
-
