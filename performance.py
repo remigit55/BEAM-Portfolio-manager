@@ -49,6 +49,7 @@ def display_performance_history():
         st.session_state.selected_ticker_table_period = "1W"
 
     # CSS pour styliser les "boutons-texte" et leur conteneur
+    # et pour cacher le conteneur des boutons Streamlit natifs
     st.markdown("""
         <style>
         /* Conteneur spécifique pour les éléments de période */
@@ -90,9 +91,8 @@ def display_performance_history():
             text-decoration: none !important; /* Pas de soulignement pour l'élément sélectionné */
         }
 
-        /* Cache les boutons Streamlit natifs qui déclenchent l'action */
-        /* Utilisation de !important pour s'assurer que cela écrase les styles par défaut de Streamlit */
-        .hidden-st-button {
+        /* Cache le conteneur des boutons Streamlit natifs */
+        div[data-testid="stVerticalBlock"] > div > div > button[data-testid^="stButton-hidden_period_btn_"] {
             display: none !important;
         }
         </style>
@@ -106,7 +106,6 @@ def display_performance_history():
         is_selected = (st.session_state.selected_ticker_table_period == label)
         
         # Chaque élément span aura un ID unique pour que le JS puisse le cibler
-        # et un onclick qui va "cliquer" sur un bouton Streamlit caché.
         period_items_html += f"""
         <span id="period_item_{label}" class="period-item {'selected' if is_selected else ''}">
             {label}
@@ -118,20 +117,16 @@ def display_performance_history():
 
     # Créer les boutons Streamlit cachés qui seront cliqués par le JavaScript
     # Ces boutons mettront à jour la session_state et déclencheront un rerun.
-    for label in period_options:
-        # Utilisez une clé unique pour chaque bouton
-        # Le bouton est créé dans un div avec un data-testid spécifique
-        st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}")
-        # Injecter du CSS pour cacher spécifiquement le div conteneur de ce bouton
-        st.markdown(f"""
-            <style>
-            div[data-testid="stButton-hidden_period_btn_{label}"] {{
-                display: none !important; /* Cache le conteneur du bouton */
-            }}
-            </style>
-        """, unsafe_allow_html=True)
-
-
+    # Utilisation d'un st.container() pour les regrouper et les cacher plus facilement
+    # Le data-testid du container sera utilisé pour le CSS de masquage
+    hidden_buttons_container = st.container()
+    with hidden_buttons_container:
+        for label in period_options:
+            # Utilisez une clé unique pour chaque bouton
+            if st.button(label, key=f"hidden_period_btn_{label}", help=f"Sélectionner {label}"):
+                st.session_state.selected_ticker_table_period = label
+                st.rerun()
+    
     # JavaScript pour attacher les écouteurs d'événements aux spans
     # et simuler un clic sur le bouton Streamlit caché correspondant.
     # Le script est enveloppé dans DOMContentLoaded pour s'assurer que tous les éléments sont chargés.
