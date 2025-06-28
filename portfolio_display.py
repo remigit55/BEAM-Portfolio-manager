@@ -228,13 +228,21 @@ def afficher_portefeuille():
         0
     )
 
+    # Pré-formatage de la colonne "Valeur Acquisition (Source)"
+    # Cette colonne est formatée ici pour inclure la devise source, car .style.format()
+    # ne peut pas facilement accéder à d'autres colonnes de la même ligne pour le formatage.
+    df["Valeur Acquisition_fmt"] = [
+        f"{format_fr(val, 2)} {dev}" if pd.notnull(val) else ""
+        for val, dev in zip(df["Valeur Acquisition"], df["Devise"])
+    ]
+
     # Définition des colonnes à afficher et de leurs libellés
     # Nous utilisons les noms des colonnes originales (non formatées) pour le DataFrame
-    # et nous appliquerons le formatage via .style.format()
+    # et nous appliquerons le formatage via .style.format(), sauf pour Valeur Acquisition (Source)
     cols_to_display = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
-        "Valeur Acquisition",  # Valeur dans la devise source
+        "Valeur Acquisition_fmt",  # Utilise la colonne pré-formatée
         "Valeur_Actuelle_conv",  # Valeur convertie en devise cible pour la colonne "Valeur Acquisition (EUR)"
         "Taux_FX_Acquisition", 
         "currentPrice", "Valeur_Actuelle_conv", "Gain/Perte", "Gain/Perte (%)",
@@ -245,7 +253,7 @@ def afficher_portefeuille():
     labels_for_display = [
         "Ticker", "Nom", "Catégories", "Devise Source", 
         "Quantité", "Prix d'Acquisition (Source)", 
-        "Valeur Acquisition (Source)", 
+        "Valeur Acquisition (Source)", # Label pour la colonne pré-formatée
         f"Valeur Acquisition ({devise_cible})", 
         "Taux FX (Source/Cible)", 
         "Prix Actuel", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
@@ -274,10 +282,10 @@ def afficher_portefeuille():
     df_disp.columns = final_labels  
 
     # Définition du dictionnaire de formatage pour st.dataframe.style.format
+    # Notez que "Valeur Acquisition (Source)" n'est PLUS ici car elle est pré-formatée
     format_dict_portfolio = {
         "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
         "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        "Valeur Acquisition (Source)": lambda x: f"{format_fr(x, 2)} {df['Devise'].iloc[df_disp.index.get_loc(x)]}" if pd.notnull(x) else "", # Complexité ici
         f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
         "Taux FX (Source/Cible)": lambda x: format_fr(x, 6) if pd.notnull(x) else "N/A",
         "Prix Actuel": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
