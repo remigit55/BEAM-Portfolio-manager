@@ -332,7 +332,7 @@ def afficher_portefeuille():
 
     return total_valeur, total_actuelle, total_h52, total_lt
 
----
+
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
