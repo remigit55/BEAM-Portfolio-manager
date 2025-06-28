@@ -275,7 +275,8 @@ def afficher_portefeuille():
     column_config = {}
     
     # Colonnes qui nécessitent un formatage spécifique (virgule décimale, espace milliers)
-    cols_to_preformat = {
+    # et qui doivent être alignées à droite.
+    cols_to_preformat_and_align_right = {
         "Quantité": (0, ""), # Nombre entier
         "Acquisition": (4, ""),
         "currentPrice": (4, ""),
@@ -293,8 +294,8 @@ def afficher_portefeuille():
         "Z-Score": (2, "")
     }
 
-    # Appliquer le formatage `format_fr` aux colonnes appropriées dans df_display
-    for original_col, (dec_places, suffix) in cols_to_preformat.items():
+    # Appliquer le formatage `format_fr` et l'alignement à droite aux colonnes appropriées dans df_display
+    for original_col, (dec_places, suffix) in cols_to_preformat_and_align_right.items():
         if original_col in labels: # Check if the original column has a label defined
             display_label = labels[original_col]
             if display_label in df_display.columns:
@@ -302,14 +303,14 @@ def afficher_portefeuille():
                     lambda x: f"{format_fr(x, dec_places)}{suffix}" if pd.notna(x) else ""
                 )
                 # Puisque nous avons pré-formaté, ces colonnes deviennent de type 'text' pour st.dataframe
+                # Nous ajoutons 'text_align="right"' pour l'alignement.
                 column_config[display_label] = st.column_config.TextColumn(
                     display_label,
-                    width="small" if "Actuelle" in display_label or "Acquisition" in display_label else "medium" # Adjust width based on content
+                    width="small" if "Actuelle" in display_label or "Acquisition" in display_label else "medium", # Adjust width
+                    text_align="right" # Alignement à droite pour les chiffres
                 )
-        # Note: 'Quantité' est déjà dans cols_to_preformat, pas besoin de le gérer séparément ici.
 
-    # Configurer les colonnes textuelles qui n'ont pas été pré-formatées comme numériques
-    # On vérifie si la colonne existe dans df_display avant de la configurer
+    # Configurer les colonnes textuelles (qui ne sont pas des nombres) pour un alignement par défaut (gauche)
     if labels[ticker_col] in df_display.columns:
         column_config[labels[ticker_col]] = st.column_config.TextColumn(labels[ticker_col], width="small")
     if labels["shortName"] in df_display.columns:
@@ -332,7 +333,7 @@ def afficher_portefeuille():
 
     return total_valeur, total_actuelle, total_h52, total_lt
 
-
+---
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
@@ -451,7 +452,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         allocation_column_config = {}
 
         # Colonnes qui nécessitent un formatage spécifique pour la table d'allocation
-        cols_to_preformat_allocation = {
+        cols_to_preformat_allocation_and_align_right = {
             "Valeur Actuelle": (2, f" {devise_cible}"),
             "Part Actuelle (%)": (2, " %"),
             "Cible (%)": (2, " %"),
@@ -459,17 +460,18 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Ajustement Nécessaire": (2, f" {devise_cible}")
         }
 
-        for col, (dec_places, suffix) in cols_to_preformat_allocation.items():
+        for col, (dec_places, suffix) in cols_to_preformat_allocation_and_align_right.items():
             if col in df_allocation.columns:
                 df_allocation[col] = df_allocation[col].apply(
                     lambda x: f"{format_fr(x, dec_places)}{suffix}" if pd.notna(x) else ""
                 )
                 allocation_column_config[col] = st.column_config.TextColumn(
                     col,
-                    width="small" if "Catégories" not in col else "medium"
+                    width="small" if "Catégories" not in col else "medium",
+                    text_align="right" # Alignement à droite pour les chiffres dans le tableau de synthèse
                 )
         
-        # Configurer la colonne "Catégories" comme texte
+        # Configurer la colonne "Catégories" comme texte avec alignement par défaut (gauche)
         allocation_column_config["Catégories"] = st.column_config.TextColumn("Catégories", width="medium")
 
         st.dataframe(df_allocation, use_container_width=True, column_config=allocation_column_config)
