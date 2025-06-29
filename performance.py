@@ -8,9 +8,9 @@ from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
 
-from period_selector_component import period_selector
+from period_selector_component import period_selector  # Assumes this module exists
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
-from historical_performance_calculator import reconstruct_historical_portfolio_value
+from historical_performance_calculator import reconstruct_historical_portfolio_value  # Assumes this module exists
 from utils import format_fr
 from portfolio_display import convertir
 
@@ -41,9 +41,7 @@ def display_performance_history():
                     columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
                 )
         except Exception as e:
-            st.error(f"Erreur lors de la récupération des taux de change historiques --
-
- : {e}. Les conversions de devise pourraient être incorrectes.")
+            st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
             st.session_state.historical_fx_rates_df = pd.DataFrame(
                 1.0, 
                 index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
@@ -114,7 +112,7 @@ def display_performance_history():
                         st.warning(f"Quantité pour le ticker '{ticker}' est vide ou invalide. Utilisation de 0.")
                         quantity = 0.0
                 else:
-                    st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Utilisation de 0.")
+                    st warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Utilisation de 0.")
                     quantity = 0.0
 
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
