@@ -8,13 +8,18 @@ import json
 import streamlit as st
 import builtins
 
-# La fonction is_pence_denominated est supprimée.
+def is_pence_denominated(currency):
+    """
+    Détermine si un actif est libellé en pence (GBp) en fonction de la devise.
+    Retourne True si une conversion (division par 100) est nécessaire.
+    """
+    return str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
 
 @st.cache_data(ttl=3600)
-def fetch_stock_history(Ticker, start_date, end_date):
+def fetch_stock_history(Ticker, start_date, end_date, currency=None):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
-    La conversion pence-vers-livre n'est plus gérée ici.
+    Applique une conversion pence-vers-livre si la devise est GBp.
     """
     try:
         if not builtins.isinstance(Ticker, builtins.str):
@@ -42,7 +47,10 @@ def fetch_stock_history(Ticker, start_date, end_date):
                     st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
                     return pd.Series(dtype='float64')
             
-            # La logique de conversion pence-vers-livre est supprimée d'ici.
+            # Appliquer la conversion pence-vers-livre si la devise est GBp
+            if currency and is_pence_denominated(currency):
+                close_data = close_data / 100.0
+                st.info(f"Conversion pence-vers-livre appliquée pour {Ticker} (devise: {currency}).")
             
             return close_data
 
@@ -111,8 +119,8 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     ticker_currency_map = dict(zip(tickers, currencies)) if len(tickers) == len(currencies) else {}
     
     for ticker in tickers:
-        # fetch_stock_history n'a plus besoin du paramètre currency pour la conversion pence
-        prices = fetch_stock_history(ticker, start_date, end_date)
+        currency = ticker_currency_map.get(ticker, None)
+        prices = fetch_stock_history(ticker, start_date, end_date, currency=currency)
         if not prices.empty:
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
