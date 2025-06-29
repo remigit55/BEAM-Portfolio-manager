@@ -1,4 +1,3 @@
-```python
 # portfolio_display.py
 
 import streamlit as st
