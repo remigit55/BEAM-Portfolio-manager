@@ -20,9 +20,6 @@ def display_performance_history():
         return
 
     df_current_portfolio = st.session_state.df.copy()
-    
-    target_currency = st.session_state.get("devise_cible", "EUR")
-    fx_rates = st.session_state.fx_rates
 
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
@@ -30,9 +27,10 @@ def display_performance_history():
         df_current_portfolio.loc[df_current_portfolio["Devise"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
 
-
-    if "Devise" in df_current_portfolio.columns:
-        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
+    target_currency = st.session_state.get("devise_cible", "EUR")
+    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
+    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
+    st.session_state.fx_rates = fetch_fx_rates(target_currency)
 
     devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
     devises_a_fetch = list(set([target_currency] + devises_uniques_df))
