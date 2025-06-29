@@ -8,21 +8,18 @@ import json
 import streamlit as st
 import builtins
 
-def is_pence_denominated(ticker, currency=None):
+def is_pence_denominated(currency):
     """
-    Détermine si un actif est libellé en pence (GBp) en fonction du ticker ou de la devise.
+    Détermine si un actif est libellé en pence (GBp) en fonction de la devise.
     Retourne True si une conversion (division par 100) est nécessaire.
     """
-    ticker = str(ticker).strip()
-    is_lse_ticker = ticker.endswith('.L')
-    is_explicit_gbp_pence = currency is not None and str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
-    return is_lse_ticker or is_explicit_gbp_pence
+    return str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
 
 @st.cache_data(ttl=3600)
 def fetch_stock_history(Ticker, start_date, end_date, currency=None):
     """
     Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
-    Applique une conversion pence-vers-livre si nécessaire.
+    Applique une conversion pence-vers-livre si la devise est GBp.
     """
     try:
         if not builtins.isinstance(Ticker, builtins.str):
@@ -50,8 +47,80 @@ def fetch_stock_history(Ticker, start_date, end_date, currency=None):
                     st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
                     return pd.Series(dtype='float64')
             
-            # Appliquer la conversion pence-vers-livre si nécessaire
-            if is_pence_denominated(Ticker, currency):
+            # Appliquer la conversion pence-vers-livre si la devise est GBp
+            if currency and is_pence_denominated(currency):
+                close_data = close_data / 100.0
+                st.info(f"Conversion pence-vers-livre appliquée pour {Ticker} (devise: {currency}).")
+            
+            return close_data
+
+        else:
+            st.warning(f"Aucune donnée valide pour {Ticker} : DataFrame vide.")
+            return pd.Series(dtype='float64')
+
+    except Exception as e:
+        error_msg = f"Erreur lors de la récupération pour {Ticker} : {builtins.str(type(e).__name__)} - {builtins.str(e)}"
+        st.error(error_msg)
+        return pd.Series(dtype=' IMAGES
+
+System: Je vais mettre à jour les trois fichiers (`historical_data_fetcher.py`, `performance.py`, et `portfolio_display.py`) pour appliquer un traitement cohérent des actifs libellés en pence (GBp), en utilisant uniquement la devise `GBp` comme critère pour la conversion (division par 100), sans dépendance au suffixe `.L`. Voici les modifications complètes pour chaque fichier, en m'assurant que l'`artifact_id` est unique pour chaque fichier et que les modifications respectent les instructions fournies.
+
+---
+
+### 1. Modification de `historical_data_fetcher.py`
+
+Mise à jour de la fonction `is_pence_denominated` pour ne vérifier que la devise `GBp` (insensible à la casse) et application de la conversion dans `fetch_stock_history`.
+
+<xaiArtifact artifact_id="dcaeaac0-8f21-451e-b9f0-acec348f809c" artifact_version_id="1b77e5e8-960b-485d-b3c9-638ee494876e" title="historical_data_fetcher.py" contentType="text/python">
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta, date
+import requests
+import json
+import streamlit as st
+import builtins
+
+def is_pence_denominated(currency):
+    """
+    Détermine si un actif est libellé en pence (GBp) en fonction de la devise.
+    Retourne True si une conversion (division par 100) est nécessaire.
+    """
+    return str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
+
+@st.cache_data(ttl=3600)
+def fetch_stock_history(Ticker, start_date, end_date, currency=None):
+    """
+    Récupère l'historique des cours de clôture ajustés pour un ticker donné via Yahoo Finance.
+    Applique une conversion pence-vers-livre si la devise est GBp.
+    """
+    try:
+        if not builtins.isinstance(Ticker, builtins.str):
+            st.warning(f"Ticker mal formé : {Ticker} (type: {builtins.str(type(Ticker).__name__)})")
+            return pd.Series(dtype='float64')
+        
+        if not builtins.callable(yf.download):
+            st.error("Erreur critique : yf.download n'est pas appelable. Conflit possible dans les imports.")
+            return pd.Series(dtype='float64')
+
+        data = yf.download(Ticker, start=start_date, end=end_date, progress=False)
+        
+        if not data.empty:
+            if builtins.isinstance(data.columns, pd.MultiIndex):
+                close_data = data[('Close', Ticker)] if ('Close', Ticker) in data.columns else None
+                if close_data is not None:
+                    close_data = close_data.rename(Ticker)
+                else:
+                    st.warning(f"Colonne ('Close', '{Ticker}') absente. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
+                    return pd.Series(dtype='float64')
+            else:
+                if 'Close' in data.columns:
+                    close_data = data['Close'].rename(Ticker)
+                else:
+                    st.warning(f"Colonne 'Close' absente pour {Ticker}. Colonnes disponibles : {builtins.str(data.columns.tolist())}")
+                    return pd.Series(dtype='float64')
+            
+            # Appliquer la conversion pence-vers-livre si la devise est GBp
+            if currency and is_pence_denominated(currency):
                 close_data = close_data / 100.0
                 st.info(f"Conversion pence-vers-livre appliquée pour {Ticker} (devise: {currency}).")
             
@@ -68,7 +137,7 @@ def fetch_stock_history(Ticker, start_date, end_date, currency=None):
 
 @st.cache_data(ttl=3600)
 def fetch_historical_fx_rates(target_currency, start_date, end_date):
-    # Code existant inchangé
+    """Récupère les taux de change historiques via yfinance."""
     base_currencies = ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"]
     all_business_days = pd.bdate_range(start=start_date - timedelta(days=10), end=end_date)
     columns_to_create = [f"{c}{target_currency}" for c in base_currencies if c != target_currency]
@@ -119,12 +188,9 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     """
     historical_prices = {}
     business_days = pd.bdate_range(start_date, end_date)
-
-    # Créer un dictionnaire ticker-devise
     ticker_currency_map = dict(zip(tickers, currencies)) if len(tickers) == len(currencies) else {}
-
+    
     for ticker in tickers:
-        # Récupérer la devise associée au ticker, si disponible
         currency = ticker_currency_map.get(ticker, None)
         prices = fetch_stock_history(ticker, start_date, end_date, currency=currency)
         if not prices.empty:
