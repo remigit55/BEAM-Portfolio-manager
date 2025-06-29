@@ -13,7 +13,6 @@ from utils import safe_escape, format_fr
 # Import des fonctions de récupération de données
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 
-
 def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_cat="Catégorie", colonne_valeur="Valeur Actuelle"):
     if "Minières" not in allocations_reelles or "Minières" not in objectifs:
         return None
@@ -48,8 +47,6 @@ def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_ca
     else:
         return 0
 
-
-# --- Fonction de conversion de devise ---
 def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
     """
     Convertit une valeur d'une devise source vers la devise cible en utilisant les taux de change fournis.
@@ -76,15 +73,14 @@ def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustmen
             taux_scalar = float(raw_taux)
         except (TypeError, ValueError):
             taux_scalar = np.nan
-    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)): # Ajout des types numpy pour robustesse
+    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)):
         # Si c'est un scalaire, on l'utilise directement
         taux_scalar = float(fx_rates_or_scalar)
     else:
         st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
-        taux_scalar = 1.0 # Valeur par défaut si le type est inattendu
+        taux_scalar = 1.0  # Valeur par défaut si le type est inattendu
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # Message d'avertissement plus précis si le taux est invalide
         st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
         return val, np.nan  # Retourne la valeur originale et un taux NaN
     
@@ -132,76 +128,14 @@ def afficher_portefeuille():
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # --- NOUVEAU : Lecture et traitement de la colonne 'H' pour le facteur d'ajustement FX ---
+    # Lecture et traitement de la colonne 'H' pour le facteur d'ajustement FX
     if "H" in df.columns:
         df["Facteur_Ajustement_FX"] = df["H"].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-        df["Facteur_Ajustement_FX"] = pd.to_numeric(df["Facteur_Ajustement_FX"], errors="coerce").fillna(1.0) # Default to 1.0 if empty/invalid
+        df["Facteur_Ajustement_FX"] = pd.to_numeric(df["Facteur_Ajustement_FX"], errors="coerce").fillna(1.0)
     else:
-        df["Facteur_Ajustement_FX"] = 1.0 # Default to 1.0 if column H is missing
-    # --- FIN NOUVEAU ---
+        df["Facteur_Ajustement_FX"] = 1.0
 
-    # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
-    # Identifier la colonne ticker
-    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
-    
-    # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
-    is_lse_ticker = pd.Series(False, index=df.index)
-    if ticker_col_name:
-        is_lse_ticker = df[ticker_col_name].astype(str).str.endswith('.L', na=False)
-
-    # Créer une colonne temporaire pour la devise en majuscules pour les comparaisons
-    df['devise_upper_for_check'] = df["Devise"].astype(str).str.strip().str.upper()
-
-    # 2. Identifier si l'utilisateur a explicitement saisi 'GBp' (ou 'gbp', etc.) dans le fichier
-    df['original_devise_lower_for_gbp_check'] = df['Devise'].astype(str).str.strip().str.lower()
-    is_explicit_gbp_pence_input = df['original_devise_lower_for_gbp_check'].isin(['gbp', 'gbp.', 'gbp '])
-
-    # Masque combiné pour les lignes dont les prix doivent être divisés par 100 (pence vers livres)
-    # C'est le cas si :
-    #   - C'est un ticker LSE ET la devise est 'GBP' (comportement typique de Yahoo Finance)
-    # OU
-    #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
-    needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
-
-    # DEBUG: Afficher les valeurs avant la conversion pence-vers-livre pour HOC.L
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_before = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L avant conversion pence:")
-        st.write(f"  Acquisition: {hoc_row_before.get('Acquisition', 'N/A')}")
-        st.write(f"  currentPrice: {hoc_row_before.get('currentPrice', 'N/A')}")
-        st.write(f"  Devise: {hoc_row_before.get('Devise', 'N/A')}")
-        st.write(f"  Facteur_Ajustement_FX: {hoc_row_before.get('Facteur_Ajustement_FX', 'N/A')}")
-        st.write(f"  Needs pence conversion: {needs_pence_to_pound_conversion.loc[hoc_row_before.name]}")
-
-
-    # Appliquer la division par 100 aux colonnes de prix concernées
-    for price_col in ["Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT"]:
-        if price_col in df.columns:
-            df[price_col] = pd.to_numeric(df[price_col], errors='coerce') # S'assurer que la colonne est numérique
-            
-            # Appliquer la division seulement si le drapeau est vrai et que la valeur n'est ni NaN ni 0
-            mask_to_apply_division = needs_pence_to_pound_conversion & df[price_col].notna() & (df[price_col] != 0)
-            
-            if mask_to_apply_division.any() and ticker_col_name is not None:
-                affected_tickers = df.loc[mask_to_apply_division, ticker_col_name].dropna().unique().tolist()
-                st.info(f"DEBUG (portfolio_display): Conversion pence-vers-livre appliquée pour les tickers : {affected_tickers} sur la colonne '{price_col}'.")
-
-            df.loc[mask_to_apply_division, price_col] = df.loc[mask_to_apply_division, price_col] / 100.0
-    
-    # DEBUG: Afficher les valeurs après la conversion pence-vers-livre pour HOC.L
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_after = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L après conversion pence:")
-        st.write(f"  Acquisition: {hoc_row_after.get('Acquisition', 'N/A')}")
-        st.write(f"  currentPrice: {hoc_row_after.get('currentPrice', 'N/A')}")
-        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after.get('Facteur_Ajustement_FX', 'N/A')}")
-
-
-    # Supprimer les colonnes temporaires
-    df.drop(columns=['devise_upper_for_check', 'original_devise_lower_for_gbp_check'], inplace=True)
-    # --- FIN DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
-
-    # Nettoyage final de la colonne Devise (après la détection des GBp)
+    # Nettoyage de la colonne Devise
     if "Devise" in df.columns:
         df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
     else:
@@ -213,7 +147,6 @@ def afficher_portefeuille():
         df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip()  
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
     elif any(col.strip().lower() in ["categories", "catégorie", "category"] for col in df.columns):
-        # Trouver la colonne correspondante (insensible à la casse et accents)
         cat_col = next(col for col in df.columns if col.strip().lower() in ["categories", "catégorie", "category"])
         df["Catégories"] = df[cat_col].astype(str).fillna("").str.strip()
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
@@ -239,17 +172,11 @@ def afficher_portefeuille():
             if ticker not in st.session_state.momentum_results_cache:
                 st.session_state.momentum_results_cache[ticker] = fetch_momentum_data(ticker)
 
-
         # Obtenir l'heure actuelle en UTC
         utc_now = datetime.datetime.now(datetime.timezone.utc)
-
-        # Définir le fuseau horaire cible (par exemple, Paris pour l'heure française)
-        # Utilise 'Europe/Paris' pour inclure la gestion de l'heure d'été/hiver
         try:
             paris_tz = pytz.timezone('Europe/Paris')
-            # Convertir l'heure UTC en heure locale de Paris
             local_time = utc_now.astimezone(paris_tz)
-            # Formater pour l'affichage français (jour/mois/année à HH:MM:SS)
             st.session_state["last_yfinance_update"] = local_time.strftime("%d/%m/%Y à %H:%M:%S")
         except pytz.UnknownTimeZoneError:
             st.warning("Erreur de fuseau horaire 'Europe/Paris'. Affichage en UTC.")
@@ -261,10 +188,10 @@ def afficher_portefeuille():
 
         df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", "")) # Correction ici
+        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
-    else:
+    else: 
         df["shortName"] = ""
         df["currentPrice"] = np.nan
         df["fiftyTwoWeekHigh"] = np.nan
@@ -298,12 +225,6 @@ def afficher_portefeuille():
         axis=1, result_type='expand'
     )
 
-    # Calcul des totaux globaux convertis
-    total_valeur = df["Valeur_conv"].sum()
-    total_actuelle = df["Valeur_Actuelle_conv"].sum()
-    total_h52 = df["Valeur_H52_conv"].sum()
-    total_lt = df["Valeur_LT_conv"].sum()
-
     # Calcul Gain/Perte
     df['Gain/Perte'] = df['Valeur_Actuelle_conv'] - df['Valeur_conv']
     df['Gain/Perte (%)'] = np.where(
@@ -313,8 +234,6 @@ def afficher_portefeuille():
     )
 
     # Pré-formatage de la colonne "Valeur Acquisition (Source)"
-    # Cette colonne est formatée ici pour inclure la devise source, car .style.format()
-    # ne peut pas facilement accéder à d'autres colonnes de la même ligne pour le formatage.
     df["Valeur Acquisition_fmt"] = [
         f"{format_fr(val, 2)} {dev}" if pd.notnull(val) else ""
         for val, dev in zip(df["Valeur Acquisition"], df["Devise"])
@@ -324,7 +243,7 @@ def afficher_portefeuille():
     cols_to_display = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
-        "Valeur Acquisition_fmt",  # Utilise la colonne pré-formatée
+        "Valeur Acquisition_fmt",
         f"Valeur Acquisition ({devise_cible})", 
         "Taux FX (Source/Cible)", 
         "currentPrice", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
@@ -335,7 +254,7 @@ def afficher_portefeuille():
     labels_for_display = [
         "Ticker", "Nom", "Catégories", "Devise Source", 
         "Quantité", "Prix d'Acquisition (Source)", 
-        "Valeur Acquisition (Source)", # Label pour la colonne pré-formatée
+        "Valeur Acquisition (Source)",
         f"Valeur Acquisition ({devise_cible})", 
         "Taux FX (Source/Cible)", 
         "Prix Actuel", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
@@ -351,7 +270,7 @@ def afficher_portefeuille():
         if col_name in df.columns:
             final_cols.append(col_name)
             final_labels.append(labels_for_display[i])
-        elif col_name == ticker_col and ticker_col is not None: # Gérer le cas où ticker_col est "Tickers"
+        elif col_name == ticker_col and ticker_col is not None:
             if ticker_col in df.columns:
                 final_cols.append(ticker_col)
                 final_labels.append(labels_for_display[i])
@@ -363,7 +282,7 @@ def afficher_portefeuille():
     df_disp = df[final_cols].copy()
     df_disp.columns = final_labels  
 
-    # Définition du dictionnaire de formatage pour st.dataframe.style.format
+    # Définition du dictionnaire de formatage
     format_dict_portfolio = {
         "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
         "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
@@ -381,19 +300,17 @@ def afficher_portefeuille():
         "Z-Score": lambda x: format_fr(x, 2) if pd.notnull(x) else "",
     }
 
-    # Filtrer le dictionnaire de formatage pour n'inclure que les colonnes réellement affichées
+    # Filtrer le dictionnaire de formatage
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
     # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à gauche
     try:
-        valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
+        valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1
         st.markdown(f"""
             <style>
-            /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
             div[data-testid="stDataFrame"] table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
                 text-align: left !important;
             }}
-            /* Cible l'en-tête (th) de la colonne "Valeur Acquisition (Source)" */
             div[data-testid="stDataFrame"] table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
                 text-align: left !important;
             }}
@@ -412,8 +329,7 @@ def afficher_portefeuille():
 
 def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
-    Affiche la synthèse globale du portefeuille, y compris les métriques clés et le nouveau
-    tableau de répartition par Catégories avec les objectifs.
+    Affiche la synthèse globale du portefeuille, y compris les métriques clés et le tableau de répartition par Catégories.
     """
     devise_cible = st.session_state.get("devise_cible", "EUR")
 
@@ -460,10 +376,9 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         )
     st.markdown("---")
 
-    # --- Tableau de Répartition par Catégories ---
+    # Tableau de Répartition par Catégories
     st.markdown("#### Répartition et Objectifs par Catégories")  
 
-    # Définition des allocations cibles par catégorie
     target_allocations = st.session_state.get("target_allocations", {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -490,7 +405,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Calcul de la base pour l'objectif
         current_minieres_value = category_values.get("Minières", 0.0)
         target_minieres_pct = target_allocations.get("Minières", 0.0)
-        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle  # Fallback to total_actuelle if target_minieres_pct is 0
+        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
             theoretical_portfolio_total_from_minieres = total_actuelle  
@@ -516,7 +431,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                     for cat in all_relevant_categories
                 }
                 value_to_adjust = calculer_reallocation_miniere(df, temp_allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
-                if value_to_adjust is None: # Gérer le cas où calculer_reallocation_miniere retourne None
+                if value_to_adjust is None:
                     value_to_adjust = np.nan
             else:
                 value_to_adjust = target_value_for_category - current_value_cat
@@ -554,7 +469,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         df_disp_cat = df_allocation[cols_to_display_cat].copy()
         df_disp_cat.columns = labels_for_display_cat
 
-        # Définition du dictionnaire de formatage pour st.dataframe.style.format
+        # Définition du dictionnaire de formatage
         format_dict_category = {
             "Valeur Actuelle": lambda x: f"{format_fr(x, 2)} {devise_cible}",
             "Part Actuelle (%)": lambda x: f"{format_fr(x, 2)} %",
@@ -563,13 +478,11 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             f"Ajustement Nécessaire ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "N/A"
         }
 
-        # Filtrer le dictionnaire de formatage pour n'inclure que les colonnes réellement affichées
+        # Filtrer le dictionnaire de formatage
         filtered_format_dict_category = {k: v for k, v in format_dict_category.items() if k in df_disp_cat.columns}
         
-        # Affichage du tableau de répartition par catégories
+        # Affichage du tableau de répartition
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
-
-        
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
