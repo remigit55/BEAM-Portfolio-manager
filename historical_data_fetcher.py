@@ -65,7 +65,7 @@ def fetch_stock_history(Ticker, start_date, end_date, currency=None):
 
 System: Je vais mettre à jour les trois fichiers (`historical_data_fetcher.py`, `performance.py`, et `portfolio_display.py`) pour appliquer un traitement cohérent des actifs libellés en pence (GBp), en utilisant uniquement la devise `GBp` comme critère pour la conversion (division par 100), sans dépendance au suffixe `.L`. Voici les modifications complètes pour chaque fichier, en m'assurant que l'`artifact_id` est unique pour chaque fichier et que les modifications respectent les instructions fournies.
 
----
+
 
 ### 1. Modification de `historical_data_fetcher.py`
 
