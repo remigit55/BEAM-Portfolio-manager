@@ -21,25 +21,17 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
-    if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
-        end_date_for_fx = datetime.now().date()
-        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10)
-        try:
-            st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
-            if st.session_state.historical_fx_rates_df.empty:
-                st.session_state.historical_fx_rates_df = pd.DataFrame(
-                    1.0,
-                    index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
-                    columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
-                )
-        except Exception:
-            st.session_state.historical_fx_rates_df = pd.DataFrame(
-                1.0,
-                index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
-                columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
-            )
+# --- Nouvelle logique de taux FX (alignée sur portfolio_display.py) ---
+from data_fetcher import fetch_fx_rates
 
-    if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
+# Initialisation des taux de change via dictionnaire
+if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
+    # Récupérer toutes les devises présentes dans le portefeuille
+    devises_uniques_df = df_current_portfolio["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df_current_portfolio.columns else []
+    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
+    st.session_state.fx_rates = fetch_fx_rates(target_currency)
+
+fx_rates = st.session_state.fx_rates
         st.error("Les taux de change historiques sont manquants.")
         return
 
@@ -88,10 +80,6 @@ def display_performance_history():
             if not ticker_row.empty:
                 if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
-                    # Correction pour GBp ou GBX → GBP avec facteur x0.01
-                    if ticker_devise in ["GBp", "GBX", "GBXP", "GBPP"]:
-                        ticker_devise = "GBP"
-                        fx_adjustment_factor *= 0.01
                 if "Quantité" in ticker_row.columns:
                     quantity = pd.to_numeric(ticker_row["Quantité"], errors='coerce').iloc[0] or 0.0
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
@@ -101,7 +89,8 @@ def display_performance_history():
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 for date_idx, price in filtered_data.items():
-                    fx_key = f"{ticker_devise}{target_currency}"
+                    fx_key = ticker_devise
+                    fx_rate_for_date = fx_rates.get(fx_key, 1.0)
                     fx_rate_for_date = st.session_state.historical_fx_rates_df.get(fx_key, pd.Series(1.0)).get(date_idx, 1.0) or 1.0
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     all_ticker_data.append({
