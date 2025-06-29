@@ -20,18 +20,29 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-    if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
-        st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
+    if "df" not in st.session_state or st.session_state.df is None or not isinstance(st.session_state.df, pd.DataFrame):
+        st.error("Le portefeuille (st.session_state.df) est manquant ou invalide. Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
         return
 
     df_current_portfolio = st.session_state.df.copy()
-    target_currency = st.session_state.get("devise_cible", "EUR")
+    
+    # Validate required columns
+    required_columns = ['Ticker', 'Quantité', 'Devise']
+    missing_columns = [col for col in required_columns if col not in df_current_portfolio.columns]
+    if missing_columns:
+        st.error(f"Colonnes manquantes dans le portefeuille : {missing_columns}. Assurez-vous que le fichier importé contient 'Ticker', 'Quantité', et 'Devise'.")
+        return
 
     # Log portfolio data for debugging
     st.write("DEBUG: df_current_portfolio head()")
     st.dataframe(df_current_portfolio.head())
-    st.write("DEBUG: df_current_portfolio info()")
-    st.write(df_current_portfolio.info())
+    try:
+        st.write("DEBUG: df_current_portfolio info()")
+        st.write(df_current_portfolio.info())
+    except Exception as e:
+        st.warning(f"Impossible d'afficher les informations de df_current_portfolio : {e}")
+
+    target_currency = st.session_state.get("devise_cible", "EUR")
 
     # Initialisation ou rafraîchissement des taux de change historiques
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
@@ -58,6 +69,10 @@ def display_performance_history():
     if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
         st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
         return
+
+    # Log FX rates for debugging
+    st.write("DEBUG: historical_fx_rates_df head()")
+    st.dataframe(st.session_state.historical_fx_rates_df.head())
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
     st.write("DEBUG: Tickers dans le portefeuille", tickers_in_portfolio)
@@ -144,9 +159,15 @@ def display_performance_history():
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
+                if filtered_data.empty or filtered_data.eq(0).all().all():
+                    st.warning(f"Données historiques pour {ticker} sont vides ou toutes nulles après traitement. Ignoré.")
+                    continue
                 
                 valid_data = False
                 for date_idx, price in filtered_data.items():
+                    if pd.isna(price) or price == 0:
+                        st.warning(f"Prix nul ou manquant pour {ticker} à {date_idx}. Ignoré.")
+                        continue
                     fx_key = f"{ticker_devise}{target_currency}"
                     fx_rate_for_date = 1.0
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
@@ -184,10 +205,13 @@ def display_performance_history():
         # Log df_display_values for debugging
         st.write("DEBUG: df_display_values head()")
         st.dataframe(df_display_values.head())
-        st.write("DEBUG: df_display_values info()")
-        st.write(df_display_values.info())
-        st.write("DEBUG: df_display_values describe()")
-        st.write(df_display_values.describe())
+        try:
+            st.write("DEBUG: df_display_values info()")
+            st.write(df_display_values.info())
+            st.write("DEBUG: df_display_values describe()")
+            st.write(df_display_values.describe())
+        except Exception as e:
+            st.warning(f"Impossible d'afficher les informations de df_display_values : {e}")
 
         if not df_display_values.empty and not df_display_values[f"Valeur Actuelle ({target_currency})"].isna().all() and df_display_values[f"Valeur Actuelle ({target_currency})"].ne(0).any():
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
@@ -201,10 +225,13 @@ def display_performance_history():
             # Log df_total_daily_value for debugging
             st.write("DEBUG: df_total_daily_value head()")
             st.dataframe(df_total_daily_value.head())
-            st.write("DEBUG: df_total_daily_value info()")
-            st.write(df_total_daily_value.info())
-            st.write("DEBUG: df_total_daily_value describe()")
-            st.write(df_total_daily_value.describe())
+            try:
+                st.write("DEBUG: df_total_daily_value info()")
+                st.write(df_total_daily_value.info())
+                st.write("DEBUG: df_total_daily_value describe()")
+                st.write(df_total_daily_value.describe())
+            except Exception as e:
+                st.warning(f"Impossible d'afficher les informations de df_total_daily_value : {e}")
 
             if not df_total_daily_value.empty and df_total_daily_value['Valeur Totale'].ne(0).any():
                 # Graphique 1: Valeur Totale du Portefeuille
@@ -258,8 +285,11 @@ def display_performance_history():
                 # Log Momentum DataFrame for debugging
                 st.write("DEBUG: df_total_daily_value head() after momentum calculation")
                 st.dataframe(df_total_daily_value.head())
-                st.write("DEBUG: df_total_daily_value info() after momentum calculation")
-                st.write(df_total_daily_value.info())
+                try:
+                    st.write("DEBUG: df_total_daily_value info() after momentum calculation")
+                    st.write(df_total_daily_value.info())
+                except Exception as e:
+                    st.warning(f"Impossible d'afficher les informations de df_total_daily_value après calcul du momentum : {e}")
 
                 if not df_total_daily_value['Momentum (%)'].dropna().empty:
                     fig_momentum = px.line(
@@ -331,6 +361,6 @@ def display_performance_history():
                 st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
                 st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
             else:
-                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les quantités, les données historiques, les tickers ou la période sélectionnée.")
+                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les quantités (non nulles), les prix historiques, les taux de change, ou la période sélectionnée.")
         else:
-            st.warning("Aucune valeur actuelle valide n'a pu être calculée pour la période sélectionnée. Vérifiez les quantités, les tickers, les données historiques ou les taux de change.")
+            st.warning("Aucune valeur actuelle valide n'a pu être calculée pour la période sélectionnée. Vérifiez les quantités (non nulles), les tickers, les données historiques, ou les taux de change.")
