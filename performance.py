@@ -7,7 +7,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
-import builtins
+import numpy as np
 
 from period_selector_component import period_selector  # Assumes this module exists
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
@@ -164,6 +164,12 @@ def display_performance_history():
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
 
+            # Log DataFrame for debugging
+            st.write("DEBUG: df_total_daily_value head()")
+            st.dataframe(df_total_daily_value.head())
+            st.write("DEBUG: df_total_daily_value info()")
+            st.write(df_total_daily_value.info())
+
             # Graphique 1: Valeur Totale du Portefeuille
             st.markdown("---")
             st.markdown("#### Performance du Portefeuille")
@@ -173,7 +179,7 @@ def display_performance_history():
                 y="Valeur Totale",
                 title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
                 labels={"Valeur Totale": f"Valeur Totale ({target_currency})", "Date": "Date"},
-                hover_data={"Valeur Totale": ':.2f'}
+                hover_data={"Valeur Totale": lambda x: f"{format_fr(x, 2)}"}
             )
             fig_total.update_layout(hovermode="x unified")
             st.plotly_chart(fig_total, use_container_width=True)
@@ -192,7 +198,7 @@ def display_performance_history():
                     y="Volatilité",
                     title=f"Volatilité Annualisée du Portefeuille (Fenêtre de {window_size} jours)",
                     labels={"Volatilité": "Volatilité Annualisée", "Date": "Date"},
-                    hover_data={"Volatilité": ':.4f'}
+                    hover_data={"Volatilité": lambda x: f"{format_fr(x, 4)}"}
                 )
                 fig_volatility.update_layout(hovermode="x unified")
                 st.plotly_chart(fig_volatility, use_container_width=True)
@@ -205,13 +211,25 @@ def display_performance_history():
             if not df_total_daily_value['Valeur Totale'].empty and df_total_daily_value['Valeur Totale'].iloc[0] != 0:
                 initial_value = df_total_daily_value['Valeur Totale'].iloc[0]
                 df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
+                # Replace inf/-inf with NaN
+                df_total_daily_value['Momentum (%)'] = df_total_daily_value['Momentum (%)'].replace([np.inf, -np.inf], np.nan)
             else:
-                df_total_daily_value['Momentum (%)'] = 0
-                st.warning("Valeur initiale du portefeuille nulle ou manquante. Le momentum est défini à 0.")
+                df_total_daily_value['Momentum (%)'] = np.nan
+                st.warning("Valeur initiale du portefeuille nulle ou manquante. Le momentum est défini à NaN.")
+
+            # Ensure data types for plotting
+            df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
+            df_total_daily_value['Momentum (%)'] = pd.to_numeric(df_total_daily_value['Momentum (%)'], errors='coerce')
+
+            # Log Momentum DataFrame for debugging
+            st.write("DEBUG: df_total_daily_value head() after momentum calculation")
+            st.dataframe(df_total_daily_value.head())
+            st.write("DEBUG: df_total_daily_value info() after momentum calculation")
+            st.write(df_total_daily_value.info())
 
             if not df_total_daily_value['Momentum (%)'].dropna().empty:
                 fig_momentum = px.line(
-                    df_total_daily_value,
+                    df_total_daily_value.dropna(subset=['Momentum (%)']),
                     x="Date",
                     y="Momentum (%)",
                     title=f"Performance Cumulée du Portefeuille ({target_currency})",
@@ -221,7 +239,7 @@ def display_performance_history():
                 fig_momentum.update_layout(hovermode="x unified")
                 st.plotly_chart(fig_momentum, use_container_width=True)
             else:
-                st.info("Pas assez de données pour calculer le momentum sur la période sélectionnée ou toutes les valeurs de momentum sont NaN.")
+                st.info("Pas assez de données valides pour afficher le graphique de momentum. Vérifiez les données historiques ou la période sélectionnée.")
 
             # Tableau des valeurs actuelles
             st.markdown("---")
