@@ -50,13 +50,11 @@ def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_ca
 
 
 # --- Fonction de conversion de devise ---
-def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
+def convertir(val, source_devise, devise_cible, fx_rates):
     """
     Convertit une valeur d'une devise source vers la devise cible en utilisant les taux de change fournis.
-    Peut accepter un dictionnaire de taux de change (clé: devise source, valeur: taux)
-    ou un taux scalaire direct.
-    Applique également un facteur d'ajustement supplémentaire au taux de change.
-    Retourne la valeur convertie et le taux utilisé (après ajustement).
+    Retourne la valeur originale et un taux de 1.0 si le taux de change est manquant ou nul.
+    Retourne la valeur convertie et le taux utilisé.
     """
     if pd.isnull(val):
         return np.nan, np.nan  # Retourne NaN pour la valeur et le taux si la valeur est NaN
@@ -67,30 +65,17 @@ def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustmen
     if source_devise == devise_cible:
         return val, 1.0  # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    taux_scalar = np.nan
-    if isinstance(fx_rates_or_scalar, dict):
-        # Si c'est un dictionnaire, on cherche le taux par la devise source
-        fx_key = source_devise
-        raw_taux = fx_rates_or_scalar.get(fx_key)
-        try:
-            taux_scalar = float(raw_taux)
-        except (TypeError, ValueError):
-            taux_scalar = np.nan
-    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)): # Ajout des types numpy pour robustesse
-        # Si c'est un scalaire, on l'utilise directement
-        taux_scalar = float(fx_rates_or_scalar)
-    else:
-        st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
-        taux_scalar = 1.0 # Valeur par défaut si le type est inattendu
+    fx_key = source_devise
+    raw_taux = fx_rates.get(fx_key)
+    
+    try:
+        taux_scalar = float(raw_taux)
+    except (TypeError, ValueError):
+        taux_scalar = np.nan
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        # Message d'avertissement plus précis si le taux est invalide
-        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
+        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({raw_taux}).")
         return val, np.nan  # Retourne la valeur originale et un taux NaN
-    
-    # Appliquer le facteur d'ajustement au taux de change
-    if pd.notnull(fx_adjustment_factor) and fx_adjustment_factor != 0:
-        taux_scalar /= fx_adjustment_factor
         
     return val * taux_scalar, taux_scalar  # Retourne la valeur convertie ET le taux utilisé
 
@@ -126,40 +111,18 @@ def afficher_portefeuille():
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
-
-    
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df.columns:
-            # Convertir en chaîne, supprimer les espaces, remplacer la virgule par un point
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            # Puis convertir en numérique
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-
-    # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
-    
-    # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
-    is_lse_ticker = pd.Series(False, index=df.index)
-    if ticker_col_name:
-        is_lse_ticker = df[ticker_col_name].astype(str).str.endswith('.L', na=False)
-
-    # Créer une colonne temporaire pour la devise en majuscules pour les comparaisons
-    df['devise_upper_for_check'] = df["Devise"].astype(str).str.strip().str.upper()
-
-    # 2. Identifier si l'utilisateur a explicitement saisi 'GBp' (ou 'gbp', etc.) dans le fichier
-    df['original_devise_lower_for_gbp_check'] = df['Devise'].astype(str).str.strip().str.lower()
-    is_explicit_gbp_pence_input = df['original_devise_lower_for_gbp_check'].isin(['gbp', 'gbp.', 'gbp '])
-
-    # Masque combiné pour les lignes dont les prix doivent être divisés par 100 (pence vers livres)
-    # C'est le cas si :
-    #   - C'est un ticker LSE ET la devise est 'GBP' (comportement typique de Yahoo Finance)
-    # OU
-    #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
-    needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
-
-
-
+    # Nettoyage de la colonne Devise
+    if "Devise" in df.columns:
+        df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
+    else:
+        st.error("Colonne 'Devise' absente. Utilisation de la devise cible par défaut.")
+        df["Devise"] = devise_cible
 
     # GESTION DE LA COLONNE 'CATÉGORIES'
     if "Categories" in df.columns:  
@@ -235,19 +198,19 @@ def afficher_portefeuille():
 
     # Conversion des valeurs à la devise cible
     df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
-        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
     df[['Valeur_Actuelle_conv', 'Taux_FX_Actuel']] = df.apply(
-        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
     df[['Valeur_H52_conv', 'Taux_FX_H52']] = df.apply(
-        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
     df[['Valeur_LT_conv', 'Taux_FX_LT']] = df.apply(
-        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), 
         axis=1, result_type='expand'
     )
 
@@ -278,10 +241,10 @@ def afficher_portefeuille():
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
         "Valeur Acquisition_fmt",  # Utilise la colonne pré-formatée
-        f"Valeur Acquisition ({devise_cible})", 
-        "Taux FX (Source/Cible)", 
-        "currentPrice", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
-        "fiftyTwoWeekHigh", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
+        "Valeur_Actuelle_conv",  # Valeur convertie en devise cible pour la colonne "Valeur Acquisition (EUR)"
+        "Taux_FX_Acquisition", 
+        "currentPrice", "Valeur_Actuelle_conv", "Gain/Perte", "Gain/Perte (%)",
+        "fiftyTwoWeekHigh", "Valeur_H52_conv", "Objectif_LT", "Valeur_LT_conv",
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -340,6 +303,7 @@ def afficher_portefeuille():
     # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à gauche
     try:
         valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
+        # st.write(f"DEBUG: Valeur Acquisition (Source) index pour alignement: {valeur_acquisition_source_idx}") # Debug line - removed
         st.markdown(f"""
             <style>
             /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
@@ -353,6 +317,7 @@ def afficher_portefeuille():
             </style>
         """, unsafe_allow_html=True)
     except ValueError:
+        # st.write("DEBUG: 'Valeur Acquisition (Source)' column not found for CSS alignment.") # Debug line - removed
         pass
 
     # Affichage du tableau du portefeuille
@@ -443,7 +408,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Calcul de la base pour l'objectif
         current_minieres_value = category_values.get("Minières", 0.0)
         target_minieres_pct = target_allocations.get("Minières", 0.0)
-        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle  # Fallback to total_actuelle if target_minieres_pct is 0
+        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
             theoretical_portfolio_total_from_minieres = total_actuelle  
@@ -522,24 +487,6 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Affichage du tableau de répartition par catégories
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
 
-        # Message de réallocation pour Minières (maintenu séparé)
-        st.markdown("#### Réallocation Minières")
-        allocations_reelles = {
-            row["Catégories"]: row["Part Actuelle (%)"] / 100
-            for _, row in df_allocation.iterrows()
-        }
-        reallocation_value = calculer_reallocation_miniere(df, allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
-
-        if reallocation_value is not None:
-            target_minieres_pct_display = format_fr(target_allocations.get('Minières', 0.0) * 100, 0)
-            if reallocation_value > 0:
-                st.info(f"Pour atteindre l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
-            elif reallocation_value < 0:
-                st.info(f"Pour maintenir l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
-            else:
-                st.info("L'allocation Minières est conforme à l'objectif.")
-        else:
-            st.info("Calcul de réallocation Minières non applicable ou données insuffisantes.")
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
