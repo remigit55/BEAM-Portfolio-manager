@@ -191,7 +191,7 @@ def afficher_portefeuille():
         df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
-    else: 
+    else:
         df["shortName"] = ""
         df["currentPrice"] = np.nan
         df["fiftyTwoWeekHigh"] = np.nan
@@ -240,6 +240,7 @@ def afficher_portefeuille():
     )
 
     # Formatage des colonnes pour l'affichage
+    # Les colonnes avec "_fmt" seront celles affichées dans le dataframe final
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Objectif_LT", 4),
@@ -255,15 +256,14 @@ def afficher_portefeuille():
                     for val, dev in zip(df[col_name], df["Devise"])
                 ]
             elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT"]:
-                # Utiliser les valeurs converties pour l'affichage en EUR
+                # Utiliser les valeurs converties pour l'affichage en devise cible
                 conv_col = f"{col_name}_conv"
                 if conv_col in df.columns:
                     df[f"{col_name}_fmt"] = df[conv_col].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
                 else:
-                    st.warning(f"Colonne convertie {conv_col} manquante pour {col_name}. Utilisation de la valeur non convertie.")
+                    # Fallback si la colonne convertie n'existe pas (ne devrait pas arriver avec le code actuel)
                     df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
             elif col_name == "Gain/Perte":
-                # Gain/Perte est déjà en devise cible, pas besoin de conv_col
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
             elif col_name in ["Gain/Perte (%)", "Momentum (%)"]:
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)} %" if pd.notnull(x) else "")
@@ -276,8 +276,8 @@ def afficher_portefeuille():
     cols = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité_fmt", "Acquisition_fmt", 
-        "Valeur Acquisition_fmt",  # Use formatted source value
-        "Valeur_conv",  # Use converted value for EUR
+        "Valeur Acquisition_fmt",  
+        "Valeur_conv",  # Cette colonne contient la valeur d'acquisition convertie en devise cible
         "Taux_FX_Acquisition_fmt", 
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
@@ -287,8 +287,8 @@ def afficher_portefeuille():
     labels = [
         "Ticker", "Nom", "Catégories", "Devise Source", 
         "Quantité", "Prix d'Acquisition (Source)", 
-        "Valeur Acquisition (Source)", 
-        f"Valeur Acquisition ({devise_cible})", 
+        "Valeur Acquisition (Source)", # Valeur d'acquisition dans la devise source
+        f"Valeur Acquisition ({devise_cible})", # Valeur d'acquisition convertie
         "Taux FX (Source/Cible)", 
         "Prix Actuel", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
         "Haut 52 Semaines", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
@@ -304,17 +304,16 @@ def afficher_portefeuille():
             if ticker_col in df.columns:
                 existing_cols_in_df.append(ticker_col)
                 existing_labels.append(labels[i])
-        elif col_name.endswith("_fmt"):
+        elif col_name.endswith("_fmt"): # C'est une colonne formatée
             if col_name in df.columns:
                 existing_cols_in_df.append(col_name)
                 existing_labels.append(labels[i])
-            else:
-                base_col_name = col_name[:-4]
+            else: # Fallback si la colonne _fmt n'est pas générée pour une raison quelconque
+                base_col_name = col_name[:-4] # Supprime "_fmt"
                 if base_col_name in df.columns:
-                    st.warning(f"Colonne formatée {col_name} manquante. Utilisation de {base_col_name}.")
                     existing_cols_in_df.append(base_col_name)
                     existing_labels.append(labels[i])
-        elif col_name in df.columns:
+        elif col_name in df.columns: # Colonne non formatée mais existante
             existing_cols_in_df.append(col_name)
             existing_labels.append(labels[i])
 
@@ -325,23 +324,26 @@ def afficher_portefeuille():
     df_disp = df[existing_cols_in_df].copy()
     df_disp.columns = existing_labels  
 
-    # Définition du dictionnaire de formatage pour st.dataframe
+    # Définition du dictionnaire de formatage pour st.dataframe.style.format
+    # Note: Puisque nous pré-formatons les colonnes avec "_fmt", le .style.format
+    # doit simplement s'assurer que ces colonnes sont traitées comme des chaînes.
+    # Pour les colonnes non-fmt (comme 'shortName', 'Signal', etc.), on peut les convertir en str.
     format_dict_portfolio = {
-        "Quantité": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Prix d'Acquisition (Source)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Valeur Acquisition (Source)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt with source currency
+        "Quantité": lambda x: x,
+        "Prix d'Acquisition (Source)": lambda x: x,
+        "Valeur Acquisition (Source)": lambda x: x,
         f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Taux FX (Source/Cible)": lambda x: x if pd.notnull(x) else "N/A",  # Use pre-formatted _fmt
-        "Prix Actuel": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        f"Valeur Actuelle ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        f"Gain/Perte ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Gain/Perte (%)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Haut 52 Semaines": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        f"Valeur H52 ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Objectif LT": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        f"Valeur LT ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Momentum (%)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
-        "Z-Score": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Taux FX (Source/Cible)": lambda x: x,
+        "Prix Actuel": lambda x: x,
+        f"Valeur Actuelle ({devise_cible})": lambda x: x,
+        f"Gain/Perte ({devise_cible})": lambda x: x,
+        "Gain/Perte (%)": lambda x: x,
+        "Haut 52 Semaines": lambda x: x,
+        f"Valeur H52 ({devise_cible})": lambda x: x,
+        "Objectif LT": lambda x: x,
+        f"Valeur LT ({devise_cible})": lambda x: x,
+        "Momentum (%)": lambda x: x,
+        "Z-Score": lambda x: x,
         "Ticker": lambda x: str(x) if pd.notnull(x) else "",
         "Nom": lambda x: str(x) if pd.notnull(x) else "",
         "Catégories": lambda x: str(x) if pd.notnull(x) else "",
@@ -354,7 +356,7 @@ def afficher_portefeuille():
     # Filtrer le dictionnaire de formatage
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
-    # CSS pour aligner les colonnes
+    # Définition des colonnes numériques et textuelles pour l'alignement CSS
     numeric_columns = [
         "Quantité", "Prix d'Acquisition (Source)", "Valeur Acquisition (Source)",
         f"Valeur Acquisition ({devise_cible})", "Taux FX (Source/Cible)", "Prix Actuel",
@@ -363,20 +365,22 @@ def afficher_portefeuille():
         "Momentum (%)", "Z-Score"
     ]
     text_columns = ["Ticker", "Nom", "Catégories", "Devise Source", "Signal", "Action", "Justification"]
+    
     css_alignments = """
         [data-testid="stDataFrame"] * { box-sizing: border-box; }
         [data-testid="stDataFrame"] div[role="grid"] table {
             width: 100% !important;
+            table-layout: auto; /* Permet aux colonnes de s'ajuster en largeur */
         }
     """
     for i, label in enumerate(df_disp.columns):
-        col_idx = i + 1
+        col_idx = i + 1 # nth-child est 1-indexé
         if label in numeric_columns:
             css_alignments += f"""
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
                     text-align: right !important;
-                    white-space: nowrap !important;
+                    white-space: nowrap !important; /* Empêche le texte de se couper */
                     padding-right: 10px !important;
                 }}
             """
@@ -385,7 +389,7 @@ def afficher_portefeuille():
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
                     text-align: left !important;
-                    white-space: normal !important;
+                    white-space: normal !important; /* Permet au texte de se couper */
                     padding-left: 10px !important;
                 }}
             """
