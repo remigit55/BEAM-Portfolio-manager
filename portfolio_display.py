@@ -377,18 +377,24 @@ def afficher_portefeuille():
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1 # nth-child est 1-indexé
         if label in numeric_columns:
+            # Target both header and data cells, and their potential inner divs
             css_alignments += f"""
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
-                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}) > div,
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}),
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) > div {{
                     text-align: right !important;
                     white-space: nowrap !important; /* Empêche le texte de se couper */
                     padding-right: 10px !important;
                 }}
             """
         elif label in text_columns:
+            # Target both header and data cells, and their potential inner divs
             css_alignments += f"""
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
-                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}) > div,
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}),
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) > div {{
                     text-align: left !important;
                     white-space: normal !important; /* Permet au texte de se couper */
                     padding-left: 10px !important;
