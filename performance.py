@@ -83,7 +83,6 @@ def display_performance_history():
                 for date_idx, price in filtered_data.items():
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
-                    # Conversion penny -> pound si besoin
                     if ticker_devise.upper() == "GBp":
                         price = price / 100
                         ticker_devise = "GBP"
