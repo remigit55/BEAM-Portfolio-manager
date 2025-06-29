@@ -20,10 +20,7 @@ def display_performance_history():
         return
 
     df_current_portfolio = st.session_state.df.copy()
-    if "Devise" in df_current_portfolio.columns:
-        df_current_portfolio["Devise"] = (
-            df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
-        )
+    
     target_currency = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.fx_rates
 
