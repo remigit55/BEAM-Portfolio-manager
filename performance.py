@@ -1,4 +1,3 @@
-from data_fetcher import fetch_fx_rates
 # performance.py
 
 import streamlit as st
