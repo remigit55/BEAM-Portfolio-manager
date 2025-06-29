@@ -29,7 +29,7 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-    st.subheader("Performance Historique du Portefeuille")
+
 
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
@@ -87,7 +87,7 @@ def display_performance_history():
         current_selected_label = "1W"
     default_period_index = period_labels.index(current_selected_label)
 
-    st.markdown("#### Sélection de la période d'affichage des cours")
+
     selected_label = st.radio(
         "", 
         period_labels, 
@@ -101,8 +101,7 @@ def display_performance_history():
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
 
-    st.info(f"Affichage des valeurs actuelles pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
-
+    
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         all_ticker_data = [] 
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
@@ -185,7 +184,7 @@ def display_performance_history():
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             
             # --- START: Add chart for daily total ---
-            st.markdown("##### Évolution Quotidienne de la Valeur Totale du Portefeuille")
+            
             fig_total = px.line(
                 df_total_daily_value,
                 x="Date",
