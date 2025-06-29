@@ -15,6 +15,14 @@ from utils import format_fr
 from portfolio_display import convertir
 
 def display_performance_history():
+    if "Devise" in df_current_portfolio.columns:
+        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
+
+    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
+    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
+    st.session_state.fx_rates = fetch_fx_rates(target_currency)
+
+    
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres'.")
         return
