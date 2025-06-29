@@ -89,7 +89,7 @@ def display_performance_history():
                 if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
                     ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                     # Correction pour GBp ou GBX → GBP avec facteur x0.01
-                    if ticker_devise in ["GBp", "GBX"]:
+                    if ticker_devise in ["GBp", "GBX", "GBXP", "GBPP"]:
                         ticker_devise = "GBP"
                         fx_adjustment_factor *= 0.01
                 if "Quantité" in ticker_row.columns:
