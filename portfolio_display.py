@@ -363,23 +363,30 @@ def afficher_portefeuille():
         "Momentum (%)", "Z-Score"
     ]
     text_columns = ["Ticker", "Nom", "Catégories", "Devise Source", "Signal", "Action", "Justification"]
-    css_alignments = ""
+    css_alignments = """
+        [data-testid="stDataFrame"] * { box-sizing: border-box; }
+        [data-testid="stDataFrame"] div[role="grid"] table {
+            width: 100% !important;
+        }
+    """
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1
         if label in numeric_columns:
             css_alignments += f"""
-                [data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}),
-                [data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
                     text-align: right !important;
                     white-space: nowrap !important;
+                    padding-right: 10px !important;
                 }}
             """
         elif label in text_columns:
             css_alignments += f"""
-                [data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}),
-                [data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
                     text-align: left !important;
                     white-space: normal !important;
+                    padding-left: 10px !important;
                 }}
             """
 
