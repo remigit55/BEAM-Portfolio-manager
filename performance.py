@@ -146,8 +146,12 @@ def display_performance_history():
                     
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
+                        st.warning(f"Taux de change manquant pour {fx_key} à la date {date_idx}. Utilisation de 1.0.")
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    if pd.isna(converted_price):
+                        st.warning(f"Échec de la conversion pour {ticker} à {date_idx}. Prix: {price}, Taux: {fx_rate_for_date}, Facteur FX: {fx_adjustment_factor}")
+                        converted_price = 0.0
                     current_value = converted_price * quantity
 
                     all_ticker_data.append({
@@ -155,146 +159,161 @@ def display_performance_history():
                         "Ticker": ticker,
                         f"Valeur Actuelle ({target_currency})": current_value
                     })
+            else:
+                st.warning(f"Aucune donnée historique pour {ticker} sur la période {fetch_start_date} à {end_date_table}.")
 
         df_display_values = pd.DataFrame(all_ticker_data)
+
+        # Log df_display_values for debugging
+        st.write("DEBUG: df_display_values head()")
+        st.dataframe(df_display_values.head())
+        st.write("DEBUG: df_display_values info()")
+        st.write(df_display_values.info())
+        st.write("DEBUG: df_display_values describe()")
+        st.write(df_display_values.describe())
 
         if not df_display_values.empty:
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
-            df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
+            df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'], errors='coerce')
+            df_total_daily_value['Valeur Totale'] = pd.to_numeric(df_total_daily_value['Valeur Totale'], errors='coerce')
+            df_total_daily_value = df_total_daily_value.dropna(subset=['Date', 'Valeur Totale'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
+            df_total_daily_value = df_total_daily_value.replace([np.inf, -np.inf], np.nan).dropna()
 
-            # Log DataFrame for debugging
+            # Log df_total_daily_value for debugging
             st.write("DEBUG: df_total_daily_value head()")
             st.dataframe(df_total_daily_value.head())
             st.write("DEBUG: df_total_daily_value info()")
             st.write(df_total_daily_value.info())
+            st.write("DEBUG: df_total_daily_value describe()")
+            st.write(df_total_daily_value.describe())
 
-            # Graphique 1: Valeur Totale du Portefeuille
-            st.markdown("---")
-            st.markdown("#### Performance du Portefeuille")
-            fig_total = px.line(
-                df_total_daily_value,
-                x="Date",
-                y="Valeur Totale",
-                title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
-                labels={"Valeur Totale": f"Valeur Totale ({target_currency})", "Date": "Date"},
-                hover_data={"Valeur Totale": lambda x: f"{format_fr(x, 2)}"}
-            )
-            fig_total.update_layout(hovermode="x unified")
-            st.plotly_chart(fig_total, use_container_width=True)
-
-            # Graphique 2: Volatilité Quotidienne
-            st.markdown("---")
-            st.markdown("#### Volatilité Quotidienne du Portefeuille")
-            df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
-            window_size = 20
-            df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5)
-
-            if not df_total_daily_value['Volatilité'].dropna().empty:
-                fig_volatility = px.line(
-                    df_total_daily_value.dropna(subset=['Volatilité']),
+            if not df_total_daily_value.empty:
+                # Graphique 1: Valeur Totale du Portefeuille
+                st.markdown("---")
+                st.markdown("#### Performance du Portefeuille")
+                fig_total = px.line(
+                    df_total_daily_value,
                     x="Date",
-                    y="Volatilité",
-                    title=f"Volatilité Annualisée du Portefeuille (Fenêtre de {window_size} jours)",
-                    labels={"Volatilité": "Volatilité Annualisée", "Date": "Date"},
-                    hover_data={"Volatilité": lambda x: f"{format_fr(x, 4)}"}
+                    y="Valeur Totale",
+                    title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
+                    labels={"Valeur Totale": f"Valeur Totale ({target_currency})", "Date": "Date"},
+                    hover_data={"Valeur Totale": lambda x: f"{format_fr(x, 2)}"}
                 )
-                fig_volatility.update_layout(hovermode="x unified")
-                st.plotly_chart(fig_volatility, use_container_width=True)
-            else:
-                st.info("Pas assez de données pour calculer la volatilité sur la période sélectionnée ou toutes les valeurs de volatilité sont NaN.")
+                fig_total.update_layout(hovermode="x unified")
+                st.plotly_chart(fig_total, use_container_width=True)
 
-            # Graphique 3: Momentum du Portefeuille
-            st.markdown("---")
-            st.markdown("#### Momentum du Portefeuille")
-            if not df_total_daily_value['Valeur Totale'].empty and df_total_daily_value['Valeur Totale'].iloc[0] != 0:
-                initial_value = df_total_daily_value['Valeur Totale'].iloc[0]
-                df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
-                # Replace inf/-inf with NaN
-                df_total_daily_value['Momentum (%)'] = df_total_daily_value['Momentum (%)'].replace([np.inf, -np.inf], np.nan)
-            else:
-                df_total_daily_value['Momentum (%)'] = np.nan
-                st.warning("Valeur initiale du portefeuille nulle ou manquante. Le momentum est défini à NaN.")
+                # Graphique 2: Volatilité Quotidienne
+                st.markdown("---")
+                st.markdown("#### Volatilité Quotidienne du Portefeuille")
+                df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
+                window_size = 20
+                df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5)
 
-            # Ensure data types for plotting
-            df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
-            df_total_daily_value['Momentum (%)'] = pd.to_numeric(df_total_daily_value['Momentum (%)'], errors='coerce')
-
-            # Log Momentum DataFrame for debugging
-            st.write("DEBUG: df_total_daily_value head() after momentum calculation")
-            st.dataframe(df_total_daily_value.head())
-            st.write("DEBUG: df_total_daily_value info() after momentum calculation")
-            st.write(df_total_daily_value.info())
-
-            if not df_total_daily_value['Momentum (%)'].dropna().empty:
-                fig_momentum = px.line(
-                    df_total_daily_value.dropna(subset=['Momentum (%)']),
-                    x="Date",
-                    y="Momentum (%)",
-                    title=f"Performance Cumulée du Portefeuille ({target_currency})",
-                    labels={"Momentum (%)": "Changement en %", "Date": "Date"},
-                    hover_data={"Momentum (%)": lambda x: f"{format_fr(x, 2)}"}
-                )
-                fig_momentum.update_layout(hovermode="x unified")
-                st.plotly_chart(fig_momentum, use_container_width=True)
-            else:
-                st.info("Pas assez de données valides pour afficher le graphique de momentum. Vérifiez les données historiques ou la période sélectionnée.")
-
-            # Tableau des valeurs actuelles
-            st.markdown("---")
-            df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
-            df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
-            df_pivot_current_value = df_pivot_current_value.loc[:, (df_pivot_current_value.columns >= pd.Timestamp(start_date_table)) & (df_pivot_current_value.columns <= pd.Timestamp(end_date_table))]
-            df_pivot_current_value.columns = [f"Valeur Actuelle ({col.strftime('%d/%m/%Y')})" for col in df_pivot_current_value.columns]
-            df_final_display = df_pivot_current_value.reset_index()
-
-            sorted_columns = ['Ticker']
-            dates_ordered = sorted(list(set([col.date() for col in df_display_values['Date']])))
-            for d in dates_ordered:
-                date_str = d.strftime('%d/%m/%Y')
-                sorted_columns.append(f"Valeur Actuelle ({date_str})")
-            
-            final_columns_to_display = [col for col in sorted_columns if col in df_final_display.columns]
-            df_final_display = df_final_display[final_columns_to_display]
-
-            format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
-
-            # CSS pour aligner les colonnes du tableau
-            css_alignments = """
-                [data-testid="stDataFrame"] * { box-sizing: border-box; }
-                [data-testid="stDataFrame"] div[role="grid"] table {
-                    width: 100% !important;
-                }
-            """
-            for i, label in enumerate(df_final_display.columns):
-                col_idx = i + 1
-                if label == "Ticker":
-                    css_alignments += f"""
-                        [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
-                        [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
-                            text-align: left !important;
-                            white-space: normal !important;
-                            padding-left: 10px !important;
-                        }}
-                    """
+                if not df_total_daily_value['Volatilité'].dropna().empty:
+                    fig_volatility = px.line(
+                        df_total_daily_value.dropna(subset=['Volatilité']),
+                        x="Date",
+                        y="Volatilité",
+                        title=f"Volatilité Annualisée du Portefeuille (Fenêtre de {window_size} jours)",
+                        labels={"Volatilité": "Volatilité Annualisée", "Date": "Date"},
+                        hover_data={"Volatilité": lambda x: f"{format_fr(x, 4)}"}
+                    )
+                    fig_volatility.update_layout(hovermode="x unified")
+                    st.plotly_chart(fig_volatility, use_container_width=True)
                 else:
-                    css_alignments += f"""
-                        [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
-                        [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
-                            text-align: right !important;
-                            white-space: nowrap !important;
-                            padding-right: 10px !important;
-                        }}
-                    """
+                    st.info("Pas assez de données pour calculer la volatilité sur la période sélectionnée ou toutes les valeurs de volatilité sont NaN.")
 
-            st.markdown(f"""
-                <style>
-                    {css_alignments}
-                </style>
-            """, unsafe_allow_html=True)
+                # Graphique 3: Momentum du Portefeuille
+                st.markdown("---")
+                st.markdown("#### Momentum du Portefeuille")
+                if not df_total_daily_value['Valeur Totale'].empty and df_total_daily_value['Valeur Totale'].iloc[0] != 0:
+                    initial_value = df_total_daily_value['Valeur Totale'].iloc[0]
+                    df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
+                    df_total_daily_value['Momentum (%)'] = df_total_daily_value['Momentum (%)'].replace([np.inf, -np.inf], np.nan)
+                else:
+                    df_total_daily_value['Momentum (%)'] = np.nan
+                    st.warning("Valeur initiale du portefeuille nulle ou manquante. Le momentum est défini à NaN.")
 
-            st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
-            st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
+                df_total_daily_value['Momentum (%)'] = pd.to_numeric(df_total_daily_value['Momentum (%)'], errors='coerce')
+
+                # Log Momentum DataFrame for debugging
+                st.write("DEBUG: df_total_daily_value head() after momentum calculation")
+                st.dataframe(df_total_daily_value.head())
+                st.write("DEBUG: df_total_daily_value info() after momentum calculation")
+                st.write(df_total_daily_value.info())
+
+                if not df_total_daily_value['Momentum (%)'].dropna().empty:
+                    fig_momentum = px.line(
+                        df_total_daily_value.dropna(subset=['Momentum (%)']),
+                        x="Date",
+                        y="Momentum (%)",
+                        title=f"Performance Cumulée du Portefeuille ({target_currency})",
+                        labels={"Momentum (%)": "Changement en %", "Date": "Date"},
+                        hover_data={"Momentum (%)": lambda x: f"{format_fr(x, 2)}"}
+                    )
+                    fig_momentum.update_layout(hovermode="x unified")
+                    st.plotly_chart(fig_momentum, use_container_width=True)
+                else:
+                    st.info("Pas assez de données valides pour afficher le graphique de momentum. Vérifiez les données historiques ou la période sélectionnée.")
+
+                # Tableau des valeurs actuelles
+                st.markdown("---")
+                df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
+                df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
+                df_pivot_current_value = df_pivot_current_value.loc[:, (df_pivot_current_value.columns >= pd.Timestamp(start_date_table)) & (df_pivot_current_value.columns <= pd.Timestamp(end_date_table))]
+                df_pivot_current_value.columns = [f"Valeur Actuelle ({col.strftime('%d/%m/%Y')})" for col in df_pivot_current_value.columns]
+                df_final_display = df_pivot_current_value.reset_index()
+
+                sorted_columns = ['Ticker']
+                dates_ordered = sorted(list(set([col.date() for col in df_display_values['Date']])))
+                for d in dates_ordered:
+                    date_str = d.strftime('%d/%m/%Y')
+                    sorted_columns.append(f"Valeur Actuelle ({date_str})")
+                
+                final_columns_to_display = [col for col in sorted_columns if col in df_final_display.columns]
+                df_final_display = df_final_display[final_columns_to_display]
+
+                format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
+
+                # CSS pour aligner les colonnes du tableau
+                css_alignments = """
+                    [data-testid="stDataFrame"] * { box-sizing: border-box; }
+                    [data-testid="stDataFrame"] div[role="grid"] table {
+                        width: 100% !important;
+                    }
+                """
+                for i, label in enumerate(df_final_display.columns):
+                    col_idx = i + 1
+                    if label == "Ticker":
+                        css_alignments += f"""
+                            [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                            [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                                text-align: left !important;
+                                white-space: normal !important;
+                                padding-left: 10px !important;
+                            }}
+                        """
+                    else:
+                        css_alignments += f"""
+                            [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                            [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                                text-align: right !important;
+                                white-space: nowrap !important;
+                                padding-right: 10px !important;
+                            }}
+                        """
+
+                st.markdown(f"""
+                    <style>
+                        {css_alignments}
+                    </style>
+                """, unsafe_allow_html=True)
+
+                st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
+                st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
+            else:
+                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les données historiques ou la période sélectionnée.")
         else:
-            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
+            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée. Vérifiez les données des tickers ou les taux de change.")
