@@ -54,9 +54,10 @@ def display_performance_history():
         return
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
+    st.write("DEBUG: Tickers dans le portefeuille", tickers_in_portfolio)
 
     if not tickers_in_portfolio:
-        st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
+        st.info("Aucun ticker à afficher. Veuillez importer un portefeuille avec des tickers valides.")
         return
 
     # SÉLECTION DE PÉRIODE AVEC ST.RADIO
@@ -89,12 +90,14 @@ def display_performance_history():
 
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
+    st.write(f"DEBUG: Période sélectionnée - Début: {start_date_table}, Fin: {end_date_table}")
 
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         all_ticker_data = []
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
+        valid_tickers = []
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
             quantity = 0.0
@@ -108,29 +111,28 @@ def display_performance_history():
                 
                 if "Quantité" in ticker_row.columns:
                     numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
-                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]):
+                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]) and numeric_quantities.iloc[0] != 0:
                         quantity = numeric_quantities.iloc[0]
                     else:
-                        st.warning(f"Quantité pour le ticker '{ticker}' est vide ou invalide. Utilisation de 0.")
-                        quantity = 0.0
+                        st.warning(f"Quantité pour le ticker '{ticker}' est vide, invalide ou zéro. Ignoré.")
+                        continue
                 else:
-                    st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Utilisation de 0.")
-                    quantity = 0.0
+                    st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Ignoré.")
+                    continue
 
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
                     numeric_fx_factor = pd.to_numeric(ticker_row["Facteur_Ajustement_FX"], errors='coerce')
-                    if not numeric_fx_factor.empty and pd.notnull(numeric_fx_factor.iloc[0]):
+                    if not numeric_fx_factor.empty and pd.notnull(numeric_fx_factor.iloc[0]) and numeric_fx_factor.iloc[0] != 0:
                         fx_adjustment_factor = numeric_fx_factor.iloc[0]
                     else:
-                        st.warning(f"Facteur d'ajustement FX pour '{ticker}' est vide ou invalide. Utilisation de 1.0.")
+                        st.warning(f"Facteur d'ajustement FX pour '{ticker}' est vide, invalide ou zéro. Utilisation de 1.0.")
                         fx_adjustment_factor = 1.0
                 else:
                     fx_adjustment_factor = 1.0
 
             else:
-                st.warning(f"Ticker '{ticker}' non trouvé dans le DataFrame. Utilisation de quantité 0 et facteur FX 1.0.")
-                quantity = 0.0
-                fx_adjustment_factor = 1.0
+                st.warning(f"Ticker '{ticker}' non trouvé dans le DataFrame. Ignoré.")
+                continue
 
             # Récupérer les données historiques
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
@@ -149,9 +151,9 @@ def display_performance_history():
                         st.warning(f"Taux de change manquant pour {fx_key} à la date {date_idx}. Utilisation de 1.0.")
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
-                    if pd.isna(converted_price):
-                        st.warning(f"Échec de la conversion pour {ticker} à {date_idx}. Prix: {price}, Taux: {fx_rate_for_date}, Facteur FX: {fx_adjustment_factor}")
-                        converted_price = 0.0
+                    if pd.isna(converted_price) or np.isinf(converted_price):
+                        st.warning(f"Échec de la conversion pour {ticker} à {date_idx}. Prix: {price}, Taux: {fx_rate_for_date}, Facteur FX: {fx_adjustment_factor}. Ignoré.")
+                        continue
                     current_value = converted_price * quantity
 
                     all_ticker_data.append({
@@ -159,8 +161,11 @@ def display_performance_history():
                         "Ticker": ticker,
                         f"Valeur Actuelle ({target_currency})": current_value
                     })
+                valid_tickers.append(ticker)
             else:
-                st.warning(f"Aucune donnée historique pour {ticker} sur la période {fetch_start_date} à {end_date_table}.")
+                st.warning(f"Aucune donnée historique pour {ticker} sur la période {fetch_start_date} à {end_date_table}. Ignoré.")
+
+        st.write("DEBUG: Tickers valides avec données historiques", valid_tickers)
 
         df_display_values = pd.DataFrame(all_ticker_data)
 
@@ -172,14 +177,14 @@ def display_performance_history():
         st.write("DEBUG: df_display_values describe()")
         st.write(df_display_values.describe())
 
-        if not df_display_values.empty:
+        if not df_display_values.empty and not df_display_values[f"Valeur Actuelle ({target_currency})"].isna().all():
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'], errors='coerce')
             df_total_daily_value['Valeur Totale'] = pd.to_numeric(df_total_daily_value['Valeur Totale'], errors='coerce')
             df_total_daily_value = df_total_daily_value.dropna(subset=['Date', 'Valeur Totale'])
-            df_total_daily_value = df_total_daily_value.sort_values('Date')
             df_total_daily_value = df_total_daily_value.replace([np.inf, -np.inf], np.nan).dropna()
+            df_total_daily_value = df_total_daily_value.sort_values('Date')
 
             # Log df_total_daily_value for debugging
             st.write("DEBUG: df_total_daily_value head()")
@@ -314,6 +319,6 @@ def display_performance_history():
                 st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
                 st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
             else:
-                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les données historiques ou la période sélectionnée.")
+                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les données historiques, les tickers ou la période sélectionnée.")
         else:
-            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée. Vérifiez les données des tickers ou les taux de change.")
+            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée. Vérifiez les tickers, les données historiques ou les taux de change.")
