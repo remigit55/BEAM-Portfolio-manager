@@ -4,18 +4,25 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
-from pandas.tseries.offsets import BDay # Pour les jours ouvrables
+from pandas.tseries.offsets import BDay
 import yfinance as yf
-import builtins # Pour contourner l'écrasement de str()
+import builtins
 
-# Importe le nouveau composant personnalisé
 from period_selector_component import period_selector
-
-# Import des fonctions nécessaires
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
-from portfolio_display import convertir # Importer la fonction de conversion (maintenant avec fx_adjustment_factor)
+from portfolio_display import convertir
+
+def is_pence_denominated(ticker, currency):
+    """
+    Détermine si un actif est libellé en pence (GBp) en fonction du ticker ou de la devise.
+    Retourne True si une conversion (division par 100) est nécessaire.
+    """
+    ticker = str(ticker).strip()
+    is_lse_ticker = ticker.endswith('.L')
+    is_explicit_gbp_pence = str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
+    return is_lse_ticker or is_explicit_gbp_pence
 
 def display_performance_history():
     """
@@ -35,17 +42,23 @@ def display_performance_history():
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
         st.info("Récupération des taux de change historiques initiaux...")
         end_date_for_fx = datetime.now().date()
-        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10) # Fetch 10 years of FX data for broader use
+        start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10)
         try:
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
                 st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
-                st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
-                                                                        columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
+                st.session_state.historical_fx_rates_df = pd.DataFrame(
+                    1.0, 
+                    index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
+                    columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
+                )
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
-            st.session_state.historical_fx_rates_df = pd.DataFrame(1.0, index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
-                                                                    columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency])
+            st.session_state.historical_fx_rates_df = pd.DataFrame(
+                1.0, 
+                index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
+                columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
+            )
 
     if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
         st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
@@ -58,9 +71,15 @@ def display_performance_history():
         return
 
     # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO ---
-    period_options = {"1W": timedelta(weeks=1), "1M": timedelta(days=30), "3M": timedelta(days=90),
-                      "6M": timedelta(days=180), "1Y": timedelta(days=365), "5Y": timedelta(days=365 * 5),
-                      "10Y": timedelta(days=365 * 10)}
+    period_options = {
+        "1W": timedelta(weeks=1), 
+        "1M": timedelta(days=30), 
+        "3M": timedelta(days=90),
+        "6M": timedelta(days=180), 
+        "1Y": timedelta(days=365), 
+        "5Y": timedelta(days=365 * 5),
+        "10Y": timedelta(days=365 * 10)
+    }
     period_labels = list(period_options.keys())
     
     current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
@@ -126,12 +145,18 @@ def display_performance_history():
                 quantity = 0.0
                 fx_adjustment_factor = 1.0
 
-            data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
+            # Récupérer les données historiques avec la devise pour gérer la conversion GBp
+            data = fetch_stock_history(ticker, fetch_start_date, end_date_table, currency=ticker_devise)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 
                 for date_idx, price in filtered_data.items():
-                    fx_key = f"{ticker_devise}{target_currency}"
+                    # Déterminer la devise à utiliser pour la conversion
+                    conversion_currency = ticker_devise
+                    if is_pence_denominated(ticker, ticker_devise):
+                        conversion_currency = "GBP"  # Après conversion pence-vers-livre, utiliser GBP pour le taux de change
+
+                    fx_key = f"{conversion_currency}{target_currency}"
                     
                     fx_rate_for_date = 1.0
                     if fx_key in st.session_state.historical_fx_rates_df.columns:
@@ -142,7 +167,7 @@ def display_performance_history():
                         fx_rate_for_date = 1.0
 
                     # Passer directement le taux scalaire
-                    converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    converted_price, _ = convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     
                     current_value = converted_price * quantity 
 
