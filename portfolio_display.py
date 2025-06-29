@@ -569,24 +569,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Affichage du tableau de répartition par catégories
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
 
-        # Message de réallocation pour Minières (maintenu séparé)
-        st.markdown("#### Réallocation Minières")
-        allocations_reelles = {
-            row["Catégories"]: row["Part Actuelle (%)"] / 100
-            for _, row in df_allocation.iterrows()
-        }
-        reallocation_value = calculer_reallocation_miniere(df, allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
-
-        if reallocation_value is not None:
-            target_minieres_pct_display = format_fr(target_allocations.get('Minières', 0.0) * 100, 0)
-            if reallocation_value > 0:
-                st.info(f"Pour atteindre l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
-            elif reallocation_value < 0:
-                st.info(f"Pour maintenir l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
-            else:
-                st.info("L'allocation Minières est conforme à l'objectif.")
-        else:
-            st.info("Calcul de réallocation Minières non applicable ou données insuffisantes.")
+        
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
