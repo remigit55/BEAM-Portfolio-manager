@@ -83,7 +83,6 @@ def display_performance_history():
                 for date_idx, price in filtered_data.items():
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
-                    fx_rate_for_date = st.session_state.historical_fx_rates_df.get(fx_key, pd.Series(1.0)).get(date_idx, 1.0) or 1.0
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     all_ticker_data.append({
                         "Date": date_idx,
