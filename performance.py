@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # performance.py
 
 import streamlit as st
@@ -112,7 +113,7 @@ def display_performance_history():
                         st.warning(f"Quantité pour le ticker '{ticker}' est vide ou invalide. Utilisation de 0.")
                         quantity = 0.0
                 else:
-                    st warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Utilisation de 0.")
+                    st.warning(f"Colonne 'Quantité' manquante pour le ticker '{ticker}'. Utilisation de 0.")
                     quantity = 0.0
 
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
