@@ -7,29 +7,22 @@ from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
+import os 
 
-from period_selector_component import period_selector # Keep if used, otherwise remove
+# Importe le nouveau composant personnalisé
+from period_selector_component import period_selector
+
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
-from historical_performance_calculator import reconstruct_historical_portfolio_value # Keep if used, otherwise remove
+from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
-from portfolio_display import convertir
 
-def is_pence_denominated(ticker, currency):
-    """
-    Détermine si un actif est libellé en pence (GBp) en fonction du ticker ou de la devise.
-    Retourne True si une conversion (division par 100) est nécessaire.
-    """
-    ticker = str(ticker).strip()
-    is_lse_ticker = ticker.endswith('.L')
-    is_explicit_gbp_pence = str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
-    return is_lse_ticker or is_explicit_gbp_pence
+# La fonction is_pence_denominated est supprimée.
 
 def display_performance_history():
     """
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
         return
@@ -46,6 +39,7 @@ def display_performance_history():
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
                 st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
+                # Fallback to a DataFrame of 1.0 if FX rates cannot be fetched
                 st.session_state.historical_fx_rates_df = pd.DataFrame(
                     1.0, 
                     index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
@@ -53,6 +47,7 @@ def display_performance_history():
                 )
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
+            # Fallback to a DataFrame of 1.0 if FX rates cannot be fetched
             st.session_state.historical_fx_rates_df = pd.DataFrame(
                 1.0, 
                 index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
@@ -69,44 +64,43 @@ def display_performance_history():
         st.info("Aucun ticker à afficher. Veuillez importer un portefeuille.")
         return
 
-    # --- SÉLECTION DE PÉRIODE AVEC ST.RADIO ---
+    # --- SÉLECTION DE PÉRIODE VIA COMPOSANT PERSONNALISÉ ---
+
     period_options = {
-        "1W": timedelta(weeks=1), 
-        "1M": timedelta(days=30), 
+        "1W": timedelta(weeks=1),
+        "1M": timedelta(days=30),
         "3M": timedelta(days=90),
-        "6M": timedelta(days=180), 
-        "1Y": timedelta(days=365), 
+        "6M": timedelta(days=180),
+        "1Y": timedelta(days=365),
         "5Y": timedelta(days=365 * 5),
-        "10Y": timedelta(days=365 * 10)
+        "10Y": timedelta(days=365 * 10),
     }
-    period_labels = list(period_options.keys())
+
+    if "selected_ticker_table_period" not in st.session_state:
+        st.session_state.selected_ticker_table_period = "1W"
+
+    st.markdown("#### Sélection de la période d'affichage des cours")
     
-    current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
-    if current_selected_label not in period_labels:
-        current_selected_label = "1W"
-    default_period_index = period_labels.index(current_selected_label)
-
-
-    selected_label = st.radio(
-        "Sélectionnez une période:", 
-        period_labels, 
-        index=default_period_index,
-        key="selected_ticker_table_period_radio", 
-        horizontal=True
+    # Appel du composant personnalisé
+    new_selected_period = period_selector(
+        period_options=period_options,
+        selected_period=st.session_state.selected_ticker_table_period,
+        key="period_selector_custom_component" # Clé unique pour ce composant
     )
-    st.session_state.selected_ticker_table_period_label = selected_label
-    selected_period_td = period_options[selected_label]
+
+    # Si une nouvelle période a été sélectionnée par le composant, mettre à jour l'état de session et relancer
+    if new_selected_period != st.session_state.selected_ticker_table_period:
+        st.session_state.selected_ticker_table_period = new_selected_period
+        st.rerun() 
 
     end_date_table = datetime.now().date()
+    selected_period_td = period_options[st.session_state.selected_ticker_table_period]
     start_date_table = end_date_table - selected_period_td
 
-    
-    with st.spinner("Récupération et conversion des cours des tickers en cours..."):
+    st.info(f"Affichage des cours de clôture pour les tickers du portefeuille sur la période : {start_date_table.strftime('%d/%m/%Y')} à {end_date_table.strftime('%d/%m/%Y')}.")
+
+    with st.spinner("Récupération des cours des tickers en cours..."):
         all_ticker_data = [] 
-        # Extend fetch_start_date slightly back to ensure enough data for calculations like momentum/volatility
-        # For volatility (20-day window), we need at least 20 days of returns, so more than 20 days of prices.
-        # For momentum, depends on the calculation (e.g., 1-month momentum needs 1 month of prices).
-        # Adding some buffer here to be safe.
         fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2)) 
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
@@ -147,17 +141,15 @@ def display_performance_history():
                 quantity = 0.0
                 fx_adjustment_factor = 1.0
 
-            # Récupérer les données historiques avec la devise pour gérer la conversion GBp
-            data = fetch_stock_history(ticker, fetch_start_date, end_date_table, currency=ticker_devise)
+            # Récupérer les données historiques (sans conversion pence-vers-livre ici)
+            data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 
                 for date_idx, price in filtered_data.items():
-                    # Déterminer la devise à utiliser pour la conversion
+                    # La devise de conversion est la devise du ticker, sans traitement spécial pour les pence
                     conversion_currency = ticker_devise
-                    if is_pence_denominated(ticker, ticker_devise):
-                        conversion_currency = "GBP"  # Après conversion pence-vers-livre, utiliser GBP pour le taux de change
-
+                    
                     fx_key = f"{conversion_currency}{target_currency}"
                     
                     fx_rate_for_date = 1.0
@@ -168,9 +160,12 @@ def display_performance_history():
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
 
-                    # Passer directement le taux scalaire
-                    converted_price, _ = convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor)
-                    
+                    # Appliquer la conversion avec le taux et le facteur d'ajustement
+                    converted_price, _ = st.session_state.df.apply(
+                        lambda x: st.session_state.convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor),
+                        axis=1, result_type='expand'
+                    ).iloc[0] # Appeler convertir depuis st.session_state.df car elle est définie dans portfolio_display.py
+
                     current_value = converted_price * quantity 
 
                     all_ticker_data.append({
@@ -180,10 +175,6 @@ def display_performance_history():
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
-        st.write("DEBUG: df_display_values head()")
-        st.dataframe(df_display_values.head()) # DEBUG LINE
-        st.write("DEBUG: df_display_values info()")
-        st.write(df_display_values.info()) # DEBUG LINE
 
         if not df_display_values.empty:
             # Calculate daily total portfolio value
@@ -193,12 +184,6 @@ def display_performance_history():
             # Ensure 'Date' column is datetime
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
-
-
-            st.write("DEBUG: df_total_daily_value head() after grouping")
-            st.dataframe(df_total_daily_value.head()) # DEBUG LINE
-            st.write("DEBUG: df_total_daily_value info() after grouping")
-            st.write(df_total_daily_value.info()) # DEBUG LINE
 
             # --- Graphique 1: Valeur Totale du Portefeuille ---
             st.markdown("---")
@@ -226,11 +211,6 @@ def display_performance_history():
             # Multiplier par sqrt(252) pour annualiser la volatilité si vous le souhaitez
             df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5) # Annualisé
 
-            st.write("DEBUG: df_total_daily_value head() after volatility calculation")
-            st.dataframe(df_total_daily_value.head(window_size + 5)) # DEBUG LINE
-            st.write("DEBUG: df_total_daily_value info() after volatility calculation")
-            st.write(df_total_daily_value.info()) # DEBUG LINE
-
             if not df_total_daily_value['Volatilité'].dropna().empty:
                 fig_volatility = px.line(
                     df_total_daily_value.dropna(subset=['Volatilité']), # Dropna pour enlever les NaNs de la fenêtre de calcul
@@ -249,21 +229,12 @@ def display_performance_history():
             st.markdown("---")
             st.markdown("#### Momentum du Portefeuille")
 
-            # Calcul du changement en pourcentage par rapport au début de la période
-            # Pour un "momentum" visuel, un graphique des rendements cumulés est plus parlant.
-            # Ou un simple pourcentage de changement par rapport à la première valeur de la période.
-
             if not df_total_daily_value['Valeur Totale'].empty and df_total_daily_value['Valeur Totale'].iloc[0] != 0:
                 initial_value = df_total_daily_value['Valeur Totale'].iloc[0]
                 df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
             else:
-                df_total_daily_value['Momentum (%)'] = 0 # Ou np.nan si vous préférez, pour indiquer l'absence de calcul
+                df_total_daily_value['Momentum (%)'] = 0 
             
-            st.write("DEBUG: df_total_daily_value head() after momentum calculation")
-            st.dataframe(df_total_daily_value.head()) # DEBUG LINE
-            st.write("DEBUG: df_total_daily_value info() after momentum calculation")
-            st.write(df_total_daily_value.info()) # DEBUG LINE
-
             if not df_total_daily_value['Momentum (%)'].dropna().empty:
                 fig_momentum = px.line(
                     df_total_daily_value,
@@ -309,4 +280,3 @@ def display_performance_history():
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
-
