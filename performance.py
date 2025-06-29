@@ -15,6 +15,7 @@ from period_selector_component import period_selector
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
+from portfolio_display import convertir # Importe la fonction convertir directement
 
 # La fonction is_pence_denominated est supprimée.
 
@@ -161,10 +162,7 @@ def display_performance_history():
                         fx_rate_for_date = 1.0
 
                     # Appliquer la conversion avec le taux et le facteur d'ajustement
-                    converted_price, _ = st.session_state.df.apply(
-                        lambda x: st.session_state.convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor),
-                        axis=1, result_type='expand'
-                    ).iloc[0] # Appeler convertir depuis st.session_state.df car elle est définie dans portfolio_display.py
+                    converted_price, _ = convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor)
 
                     current_value = converted_price * quantity 
 
