@@ -4,7 +4,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import streamlit.components.v1 as components
 import datetime
 import pytz
 
@@ -123,7 +122,7 @@ def afficher_portefeuille():
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
-    # Nettoyage et conversion des colonnes numériques
+    # Nettoyage et migration des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df.columns:
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
@@ -326,204 +325,70 @@ def afficher_portefeuille():
     df_disp = df[existing_cols_in_df].copy()
     df_disp.columns = existing_labels  
 
-    # Gestion du tri des colonnes via les en-têtes HTML
-    if "sort_column" not in st.session_state:
-        st.session_state.sort_column = None
-    if "sort_direction" not in st.session_state:
-        st.session_state.sort_direction = "asc"
-
-    if st.session_state.sort_column:
-        sort_col_label = st.session_state.sort_column
-        if sort_col_label in df_disp.columns:
-            original_col_name = None
-            try:
-                idx = existing_labels.index(sort_col_label)
-                original_col_name = existing_cols_in_df[idx]
-                if original_col_name.endswith("_fmt"):
-                    original_col_name = original_col_name[:-4]  
-            except ValueError:
-                pass
-
-            if original_col_name and original_col_name in df.columns and pd.api.types.is_numeric_dtype(df[original_col_name]):
-                df = df.sort_values(
-                    by=original_col_name,
-                    ascending=(st.session_state.sort_direction == "asc")
-                )
-                df_disp = df[existing_cols_in_df].copy()
-                df_disp.columns = existing_labels
-            else:
-                df_disp = df_disp.sort_values(
-                    by=sort_col_label,
-                    ascending=(st.session_state.sort_direction == "asc"),
-                    key=lambda x: x.astype(str).str.lower()
-                )
-    
-    # Formatage des totaux pour l'affichage
-    total_valeur_str = format_fr(total_valeur, 2)
-    total_actuelle_str = format_fr(total_actuelle, 2)
-    total_h52_str = format_fr(total_h52, 2)
-    total_lt_str = format_fr(total_lt, 2)
-
-    # Génération du CSS pour les largeurs et alignements de colonnes
-    css_col_widths = ""
-    width_specific_cols = {
-        "Ticker": "80px",
-        "Nom": "200px",
-        "Catégories": "100px",  
-        "Devise Source": "60px",
-        "Valeur Acquisition (Source)": "120px",  
-        "Taux FX (Source/Cible)": "100px",  
-        "Signal": "100px",
-        "Action": "150px",
-        "Justification": "200px",
+    # Définition du dictionnaire de formatage pour st.dataframe
+    format_dict_portfolio = {
+        "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
+        "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
+        "Valeur Acquisition (Source)": lambda x: str(x) if pd.notnull(x) else "",  # Already formatted with source currency
+        f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
+        "Taux FX (Source/Cible)": lambda x: format_fr(x, 6) if pd.notnull(x) else "N/A",
+        "Prix Actuel": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
+        f"Valeur Actuelle ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
+        f"Gain/Perte ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
+        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
+        "Haut 52 Semaines": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
+        f"Valeur H52 ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
+        "Objectif LT": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
+        f"Valeur LT ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
+        "Momentum (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
+        "Z-Score": lambda x: format_fr(x, 2) if pd.notnull(x) else "",
+        "Ticker": lambda x: str(x) if pd.notnull(x) else "",
+        "Nom": lambda x: str(x) if pd.notnull(x) else "",
+        "Catégories": lambda x: str(x) if pd.notnull(x) else "",
+        "Devise Source": lambda x: str(x) if pd.notnull(x) else "",
+        "Signal": lambda x: str(x) if pd.notnull(x) else "",
+        "Action": lambda x: str(x) if pd.notnull(x) else "",
+        "Justification": lambda x: str(x) if pd.notnull(x) else ""
     }
-    
+
+    # Filtrer le dictionnaire de formatage
+    filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
+
+    # CSS pour aligner les colonnes
     left_aligned_labels = ["Ticker", "Nom", "Catégories", "Signal", "Action", "Justification", "Devise Source"]
-
+    css_alignments = ""
     for i, label in enumerate(df_disp.columns):
-        col_idx = i + 1  
-        
-        if label in width_specific_cols:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: {width_specific_cols[label]}; }}"
-        else:
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}), .portfolio-table td:nth-child({col_idx}) {{ width: 100px; }}"
-        
+        col_idx = i + 1
         if label in left_aligned_labels:
-            css_col_widths += f".portfolio-table td:nth-child({col_idx}) {{ text-align: left !important; white-space: normal; }}"
-            css_col_widths += f".portfolio-table th:nth-child({col_idx}) {{ text-align: left !important; }}"
-            
-    # Construction du HTML du tableau
-    html_code = f"""
-    <style>
-        .scroll-wrapper {{
-            overflow-x: auto !important;
-            overflow-y: auto;
-            max-height: 500px;
-            max-width: none !important;
-            width: auto;
-            display: block;
-            position: relative;
-        }}
-        .portfolio-table {{
-            min-width: 2500px;  
-            border-collapse: collapse;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }}
-        .portfolio-table th {{
-            background: #363636;
-            color: white;
-            padding: 8px;
-            text-align: center;
-            border: none;
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            font-size: 12px;
-            box-sizing: border-box;
-            cursor: pointer;
-        }}
-        .portfolio-table td {{
-            padding: 6px;
-            text-align: right;
-            border: none;
-            font-size: 11px;
-            white-space: nowrap;
-        }}
-        {css_col_widths}  
+            css_alignments += f"""
+                div[data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}) {{
+                    text-align: left !important;
+                    white-space: normal;
+                }}
+                div[data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                    text-align: left !important;
+                }}
+            """
+        else:
+            css_alignments += f"""
+                div[data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}) {{
+                    text-align: right !important;
+                    white-space: nowrap;
+                }}
+                div[data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                    text-align: right !important;
+                }}
+            """
 
-        .portfolio-table tr:nth-child(even) {{ background: #fefefe; }}
-        .total-row td {{
-            background: #A49B6D;
-            color: white;
-            font-weight: bold;
-        }}
-    </style>
-    <div class="scroll-wrapper">
-        <table class="portfolio-table">
-            <thead><tr>
-    """
+    st.markdown(f"""
+        <style>
+            {css_alignments}
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Ajout des en-têtes de colonnes avec icônes de tri
-    for lbl in df_disp.columns:
-        sort_icon = ""
-        if st.session_state.sort_column == lbl:
-            sort_icon = " ▲" if st.session_state.sort_direction == "asc" else " ▼"
-        
-        html_code += f'<th id="sort-{safe_escape(lbl)}">{safe_escape(lbl)}{sort_icon}</th>'
-
-    html_code += """
-            </tr></thead>
-            <tbody>
-    """
-
-    # Ajout des lignes de données
-    for _, row in df_disp.iterrows():
-        html_code += "<tr>"
-        for lbl in df_disp.columns:
-            val = row[lbl]
-            if lbl == "Valeur Acquisition (Source)":
-                val_str = str(val) if pd.notnull(val) else ""  # Already formatted with currency
-            elif lbl == "Taux FX (Source/Cible)":
-                val_str = str(val) if pd.notnull(val) else "N/A"  # Already formatted
-            elif lbl == f"Valeur Acquisition ({devise_cible})":
-                val_str = format_fr(val, 2) + f" {devise_cible}" if pd.notnull(val) else ""
-            else:
-                val_str = safe_escape(str(val)) if pd.notnull(val) else ""
-            
-            html_code += f"<td>{val_str}</td>"
-        html_code += "</tr>"
-
-    # Ajout de la ligne des totaux
-    num_cols_displayed = len(df_disp.columns)
-    total_row_cells = [""] * num_cols_displayed
-    
-    total_cols_mapping = {
-        f"Valeur Acquisition ({devise_cible})": total_valeur_str,
-        f"Valeur Actuelle ({devise_cible})": total_actuelle_str,
-        f"Valeur H52 ({devise_cible})": total_h52_str,  
-        f"Valeur LT ({devise_cible})": total_lt_str
-    }
-
-    for display_label, total_value_str in total_cols_mapping.items():
-        if display_label in df_disp.columns:
-            try:
-                idx = list(df_disp.columns).index(display_label)
-                total_row_cells[idx] = safe_escape(total_value_str)
-            except ValueError:
-                pass
-
-    if num_cols_displayed > 0:
-        total_row_cells[0] = f"TOTAL ({safe_escape(devise_cible)})"
-
-    html_code += "<tr class='total-row'>"
-    for cell_content in total_row_cells:
-        html_code += f"<td>{cell_content}</td>"
-    html_code += "</tr>"
-
-    html_code += """
-            </tbody>
-        </table>
-    </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.portfolio-table th').forEach(function(header) {
-                header.addEventListener('click', function() {
-                    const columnLabel = this.id.replace('sort-', '');
-                    window.parent.postMessage(JSON.stringify({
-                        streamlit: {
-                            type: 'setComponentValue',
-                            args: ['sort_event', {column: columnLabel}],
-                        },
-                    }), '*');
-                });
-            });
-        });
-    </script>
-    """
-    
     # Affichage du tableau du portefeuille
     st.markdown("##### Détail du Portefeuille")
-    components.html(html_code, height=600, scrolling=True)
+    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True)
 
     st.session_state.df = df  
 
