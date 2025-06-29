@@ -1,3 +1,4 @@
+from data_fetcher import fetch_fx_rates
 # performance.py
 
 import streamlit as st
@@ -20,7 +21,7 @@ def display_performance_history():
 
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
-        fx_rates = st.session_state.fx_rates
+    fx_rates = st.session_state.fx_rates
 
 # --- Nouvelle logique de taux FX (alignée sur portfolio_display.py) ---
 
@@ -82,7 +83,6 @@ def display_performance_history():
                 for date_idx, price in filtered_data.items():
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
-                    fx_rate_for_date = st.session_state.historical_fx_rates_df.get(fx_key, pd.Series(1.0)).get(date_idx, 1.0) or 1.0
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     all_ticker_data.append({
                         "Date": date_idx,
