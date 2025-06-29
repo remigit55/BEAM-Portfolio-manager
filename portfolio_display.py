@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # portfolio_display.py
 
 import streamlit as st
@@ -224,6 +225,12 @@ def afficher_portefeuille():
         lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
+
+    # Calcul des totaux pour la synthèse
+    total_valeur = pd.to_numeric(df["Valeur_conv"], errors='coerce').sum(skipna=True)
+    total_actuelle = pd.to_numeric(df["Valeur_Actuelle_conv"], errors='coerce').sum(skipna=True)
+    total_h52 = pd.to_numeric(df["Valeur_H52_conv"], errors='coerce').sum(skipna=True)
+    total_lt = pd.to_numeric(df["Valeur_LT_conv"], errors='coerce').sum(skipna=True)
 
     # Calcul Gain/Perte
     df['Gain/Perte'] = df['Valeur_Actuelle_conv'] - df['Valeur_conv']
