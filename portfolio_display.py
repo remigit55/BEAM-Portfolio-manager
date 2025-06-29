@@ -3,7 +3,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import streamlit.components.v1 as components # Gardé au cas où d'autres composants HTML sont utilisés ailleurs
+import streamlit.components.v1 as components
 import datetime
 import pytz
 
@@ -50,11 +50,13 @@ def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_ca
 
 
 # --- Fonction de conversion de devise ---
-def convertir(val, source_devise, devise_cible, fx_rates):
+def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
     """
     Convertit une valeur d'une devise source vers la devise cible en utilisant les taux de change fournis.
-    Retourne la valeur originale et un taux de 1.0 si le taux de change est manquant ou nul.
-    Retourne la valeur convertie et le taux utilisé.
+    Peut accepter un dictionnaire de taux de change (clé: devise source, valeur: taux)
+    ou un taux scalaire direct.
+    Applique également un facteur d'ajustement supplémentaire au taux de change.
+    Retourne la valeur convertie et le taux utilisé (après ajustement).
     """
     if pd.isnull(val):
         return np.nan, np.nan  # Retourne NaN pour la valeur et le taux si la valeur est NaN
@@ -65,17 +67,30 @@ def convertir(val, source_devise, devise_cible, fx_rates):
     if source_devise == devise_cible:
         return val, 1.0  # Si c'est la même devise, pas de conversion, taux = 1.0
 
-    fx_key = source_devise
-    raw_taux = fx_rates.get(fx_key)
-    
-    try:
-        taux_scalar = float(raw_taux)
-    except (TypeError, ValueError):
-        taux_scalar = np.nan
+    taux_scalar = np.nan
+    if isinstance(fx_rates_or_scalar, dict):
+        # Si c'est un dictionnaire, on cherche le taux par la devise source
+        fx_key = source_devise
+        raw_taux = fx_rates_or_scalar.get(fx_key)
+        try:
+            taux_scalar = float(raw_taux)
+        except (TypeError, ValueError):
+            taux_scalar = np.nan
+    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)): # Ajout des types numpy pour robustesse
+        # Si c'est un scalaire, on l'utilise directement
+        taux_scalar = float(fx_rates_or_scalar)
+    else:
+        st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
+        taux_scalar = 1.0 # Valeur par défaut si le type est inattendu
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({raw_taux}).")
+        # Message d'avertissement plus précis si le taux est invalide
+        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
         return val, np.nan  # Retourne la valeur originale et un taux NaN
+    
+    # Appliquer le facteur d'ajustement au taux de change
+    if pd.notnull(fx_adjustment_factor) and fx_adjustment_factor != 0:
+        taux_scalar /= fx_adjustment_factor
         
     return val * taux_scalar, taux_scalar  # Retourne la valeur convertie ET le taux utilisé
 
@@ -111,18 +126,58 @@ def afficher_portefeuille():
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
+    # Identifier la colonne ticker pour les débogages
+    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
+
+    # DEBUG: Afficher la valeur brute de 'Acquisition' pour HOC.L avant tout traitement numérique
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_raw = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'Acquisition' (avant conversion numérique): {hoc_row_raw.get('Acquisition', 'N/A')} (Type: {type(hoc_row_raw.get('Acquisition', None))})")
+        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'currentPrice' (avant conversion numérique): {hoc_row_raw.get('currentPrice', 'N/A')} (Type: {type(hoc_row_raw.get('currentPrice', None))})")
+
+
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df.columns:
+            # Convertir en chaîne, supprimer les espaces, remplacer la virgule par un point
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
+            # Puis convertir en numérique
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Nettoyage de la colonne Devise
-    if "Devise" in df.columns:
-        df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
-    else:
-        st.error("Colonne 'Devise' absente. Utilisation de la devise cible par défaut.")
-        df["Devise"] = devise_cible
+    # DEBUG: Afficher les valeurs après pd.to_numeric mais avant conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_after_numeric = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L après pd.to_numeric (avant conversion pence):")
+        st.write(f"  Acquisition: {hoc_row_after_numeric.get('Acquisition', 'N/A')} (Type: {type(hoc_row_after_numeric.get('Acquisition', None))})")
+        st.write(f"  currentPrice: {hoc_row_after_numeric.get('currentPrice', 'N/A')} (Type: {type(hoc_row_after_numeric.get('currentPrice', None))})")
+        st.write(f"  Devise: {hoc_row_after_numeric.get('Devise', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after_numeric.get('Facteur_Ajustement_FX', 'N/A')}")
+
+
+
+    # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
+    
+    # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
+    is_lse_ticker = pd.Series(False, index=df.index)
+    if ticker_col_name:
+        is_lse_ticker = df[ticker_col_name].astype(str).str.endswith('.L', na=False)
+
+    # Créer une colonne temporaire pour la devise en majuscules pour les comparaisons
+    df['devise_upper_for_check'] = df["Devise"].astype(str).str.strip().str.upper()
+
+    # 2. Identifier si l'utilisateur a explicitement saisi 'GBp' (ou 'gbp', etc.) dans le fichier
+    df['original_devise_lower_for_gbp_check'] = df['Devise'].astype(str).str.strip().str.lower()
+    is_explicit_gbp_pence_input = df['original_devise_lower_for_gbp_check'].isin(['gbp', 'gbp.', 'gbp '])
+
+    # Masque combiné pour les lignes dont les prix doivent être divisés par 100 (pence vers livres)
+    # C'est le cas si :
+    #   - C'est un ticker LSE ET la devise est 'GBP' (comportement typique de Yahoo Finance)
+    # OU
+    #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
+    needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
+
+
+
 
     # GESTION DE LA COLONNE 'CATÉGORIES'
     if "Categories" in df.columns:  
@@ -198,19 +253,19 @@ def afficher_portefeuille():
 
     # Conversion des valeurs à la devise cible
     df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
-        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates), 
+        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_Actuelle_conv', 'Taux_FX_Actuel']] = df.apply(
-        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates), 
+        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_H52_conv', 'Taux_FX_H52']] = df.apply(
-        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates), 
+        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_LT_conv', 'Taux_FX_LT']] = df.apply(
-        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates), 
+        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
 
@@ -237,16 +292,14 @@ def afficher_portefeuille():
     ]
 
     # Définition des colonnes à afficher et de leurs libellés
-    # Nous utilisons les noms des colonnes originales (non formatées) pour le DataFrame
-    # et nous appliquerons le formatage via .style.format(), sauf pour Valeur Acquisition (Source)
     cols_to_display = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité", "Acquisition", 
         "Valeur Acquisition_fmt",  # Utilise la colonne pré-formatée
-        "Valeur_Actuelle_conv",  # Valeur convertie en devise cible pour la colonne "Valeur Acquisition (EUR)"
-        "Taux_FX_Acquisition", 
-        "currentPrice", "Valeur_Actuelle_conv", "Gain/Perte", "Gain/Perte (%)",
-        "fiftyTwoWeekHigh", "Valeur_H52_conv", "Objectif_LT", "Valeur_LT_conv",
+        f"Valeur Acquisition ({devise_cible})", 
+        "Taux FX (Source/Cible)", 
+        "currentPrice", f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
+        "fiftyTwoWeekHigh", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
         "Momentum (%)", "Z-Score",
         "Signal", "Action", "Justification"
     ]
@@ -282,7 +335,6 @@ def afficher_portefeuille():
     df_disp.columns = final_labels  
 
     # Définition du dictionnaire de formatage pour st.dataframe.style.format
-    # Notez que "Valeur Acquisition (Source)" n'est PLUS ici car elle est pré-formatée
     format_dict_portfolio = {
         "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
         "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
@@ -303,31 +355,27 @@ def afficher_portefeuille():
     # Filtrer le dictionnaire de formatage pour n'inclure que les colonnes réellement affichées
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
-    # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à droite
-    # Streamlit utilise des classes CSS générées, nous devons les cibler.
-    # La première colonne est `:nth-child(1)`, la deuxième `:nth-child(2)`, etc.
-    # Nous devons trouver l'index de "Valeur Acquisition (Source)" dans `df_disp.columns`
+    # CSS pour aligner spécifiquement la colonne "Valeur Acquisition (Source)" à gauche
     try:
         valeur_acquisition_source_idx = list(df_disp.columns).index("Valeur Acquisition (Source)") + 1 # +1 car CSS nth-child est 1-indexé
         st.markdown(f"""
             <style>
             /* Cible la cellule de données (td) de la colonne "Valeur Acquisition (Source)" */
-            .stDataFrame table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
-                text-align: right !important;
+            div[data-testid="stDataFrame"] table tbody tr td:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: left !important;
             }}
             /* Cible l'en-tête (th) de la colonne "Valeur Acquisition (Source)" */
-            .stDataFrame table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
-                text-align: right !important;
+            div[data-testid="stDataFrame"] table thead tr th:nth-child({valeur_acquisition_source_idx}) {{
+                text-align: left !important;
             }}
             </style>
         """, unsafe_allow_html=True)
     except ValueError:
-        # La colonne n'est pas présente, pas besoin de CSS spécifique
         pass
 
     # Affichage du tableau du portefeuille
     st.markdown("##### Détail du Portefeuille")
-    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True) # Ajout de hide_index=True
+    st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True)
 
     st.session_state.df = df  
 
@@ -413,7 +461,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Calcul de la base pour l'objectif
         current_minieres_value = category_values.get("Minières", 0.0)
         target_minieres_pct = target_allocations.get("Minières", 0.0)
-        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle
+        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle  # Fallback to total_actuelle if target_minieres_pct is 0
 
         if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
             theoretical_portfolio_total_from_minieres = total_actuelle  
