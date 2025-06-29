@@ -327,21 +327,21 @@ def afficher_portefeuille():
 
     # Définition du dictionnaire de formatage pour st.dataframe
     format_dict_portfolio = {
-        "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
-        "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        "Valeur Acquisition (Source)": lambda x: str(x) if pd.notnull(x) else "",  # Already formatted with source currency
+        "Quantité": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Prix d'Acquisition (Source)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Valeur Acquisition (Source)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt with source currency
         f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Taux FX (Source/Cible)": lambda x: format_fr(x, 6) if pd.notnull(x) else "N/A",
-        "Prix Actuel": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur Actuelle ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        f"Gain/Perte ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
-        "Haut 52 Semaines": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur H52 ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Objectif LT": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur LT ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Momentum (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
-        "Z-Score": lambda x: format_fr(x, 2) if pd.notnull(x) else "",
+        "Taux FX (Source/Cible)": lambda x: x if pd.notnull(x) else "N/A",  # Use pre-formatted _fmt
+        "Prix Actuel": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        f"Valeur Actuelle ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        f"Gain/Perte ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Gain/Perte (%)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Haut 52 Semaines": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        f"Valeur H52 ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Objectif LT": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        f"Valeur LT ({devise_cible})": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Momentum (%)": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
+        "Z-Score": lambda x: x if pd.notnull(x) else "",  # Use pre-formatted _fmt
         "Ticker": lambda x: str(x) if pd.notnull(x) else "",
         "Nom": lambda x: str(x) if pd.notnull(x) else "",
         "Catégories": lambda x: str(x) if pd.notnull(x) else "",
@@ -355,28 +355,31 @@ def afficher_portefeuille():
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
     # CSS pour aligner les colonnes
-    left_aligned_labels = ["Ticker", "Nom", "Catégories", "Signal", "Action", "Justification", "Devise Source"]
+    numeric_columns = [
+        "Quantité", "Prix d'Acquisition (Source)", "Valeur Acquisition (Source)",
+        f"Valeur Acquisition ({devise_cible})", "Taux FX (Source/Cible)", "Prix Actuel",
+        f"Valeur Actuelle ({devise_cible})", f"Gain/Perte ({devise_cible})", "Gain/Perte (%)",
+        "Haut 52 Semaines", f"Valeur H52 ({devise_cible})", "Objectif LT", f"Valeur LT ({devise_cible})",
+        "Momentum (%)", "Z-Score"
+    ]
+    text_columns = ["Ticker", "Nom", "Catégories", "Devise Source", "Signal", "Action", "Justification"]
     css_alignments = ""
     for i, label in enumerate(df_disp.columns):
         col_idx = i + 1
-        if label in left_aligned_labels:
+        if label in numeric_columns:
             css_alignments += f"""
-                div[data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}) {{
-                    text-align: left !important;
-                    white-space: normal;
-                }}
-                div[data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
-                    text-align: left !important;
+                [data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}),
+                [data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                    text-align: right !important;
+                    white-space: nowrap !important;
                 }}
             """
-        else:
+        elif label in text_columns:
             css_alignments += f"""
-                div[data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}) {{
-                    text-align: right !important;
-                    white-space: nowrap;
-                }}
-                div[data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
-                    text-align: right !important;
+                [data-testid="stDataFrame"] table tbody tr td:nth-child({col_idx}),
+                [data-testid="stDataFrame"] table thead tr th:nth-child({col_idx}) {{
+                    text-align: left !important;
+                    white-space: normal !important;
                 }}
             """
 
