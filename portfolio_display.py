@@ -357,6 +357,7 @@ def afficher_portefeuille():
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
     # Définition des colonnes numériques et textuelles pour l'alignement CSS
+    # Mise à jour de la liste des colonnes numériques selon votre demande
     numeric_columns = [
         "Quantité", "Prix d'Acquisition (Source)", "Valeur Acquisition (Source)",
         f"Valeur Acquisition ({devise_cible})", "Taux FX (Source/Cible)", "Prix Actuel",
