@@ -14,15 +14,12 @@ from historical_performance_calculator import reconstruct_historical_portfolio_v
 from utils import format_fr
 from portfolio_display import convertir
 
-def is_pence_denominated(ticker, currency):
+def is_pence_denominated(currency):
     """
-    Détermine si un actif est libellé en pence (GBp) en fonction du ticker ou de la devise.
+    Détermine si un actif est libellé en pence (GBp) en fonction de la devise.
     Retourne True si une conversion (division par 100) est nécessaire.
     """
-    ticker = str(ticker).strip()
-    is_lse_ticker = ticker.endswith('.L')
-    is_explicit_gbp_pence = str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
-    return is_lse_ticker or is_explicit_gbp_pence
+    return str(currency).strip().lower() in ['gbp', 'gbp.', 'gbp ']
 
 def display_performance_history():
     """
@@ -145,17 +142,15 @@ def display_performance_history():
                 quantity = 0.0
                 fx_adjustment_factor = 1.0
 
-            # Récupérer les données historiques avec la devise pour gérer la conversion GBp
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table, currency=ticker_devise)
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 
                 for date_idx, price in filtered_data.items():
-                    # Déterminer la devise à utiliser pour la conversion
                     conversion_currency = ticker_devise
-                    if is_pence_denominated(ticker, ticker_devise):
-                        conversion_currency = "GBP"  # Après conversion pence-vers-livre, utiliser GBP pour le taux de change
-
+                    if is_pence_denominated(ticker_devise):
+                        conversion_currency = "GBP"
+                    
                     fx_key = f"{conversion_currency}{target_currency}"
                     
                     fx_rate_for_date = 1.0
@@ -166,7 +161,6 @@ def display_performance_history():
                     if pd.isna(fx_rate_for_date) or fx_rate_for_date == 0:
                         fx_rate_for_date = 1.0
 
-                    # Passer directement le taux scalaire
                     converted_price, _ = convertir(price, conversion_currency, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     
                     current_value = converted_price * quantity 
@@ -180,11 +174,9 @@ def display_performance_history():
         df_display_values = pd.DataFrame(all_ticker_data)
 
         if not df_display_values.empty:
-            # Calculate daily total portfolio value
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             
-            # --- START: Add chart for daily total ---
             st.markdown("##### Évolution Quotidienne de la Valeur Totale du Portefeuille")
             fig_total = px.line(
                 df_total_daily_value,
@@ -196,7 +188,6 @@ def display_performance_history():
             )
             fig_total.update_layout(hovermode="x unified")
             st.plotly_chart(fig_total, use_container_width=True)
-            # --- END: Add chart for daily total ---
 
             df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
             df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
