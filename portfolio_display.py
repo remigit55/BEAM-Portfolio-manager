@@ -177,7 +177,7 @@ def afficher_portefeuille():
 
         df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Signal", ""))
+        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", "")) # Correction ici
         df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
     else:
@@ -326,6 +326,7 @@ def afficher_portefeuille():
         pass
 
     # Affichage du tableau du portefeuille
+    st.markdown("##### Détail du Portefeuille")
     st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True) # Ajout de hide_index=True
 
     st.session_state.df = df  
@@ -430,17 +431,25 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
             current_pct = (current_value_cat / total_actuelle) if total_actuelle > 0 else 0.0
             target_value_for_category = target_pct * theoretical_portfolio_total_from_minieres
-            deviation_pct = (current_pct - target_pct)
-            value_to_adjust = target_value_for_category - current_value_cat
             
-            valeur_pour_atteindre_objectif_str = f"{format_fr(value_to_adjust, 2)} {devise_cible}" if pd.notna(value_to_adjust) else ""
-
+            # Logique spécifique pour la réallocation des Minières
+            if category == "Minières":
+                temp_allocations_reelles = {
+                    cat: (category_values.get(cat, 0.0) / total_actuelle) if total_actuelle > 0 else 0.0
+                    for cat in all_relevant_categories
+                }
+                value_to_adjust = calculer_reallocation_miniere(df, temp_allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
+                if value_to_adjust is None: # Gérer le cas où calculer_reallocation_miniere retourne None
+                    value_to_adjust = np.nan
+            else:
+                value_to_adjust = target_value_for_category - current_value_cat
+            
             results_data.append({
                 "Catégories": category,
                 "Valeur Actuelle": current_value_cat,
                 "Part Actuelle (%)": current_pct * 100,
                 "Cible (%)": target_pct * 100,
-                "Écart à l'objectif (%)": deviation_pct * 100,
+                "Écart à l'objectif (%)": (current_pct - target_pct) * 100,
                 "Ajustement Nécessaire": value_to_adjust
             })
 
@@ -462,7 +471,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)",
             "Cible (%)",
             "Écart à l'objectif (%)",
-            f"Ajustement Nécessaire ({devise_cible})" # Ajout de la devise cible pour clarté
+            f"Ajustement Nécessaire ({devise_cible})"
         ]
 
         df_disp_cat = df_allocation[cols_to_display_cat].copy()
@@ -474,16 +483,16 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)": lambda x: f"{format_fr(x, 2)} %",
             "Cible (%)": lambda x: f"{format_fr(x, 2)} %",
             "Écart à l'objectif (%)": lambda x: f"{format_fr(x, 2)} %",
-            f"Ajustement Nécessaire ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}"
+            f"Ajustement Nécessaire ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "N/A"
         }
 
         # Filtrer le dictionnaire de formatage pour n'inclure que les colonnes réellement affichées
         filtered_format_dict_category = {k: v for k, v in format_dict_category.items() if k in df_disp_cat.columns}
         
         # Affichage du tableau de répartition par catégories
-        st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True) # Ajout de hide_index=True
+        st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
 
-        # Logique de réallocation pour Minières
+        # Message de réallocation pour Minières (maintenu séparé)
         st.markdown("#### Réallocation Minières")
         allocations_reelles = {
             row["Catégories"]: row["Part Actuelle (%)"] / 100
@@ -492,10 +501,11 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         reallocation_value = calculer_reallocation_miniere(df, allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
 
         if reallocation_value is not None:
+            target_minieres_pct_display = format_fr(target_allocations.get('Minières', 0.0) * 100, 0)
             if reallocation_value > 0:
-                st.info(f"Pour atteindre l'objectif de 41% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
+                st.info(f"Pour atteindre l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
             elif reallocation_value < 0:
-                st.info(f"Pour maintenir l'objectif de 41% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
+                st.info(f"Pour maintenir l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
             else:
                 st.info("L'allocation Minières est conforme à l'objectif.")
         else:
