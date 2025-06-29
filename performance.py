@@ -39,40 +39,47 @@ def display_performance_history():
     try:
         st.write("DEBUG: df_current_portfolio info()")
         st.write(df_current_portfolio.info())
+        st.write("DEBUG: df_current_portfolio describe()")
+        st.write(df_current_portfolio.describe(include='all'))
     except Exception as e:
         st.warning(f"Impossible d'afficher les informations de df_current_portfolio : {e}")
 
     target_currency = st.session_state.get("devise_cible", "EUR")
 
     # Initialisation ou rafraîchissement des taux de change historiques
-    if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
+    if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None or st.session_state.historical_fx_rates_df.empty:
         st.info("Récupération des taux de change historiques initiaux...")
         end_date_for_fx = datetime.now().date()
         start_date_for_fx = end_date_for_fx - timedelta(days=365 * 10)
         try:
             st.session_state.historical_fx_rates_df = fetch_historical_fx_rates(target_currency, start_date_for_fx, end_date_for_fx)
             if st.session_state.historical_fx_rates_df.empty:
-                st.warning("Aucun taux de change historique n'a pu être récupéré. Les conversions de devise pourraient être incorrectes.")
+                st.warning("Aucun taux de change historique n'a pu être récupéré. Création d'un DataFrame de secours avec taux à 1.0.")
                 st.session_state.historical_fx_rates_df = pd.DataFrame(
                     1.0, 
                     index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
                     columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
                 )
         except Exception as e:
-            st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Les conversions de devise pourraient être incorrectes.")
+            st.error(f"Erreur lors de la récupération des taux de change historiques : {e}. Création d'un DataFrame de secours avec taux à 1.0.")
             st.session_state.historical_fx_rates_df = pd.DataFrame(
                 1.0, 
                 index=pd.bdate_range(start=start_date_for_fx, end=end_date_for_fx),
                 columns=[f"{c}{target_currency}" for c in ["USD", "HKD", "CNY", "SGD", "CAD", "AUD", "GBP", "EUR"] if c != target_currency]
             )
 
-    if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame) or st.session_state.historical_fx_rates_df.empty:
-        st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
-        return
-
     # Log FX rates for debugging
     st.write("DEBUG: historical_fx_rates_df head()")
-    st.dataframe(st.session_state.historical_fx_rates_df.head())
+    try:
+        st.dataframe(st.session_state.historical_fx_rates_df.head())
+        st.write("DEBUG: historical_fx_rates_df info()")
+        st.write(st.session_state.historical_fx_rates_df.info())
+    except Exception as e:
+        st.warning(f"Impossible d'afficher les informations de historical_fx_rates_df : {e}")
+
+    if st.session_state.historical_fx_rates_df is None or not isinstance(st.session_state.historical_fx_rates_df, pd.DataFrame):
+        st.error("Les données de taux de change historiques sont manquantes ou invalides. Impossible de procéder aux conversions.")
+        return
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
     st.write("DEBUG: Tickers dans le portefeuille", tickers_in_portfolio)
@@ -132,7 +139,7 @@ def display_performance_history():
                 
                 if "Quantité" in ticker_row.columns:
                     numeric_quantities = pd.to_numeric(ticker_row["Quantité"], errors='coerce')
-                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]) and numeric_quantities.iloc[0] != 0:
+                    if not numeric_quantities.empty and pd.notnull(numeric_quantities.iloc[0]) and numeric_quantities.iloc[0] > 0:
                         quantity = numeric_quantities.iloc[0]
                     else:
                         st.warning(f"Quantité pour le ticker '{ticker}' est vide, invalide ou zéro. Ignoré.")
@@ -157,6 +164,8 @@ def display_performance_history():
 
             # Récupérer les données historiques
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
+            st.write(f"DEBUG: Données brutes pour {ticker} (head)")
+            st.dataframe(data.head())
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 if filtered_data.empty or filtered_data.eq(0).all().all():
@@ -179,6 +188,7 @@ def display_performance_history():
                         st.warning(f"Taux de change manquant pour {fx_key} à la date {date_idx}. Utilisation de 1.0.")
 
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    st.write(f"DEBUG: Conversion pour {ticker} à {date_idx}: Prix={price}, Devise={ticker_devise}, Taux={fx_rate_for_date}, Facteur FX={fx_adjustment_factor}, Prix converti={converted_price}")
                     if pd.isna(converted_price) or np.isinf(converted_price):
                         st.warning(f"Échec de la conversion pour {ticker} à {date_idx}. Prix: {price}, Taux: {fx_rate_for_date}, Facteur FX: {fx_adjustment_factor}. Ignoré.")
                         continue
@@ -361,6 +371,6 @@ def display_performance_history():
                 st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
                 st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
             else:
-                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les quantités (non nulles), les prix historiques, les taux de change, ou la période sélectionnée.")
+                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les quantités (non nulles et positives), les prix historiques, les taux de change, ou la période sélectionnée.")
         else:
-            st.warning("Aucune valeur actuelle valide n'a pu être calculée pour la période sélectionnée. Vérifiez les quantités (non nulles), les tickers, les données historiques, ou les taux de change.")
+            st.warning("Aucune valeur actuelle valide n'a pu être calculée pour la période sélectionnée. Vérifiez les quantités (non nulles et positives), les tickers, les données historiques, ou les taux de change.")
