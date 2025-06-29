@@ -28,6 +28,13 @@ def display_performance_history():
     fx_rates = st.session_state.fx_rates
 
     if "Devise" in df_current_portfolio.columns:
+        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
+        df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
+        df_current_portfolio.loc[df_current_portfolio["Devise"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
+        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
+
+
+    if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
 
     devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
