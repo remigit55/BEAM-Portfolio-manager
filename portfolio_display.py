@@ -132,14 +132,76 @@ def afficher_portefeuille():
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Lecture et traitement de la colonne 'H' pour le facteur d'ajustement FX
+    # --- NOUVEAU : Lecture et traitement de la colonne 'H' pour le facteur d'ajustement FX ---
     if "H" in df.columns:
         df["Facteur_Ajustement_FX"] = df["H"].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
         df["Facteur_Ajustement_FX"] = pd.to_numeric(df["Facteur_Ajustement_FX"], errors="coerce").fillna(1.0) # Default to 1.0 if empty/invalid
     else:
         df["Facteur_Ajustement_FX"] = 1.0 # Default to 1.0 if column H is missing
+    # --- FIN NOUVEAU ---
+
+    # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
+    # Identifier la colonne ticker
+    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
-    # Nettoyage final de la colonne Devise
+    # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
+    is_lse_ticker = pd.Series(False, index=df.index)
+    if ticker_col_name:
+        is_lse_ticker = df[ticker_col_name].astype(str).str.endswith('.L', na=False)
+
+    # Créer une colonne temporaire pour la devise en majuscules pour les comparaisons
+    df['devise_upper_for_check'] = df["Devise"].astype(str).str.strip().str.upper()
+
+    # 2. Identifier si l'utilisateur a explicitement saisi 'GBp' (ou 'gbp', etc.) dans le fichier
+    df['original_devise_lower_for_gbp_check'] = df['Devise'].astype(str).str.strip().str.lower()
+    is_explicit_gbp_pence_input = df['original_devise_lower_for_gbp_check'].isin(['gbp', 'gbp.', 'gbp '])
+
+    # Masque combiné pour les lignes dont les prix doivent être divisés par 100 (pence vers livres)
+    # C'est le cas si :
+    #   - C'est un ticker LSE ET la devise est 'GBP' (comportement typique de Yahoo Finance)
+    # OU
+    #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
+    needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
+
+    # DEBUG: Afficher les valeurs avant la conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_before = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L avant conversion pence:")
+        st.write(f"  Acquisition: {hoc_row_before.get('Acquisition', 'N/A')}")
+        st.write(f"  currentPrice: {hoc_row_before.get('currentPrice', 'N/A')}")
+        st.write(f"  Devise: {hoc_row_before.get('Devise', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_before.get('Facteur_Ajustement_FX', 'N/A')}")
+        st.write(f"  Needs pence conversion: {needs_pence_to_pound_conversion.loc[hoc_row_before.name]}")
+
+
+    # Appliquer la division par 100 aux colonnes de prix concernées
+    for price_col in ["Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT"]:
+        if price_col in df.columns:
+            df[price_col] = pd.to_numeric(df[price_col], errors='coerce') # S'assurer que la colonne est numérique
+            
+            # Appliquer la division seulement si le drapeau est vrai et que la valeur n'est ni NaN ni 0
+            mask_to_apply_division = needs_pence_to_pound_conversion & df[price_col].notna() & (df[price_col] != 0)
+            
+            if mask_to_apply_division.any() and ticker_col_name is not None:
+                affected_tickers = df.loc[mask_to_apply_division, ticker_col_name].dropna().unique().tolist()
+                st.info(f"DEBUG (portfolio_display): Conversion pence-vers-livre appliquée pour les tickers : {affected_tickers} sur la colonne '{price_col}'.")
+
+            df.loc[mask_to_apply_division, price_col] = df.loc[mask_to_apply_division, price_col] / 100.0
+    
+    # DEBUG: Afficher les valeurs après la conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_after = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L après conversion pence:")
+        st.write(f"  Acquisition: {hoc_row_after.get('Acquisition', 'N/A')}")
+        st.write(f"  currentPrice: {hoc_row_after.get('currentPrice', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after.get('Facteur_Ajustement_FX', 'N/A')}")
+
+
+    # Supprimer les colonnes temporaires
+    df.drop(columns=['devise_upper_for_check', 'original_devise_lower_for_gbp_check'], inplace=True)
+    # --- FIN DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
+
+    # Nettoyage final de la colonne Devise (après la détection des GBp)
     if "Devise" in df.columns:
         df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
     else:
@@ -182,6 +244,7 @@ def afficher_portefeuille():
         utc_now = datetime.datetime.now(datetime.timezone.utc)
 
         # Définir le fuseau horaire cible (par exemple, Paris pour l'heure française)
+        # Utilise 'Europe/Paris' pour inclure la gestion de l'heure d'été/hiver
         try:
             paris_tz = pytz.timezone('Europe/Paris')
             # Convertir l'heure UTC en heure locale de Paris
@@ -198,7 +261,7 @@ def afficher_portefeuille():
 
         df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
         df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
+        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", "")) # Correction ici
         df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
         df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
     else:
@@ -250,6 +313,8 @@ def afficher_portefeuille():
     )
 
     # Pré-formatage de la colonne "Valeur Acquisition (Source)"
+    # Cette colonne est formatée ici pour inclure la devise source, car .style.format()
+    # ne peut pas facilement accéder à d'autres colonnes de la même ligne pour le formatage.
     df["Valeur Acquisition_fmt"] = [
         f"{format_fr(val, 2)} {dev}" if pd.notnull(val) else ""
         for val, dev in zip(df["Valeur Acquisition"], df["Devise"])
@@ -296,7 +361,7 @@ def afficher_portefeuille():
         return total_valeur, total_actuelle, total_h52, total_lt
 
     df_disp = df[final_cols].copy()
-    df_disp.columns = labels_for_display  # Utiliser tous les labels pour éviter les erreurs de colonne manquante
+    df_disp.columns = final_labels  
 
     # Définition du dictionnaire de formatage pour st.dataframe.style.format
     format_dict_portfolio = {
@@ -504,24 +569,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Affichage du tableau de répartition par catégories
         st.dataframe(df_disp_cat.style.format(filtered_format_dict_category), use_container_width=True, hide_index=True)
 
-        # Message de réallocation pour Minières (maintenu séparé)
-        st.markdown("#### Réallocation Minières")
-        allocations_reelles = {
-            row["Catégories"]: row["Part Actuelle (%)"] / 100
-            for _, row in df_allocation.iterrows()
-        }
-        reallocation_value = calculer_reallocation_miniere(df, allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
-
-        if reallocation_value is not None:
-            target_minieres_pct_display = format_fr(target_allocations.get('Minières', 0.0) * 100, 0)
-            if reallocation_value > 0:
-                st.info(f"Pour atteindre l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait investir environ {format_fr(reallocation_value, 2)} {devise_cible} supplémentaires.")
-            elif reallocation_value < 0:
-                st.info(f"Pour maintenir l'objectif de {target_minieres_pct_display}% dans les Minières, il faudrait désinvestir environ {format_fr(abs(reallocation_value), 2)} {devise_cible}.")
-            else:
-                st.info("L'allocation Minières est conforme à l'objectif.")
-        else:
-            st.info("Calcul de réallocation Minières non applicable ou données insuffisantes.")
+        
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
