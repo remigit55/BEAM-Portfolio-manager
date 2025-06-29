@@ -8,9 +8,9 @@ from pandas.tseries.offsets import BDay
 import yfinance as yf
 import builtins
 
-from period_selector_component import period_selector
+from period_selector_component import period_selector # Keep if used, otherwise remove
 from historical_data_fetcher import fetch_stock_history, get_all_historical_data, fetch_historical_fx_rates
-from historical_performance_calculator import reconstruct_historical_portfolio_value
+from historical_performance_calculator import reconstruct_historical_portfolio_value # Keep if used, otherwise remove
 from utils import format_fr
 from portfolio_display import convertir
 
@@ -29,7 +29,6 @@ def display_performance_history():
     Affiche la performance historique du portefeuille basée sur sa composition actuelle,
     et un tableau des derniers cours de clôture pour tous les tickers, avec sélection de plage de dates.
     """
-
 
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
@@ -89,7 +88,7 @@ def display_performance_history():
 
 
     selected_label = st.radio(
-        "", 
+        "Sélectionnez une période:", 
         period_labels, 
         index=default_period_index,
         key="selected_ticker_table_period_radio", 
@@ -104,7 +103,8 @@ def display_performance_history():
     
     with st.spinner("Récupération et conversion des cours des tickers en cours..."):
         all_ticker_data = [] 
-        fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
+        # Extend fetch_start_date slightly back to ensure enough data for calculations like momentum/volatility
+        fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2)) 
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
@@ -183,8 +183,9 @@ def display_performance_history():
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             
-            # --- START: Add chart for daily total ---
-            
+            # --- Graphique 1: Valeur Totale du Portefeuille ---
+            st.markdown("---")
+            st.markdown("#### Performance du Portefeuille")
             fig_total = px.line(
                 df_total_daily_value,
                 x="Date",
@@ -195,8 +196,58 @@ def display_performance_history():
             )
             fig_total.update_layout(hovermode="x unified")
             st.plotly_chart(fig_total, use_container_width=True)
-            # --- END: Add chart for daily total ---
 
+            # --- Graphique 2: Volatilité quotidienne (Écart-type des rendements) ---
+            st.markdown("---")
+            st.markdown("#### Volatilité Quotidienne du Portefeuille")
+
+            # Calcul des rendements quotidiens
+            df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
+
+            # Calcul de la volatilité glissante sur une fenêtre (par exemple, 20 jours ouvrables)
+            window_size = 20 # Environ un mois de trading
+            # Multiplier par sqrt(252) pour annualiser la volatilité si vous le souhaitez
+            df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5) # Annualisé
+
+            fig_volatility = px.line(
+                df_total_daily_value.dropna(), # Dropna pour enlever les NaNs de la fenêtre de calcul
+                x="Date",
+                y="Volatilité",
+                title=f"Volatilité Annualisée du Portefeuille (Fenêtre de {window_size} jours)",
+                labels={"Volatilité": "Volatilité Annualisée", "Date": "Date"},
+                hover_data={"Volatilité": ':.4f'}
+            )
+            fig_volatility.update_layout(hovermode="x unified")
+            st.plotly_chart(fig_volatility, use_container_width=True)
+
+            # --- Graphique 3: Momentum du Portefeuille (Changement en pourcentage) ---
+            st.markdown("---")
+            st.markdown("#### Momentum du Portefeuille")
+
+            # Calcul du changement en pourcentage par rapport au début de la période
+            # Pour un "momentum" visuel, un graphique des rendements cumulés est plus parlant.
+            # Ou un simple pourcentage de changement par rapport à la première valeur de la période.
+
+            initial_value = df_total_daily_value['Valeur Totale'].iloc[0]
+            if initial_value != 0:
+                df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
+            else:
+                df_total_daily_value['Momentum (%)'] = 0 # Ou NaN si vous préférez
+
+            fig_momentum = px.line(
+                df_total_daily_value,
+                x="Date",
+                y="Momentum (%)",
+                title=f"Performance Cumulée du Portefeuille ({target_currency})",
+                labels={"Momentum (%)": "Changement en %", "Date": "Date"},
+                hover_data={"Momentum (%)": ':.2f'}
+            )
+            fig_momentum.update_layout(hovermode="x unified")
+            st.plotly_chart(fig_momentum, use_container_width=True)
+
+            # --- Fin des graphiques ---
+
+            st.markdown("---")
             df_pivot_current_value = df_display_values.pivot_table(index="Ticker", columns="Date", values=f"Valeur Actuelle ({target_currency})", dropna=False)
             df_pivot_current_value = df_pivot_current_value.sort_index(axis=1)
 
@@ -225,3 +276,4 @@ def display_performance_history():
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
         else:
             st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée.")
+            
