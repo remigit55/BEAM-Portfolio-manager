@@ -81,6 +81,10 @@ def display_performance_history():
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 for date_idx, price in filtered_data.items():
+                # Conversion penny -> pound si besoin
+                if ticker_devise.upper() == "GBp":
+                    price = price / 100
+                    ticker_devise = "GBP"
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
                     converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
