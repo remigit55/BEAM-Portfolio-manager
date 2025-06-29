@@ -67,7 +67,8 @@ def display_performance_history():
         "6M": timedelta(days=180), 
         "1Y": timedelta(days=365), 
         "5Y": timedelta(days=365 * 5),
-        "10Y": timedelta(days=365 * 10)
+        "10Y": timedelta(days=365 * 10),
+        "20Y": timedelta(days=365 * 20)
     }
     period_labels = list(period_options.keys())
     
