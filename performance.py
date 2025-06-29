@@ -157,21 +157,12 @@ def display_performance_history():
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
-        st.write("DEBUG: df_display_values head()")
-        st.dataframe(df_display_values.head())
-        st.write("DEBUG: df_display_values info()")
-        st.write(df_display_values.info())
 
         if not df_display_values.empty:
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
-
-            st.write("DEBUG: df_total_daily_value head() after grouping")
-            st.dataframe(df_total_daily_value.head())
-            st.write("DEBUG: df_total_daily_value info() after grouping")
-            st.write(df_total_daily_value.info())
 
             # Graphique 1: Valeur Totale du Portefeuille
             st.markdown("---")
@@ -193,11 +184,6 @@ def display_performance_history():
             df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
             window_size = 20
             df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5)
-
-            st.write("DEBUG: df_total_daily_value head() after volatility calculation")
-            st.dataframe(df_total_daily_value.head(window_size + 5))
-            st.write("DEBUG: df_total_daily_value info() after volatility calculation")
-            st.write(df_total_daily_value.info())
 
             if not df_total_daily_value['Volatilité'].dropna().empty:
                 fig_volatility = px.line(
@@ -221,11 +207,7 @@ def display_performance_history():
                 df_total_daily_value['Momentum (%)'] = ((df_total_daily_value['Valeur Totale'] / initial_value) - 1) * 100
             else:
                 df_total_daily_value['Momentum (%)'] = 0
-
-            st.write("DEBUG: df_total_daily_value head() after momentum calculation")
-            st.dataframe(df_total_daily_value.head())
-            st.write("DEBUG: df_total_daily_value info() after momentum calculation")
-            st.write(df_total_daily_value.info())
+                st.warning("Valeur initiale du portefeuille nulle ou manquante. Le momentum est défini à 0.")
 
             if not df_total_daily_value['Momentum (%)'].dropna().empty:
                 fig_momentum = px.line(
@@ -234,7 +216,7 @@ def display_performance_history():
                     y="Momentum (%)",
                     title=f"Performance Cumulée du Portefeuille ({target_currency})",
                     labels={"Momentum (%)": "Changement en %", "Date": "Date"},
-                    hover_data={"Momentum (%)": ':.2f'}
+                    hover_data={"Momentum (%)": lambda x: f"{format_fr(x, 2)}"}
                 )
                 fig_momentum.update_layout(hovermode="x unified")
                 st.plotly_chart(fig_momentum, use_container_width=True)
@@ -259,6 +241,40 @@ def display_performance_history():
             df_final_display = df_final_display[final_columns_to_display]
 
             format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
+
+            # CSS pour aligner les colonnes du tableau
+            css_alignments = """
+                [data-testid="stDataFrame"] * { box-sizing: border-box; }
+                [data-testid="stDataFrame"] div[role="grid"] table {
+                    width: 100% !important;
+                }
+            """
+            for i, label in enumerate(df_final_display.columns):
+                col_idx = i + 1
+                if label == "Ticker":
+                    css_alignments += f"""
+                        [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                        [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                            text-align: left !important;
+                            white-space: normal !important;
+                            padding-left: 10px !important;
+                        }}
+                    """
+                else:
+                    css_alignments += f"""
+                        [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
+                        [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) {{
+                            text-align: right !important;
+                            white-space: nowrap !important;
+                            padding-right: 10px !important;
+                        }}
+                    """
+
+            st.markdown(f"""
+                <style>
+                    {css_alignments}
+                </style>
+            """, unsafe_allow_html=True)
 
             st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
