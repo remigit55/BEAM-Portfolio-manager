@@ -27,6 +27,12 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     target_currency = st.session_state.get("devise_cible", "EUR")
 
+    # Log portfolio data for debugging
+    st.write("DEBUG: df_current_portfolio head()")
+    st.dataframe(df_current_portfolio.head())
+    st.write("DEBUG: df_current_portfolio info()")
+    st.write(df_current_portfolio.info())
+
     # Initialisation ou rafraîchissement des taux de change historiques
     if "historical_fx_rates_df" not in st.session_state or st.session_state.historical_fx_rates_df is None:
         st.info("Récupération des taux de change historiques initiaux...")
@@ -139,6 +145,7 @@ def display_performance_history():
             if not data.empty:
                 filtered_data = data.dropna().reindex(business_days_for_display).ffill().bfill()
                 
+                valid_data = False
                 for date_idx, price in filtered_data.items():
                     fx_key = f"{ticker_devise}{target_currency}"
                     fx_rate_for_date = 1.0
@@ -155,13 +162,18 @@ def display_performance_history():
                         st.warning(f"Échec de la conversion pour {ticker} à {date_idx}. Prix: {price}, Taux: {fx_rate_for_date}, Facteur FX: {fx_adjustment_factor}. Ignoré.")
                         continue
                     current_value = converted_price * quantity
+                    if current_value == 0 or pd.isna(current_value):
+                        st.warning(f"Valeur actuelle nulle pour {ticker} à {date_idx}. Ignoré.")
+                        continue
 
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
                         f"Valeur Actuelle ({target_currency})": current_value
                     })
-                valid_tickers.append(ticker)
+                    valid_data = True
+                if valid_data:
+                    valid_tickers.append(ticker)
             else:
                 st.warning(f"Aucune donnée historique pour {ticker} sur la période {fetch_start_date} à {end_date_table}. Ignoré.")
 
@@ -177,7 +189,7 @@ def display_performance_history():
         st.write("DEBUG: df_display_values describe()")
         st.write(df_display_values.describe())
 
-        if not df_display_values.empty and not df_display_values[f"Valeur Actuelle ({target_currency})"].isna().all():
+        if not df_display_values.empty and not df_display_values[f"Valeur Actuelle ({target_currency})"].isna().all() and df_display_values[f"Valeur Actuelle ({target_currency})"].ne(0).any():
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'], errors='coerce')
@@ -194,7 +206,7 @@ def display_performance_history():
             st.write("DEBUG: df_total_daily_value describe()")
             st.write(df_total_daily_value.describe())
 
-            if not df_total_daily_value.empty:
+            if not df_total_daily_value.empty and df_total_daily_value['Valeur Totale'].ne(0).any():
                 # Graphique 1: Valeur Totale du Portefeuille
                 st.markdown("---")
                 st.markdown("#### Performance du Portefeuille")
@@ -319,6 +331,6 @@ def display_performance_history():
                 st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
                 st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
             else:
-                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les données historiques, les tickers ou la période sélectionnée.")
+                st.warning("Aucune donnée valide pour afficher les graphiques. Vérifiez les quantités, les données historiques, les tickers ou la période sélectionnée.")
         else:
-            st.warning("Aucune valeur actuelle n'a pu être calculée pour la période sélectionnée. Vérifiez les tickers, les données historiques ou les taux de change.")
+            st.warning("Aucune valeur actuelle valide n'a pu être calculée pour la période sélectionnée. Vérifiez les quantités, les tickers, les données historiques ou les taux de change.")
