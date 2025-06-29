@@ -1,3 +1,5 @@
+# streamlit_app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -33,7 +35,6 @@ st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Configuration de l'actualisation automatique pour les données
 # Le script entier sera relancé toutes les 600 secondes (60000 millisecondes)
-# N'oubliez pas que cela relance TOUTE l'application Streamlit.
 st_autorefresh(interval=600 * 1000, key="data_refresh_timer")
 
 # Thème personnalisé
@@ -93,19 +94,17 @@ st.markdown(
 )
 
 # Initialisation des variables de session
-# Assurez-vous que toutes les variables sont initialisées AVANT d'être utilisées.
 for key, default in {
     "df": None,
     "google_sheets_url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8Ie4F5fk5-a7kA7QVFhRV1e4zTBELo8pXuW0t2J13nCFr4z_rP0hqbAyg/pub?gid=1844300862&single=true&output=csv", # Initialisation de l'URL par défaut
     "url_data_loaded": False,
     "fx_rates": None,
-    "devise_cible": "EUR",
+    "devise_cible": "EUR", # Valeur par défaut avant détection
     "ticker_data_cache": {},
     "momentum_results_cache": {},
     "sort_column": None,
     "sort_direction": "asc",
     "last_devise_cible_for_fx_update": "EUR",
-    # Initialise last_update_time_fx avec une date ancienne et timezone-aware (UTC)
     "last_update_time_fx": datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc),
     "total_valeur": None,
     "total_actuelle": None,
@@ -113,7 +112,7 @@ for key, default in {
     "total_lt": None,
     "uploaded_file_id": None,
     "_last_processed_file_id": None,
-    "last_yfinance_update": None, # La valeur sera définie dans portfolio_display.py
+    "last_yfinance_update": None, 
     "target_allocations": {
         "Minières": 0.41,
         "Asie": 0.25,
@@ -127,39 +126,42 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# --- NOUVEAU BLOC DE VÉRIFICATION DE LA COHÉRENCE DE last_update_time_fx ---
-# Cela garantit que last_update_time_fx est TOUJOURS un datetime timezone-aware
-# avant d'être utilisé dans les comparaisons de temps.
+# Vérification de la cohérence de last_update_time_fx
 if not isinstance(st.session_state.last_update_time_fx, datetime.datetime) or \
    st.session_state.last_update_time_fx.tzinfo is None:
     st.session_state.last_update_time_fx = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
-# --- FIN NOUVEAU BLOC ---
 
 
 # Chargement initial des données depuis Google Sheets
-# Cette logique ne devrait s'exécuter qu'une seule fois au tout début ou après un "Clear Cache"
 if st.session_state.df is None and not st.session_state.url_data_loaded:
     with st.spinner("Chargement initial du portefeuille depuis Google Sheets..."):
-        # Utilisation de la fonction load_portfolio_from_google_sheets de data_loader.py
-        df_initial = load_portfolio_from_google_sheets(st.session_state.google_sheets_url)
+        dtype_spec_for_loader = {
+            "Quantité": str,
+            "Acquisition": str,
+            "Objectif_LT": str,
+            "H": str 
+        }
+        df_initial = load_portfolio_from_google_sheets(st.session_state.google_sheets_url, dtype_spec=dtype_spec_for_loader)
         if df_initial is not None:
             st.session_state.df = df_initial
             st.session_state.url_data_loaded = True
             st.session_state.uploaded_file_id = "initial_url_load"
             st.session_state._last_processed_file_id = "initial_url_load"
-            # Laisser last_update_time_fx à sa valeur initiale (très ancienne) pour forcer une 1ère MAJ des FX
-            st.rerun() # Pour rafraîchir l'application avec les données chargées
+
+            # Détecter la devise cible à partir du DataFrame chargé
+            if "Devise" in st.session_state.df.columns and not st.session_state.df["Devise"].empty:
+                # Prend la devise la plus fréquente comme devise cible
+                st.session_state.devise_cible = st.session_state.df["Devise"].dropna().str.strip().str.upper().mode()[0]
+            else:
+                st.session_state.devise_cible = "EUR" # Fallback si colonne devise manquante
+
+            st.rerun() 
         else:
-            # Si le chargement initial a échoué, marquer comme tenté pour ne pas recharger en boucle
             st.session_state.url_data_loaded = True
 
-# --- Logique d'Actualisation des Taux de Change ---
-# Cette section s'exécutera à chaque relancement du script (par st_autorefresh ou interaction utilisateur)
+# Logique d'Actualisation des Taux de Change
 current_time_utc = datetime.datetime.now(datetime.timezone.utc)
 
-# Condition pour déclencher la mise à jour des taux de change
-# La logique est: mettre à jour si c'est la 1ère fois, si un nouveau fichier a été uploadé,
-# ou si plus de 60 secondes se sont écoulées depuis la dernière mise à jour.
 if st.session_state.last_update_time_fx is None or \
    st.session_state.last_update_time_fx == datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc) or \
    (st.session_state.get("uploaded_file_id") != st.session_state.get("_last_processed_file_id", None) and st.session_state.get("uploaded_file_id") is not None) or \
@@ -169,24 +171,71 @@ if st.session_state.last_update_time_fx is None or \
 
     with st.spinner(f"Mise à jour automatique des devises pour {devise_cible_to_use}..."):
         try:
-            # Appel à fetch_fx_rates qui est décoré avec @st.cache_data(ttl=60)
             st.session_state.fx_rates = fetch_fx_rates(devise_cible_to_use)
-            # Met à jour l'horodatage en UTC APRÈS la récupération réussie
             st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
             st.session_state.last_devise_cible_for_currency_update = devise_cible_to_use
-            # st.success("Taux de change mis à jour automatiquement.") # Peut être trop verbeux pour une actualisation toutes les minutes
         except Exception as e:
             st.error(f"Erreur lors de la mise à jour automatique des taux de change : {e}")
 
-    # Met à jour l'ID du dernier fichier traité pour éviter de recharger les FX inutilement
-    # si le même fichier est re-sélectionné sans changement réel
     if st.session_state.get("uploaded_file_id") is not None:
         st.session_state._last_processed_file_id = st.session_state.uploaded_file_id
-# --- Fin Logique d'Actualisation des Taux de Change ---
-
 
 # Fonction principale de l'application
 def main():
+    st.sidebar.title("Paramètres")
+
+    # Affichage de la devise cible détectée (plus de sélection manuelle)
+    st.sidebar.subheader("Devise de Conversion")
+    st.sidebar.info(f"Devise de référence du portefeuille : **{st.session_state.get('devise_cible', 'EUR')}**")
+
+    # Gestion du fichier
+    st.sidebar.subheader("Importer Portefeuille")
+    uploaded_file = st.sidebar.file_uploader("Importer un fichier Excel ou CSV", type=["xlsx", "xls", "csv"])
+
+    if uploaded_file is not None:
+        try:
+            dtype_spec = {
+                "Quantité": str,
+                "Acquisition": str,
+                "Objectif_LT": str,
+                "H": str 
+            }
+
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file, sep=';', decimal=',', dtype=dtype_spec)
+            else:
+                df = pd.read_excel(uploaded_file, dtype=dtype_spec)
+            
+            st.session_state.df = df
+            st.success("Fichier importé avec succès !")
+            st.session_state.ticker_data_cache = {}
+            st.session_state.momentum_results_cache = {}
+            st.session_state.fx_rates = None 
+            st.session_state.uploaded_file_id = uploaded_file.id 
+            st.session_state._last_processed_file_id = uploaded_file.id
+
+            # Détecter la devise cible à partir du DataFrame chargé
+            if "Devise" in st.session_state.df.columns and not st.session_state.df["Devise"].empty:
+                st.session_state.devise_cible = st.session_state.df["Devise"].dropna().str.strip().str.upper().mode()[0]
+            else:
+                st.session_state.devise_cible = "EUR" # Fallback
+
+            st.rerun() 
+            
+        except Exception as e:
+            st.error(f"Erreur lors de l'importation du fichier : {e}")
+            st.session_state.df = None 
+    
+    # Bouton de rafraîchissement des données
+    if st.sidebar.button("Rafraîchir les données externes"):
+        st.session_state.ticker_data_cache = {}
+        st.session_state.momentum_results_cache = {}
+        st.session_state.fx_rates = None 
+        st.experimental_rerun() 
+
+    st.sidebar.info(f"Dernière mise à jour Yahoo Finance: {st.session_state.get('last_yfinance_update', 'Jamais')}")
+
+    # Onglets principaux
     onglets = st.tabs([
         "Synthèse",
         "Portefeuille",
@@ -245,7 +294,6 @@ def main():
             afficher_transactions()
 
     with onglets[5]:
-        # Le bouton d'actualisation manuelle est maintenant géré dans afficher_tableau_taux_change
         afficher_tableau_taux_change(st.session_state.get("devise_cible", "EUR"), st.session_state.fx_rates)
 
     with onglets[6]:
