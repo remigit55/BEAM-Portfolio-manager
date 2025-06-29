@@ -126,36 +126,23 @@ def afficher_portefeuille():
     if missing_rates:
         st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
 
-    # Identifier la colonne ticker pour les débogages
-    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
-
-    # DEBUG: Afficher la valeur brute de 'Acquisition' pour HOC.L avant tout traitement numérique
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_raw = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'Acquisition' (avant conversion numérique): {hoc_row_raw.get('Acquisition', 'N/A')} (Type: {type(hoc_row_raw.get('Acquisition', None))})")
-        st.write(f"DEBUG (portfolio_display): HOC.L - Valeur brute 'currentPrice' (avant conversion numérique): {hoc_row_raw.get('currentPrice', 'N/A')} (Type: {type(hoc_row_raw.get('currentPrice', None))})")
-
-
     # Nettoyage et conversion des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df.columns:
-            # Convertir en chaîne, supprimer les espaces, remplacer la virgule par un point
             df[col] = df[col].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            # Puis convertir en numérique
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # DEBUG: Afficher les valeurs après pd.to_numeric mais avant conversion pence-vers-livre pour HOC.L
-    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
-        hoc_row_after_numeric = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
-        st.write(f"DEBUG (portfolio_display): HOC.L après pd.to_numeric (avant conversion pence):")
-        st.write(f"  Acquisition: {hoc_row_after_numeric.get('Acquisition', 'N/A')} (Type: {type(hoc_row_after_numeric.get('Acquisition', None))})")
-        st.write(f"  currentPrice: {hoc_row_after_numeric.get('currentPrice', 'N/A')} (Type: {type(hoc_row_after_numeric.get('currentPrice', None))})")
-        st.write(f"  Devise: {hoc_row_after_numeric.get('Devise', 'N/A')}")
-        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after_numeric.get('Facteur_Ajustement_FX', 'N/A')}")
-
-
+    # --- NOUVEAU : Lecture et traitement de la colonne 'H' pour le facteur d'ajustement FX ---
+    if "H" in df.columns:
+        df["Facteur_Ajustement_FX"] = df["H"].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
+        df["Facteur_Ajustement_FX"] = pd.to_numeric(df["Facteur_Ajustement_FX"], errors="coerce").fillna(1.0) # Default to 1.0 if empty/invalid
+    else:
+        df["Facteur_Ajustement_FX"] = 1.0 # Default to 1.0 if column H is missing
+    # --- FIN NOUVEAU ---
 
     # --- DÉBUT DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
+    # Identifier la colonne ticker
+    ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
     # 1. Identifier les tickers de la Bourse de Londres (terminant par '.L')
     is_lse_ticker = pd.Series(False, index=df.index)
@@ -176,8 +163,50 @@ def afficher_portefeuille():
     #   - L'utilisateur a explicitement saisi 'GBp' dans la colonne devise
     needs_pence_to_pound_conversion = (is_lse_ticker & (df['devise_upper_for_check'] == "GBP")) | is_explicit_gbp_pence_input
 
+    # DEBUG: Afficher les valeurs avant la conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_before = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L avant conversion pence:")
+        st.write(f"  Acquisition: {hoc_row_before.get('Acquisition', 'N/A')}")
+        st.write(f"  currentPrice: {hoc_row_before.get('currentPrice', 'N/A')}")
+        st.write(f"  Devise: {hoc_row_before.get('Devise', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_before.get('Facteur_Ajustement_FX', 'N/A')}")
+        st.write(f"  Needs pence conversion: {needs_pence_to_pound_conversion.loc[hoc_row_before.name]}")
 
 
+    # Appliquer la division par 100 aux colonnes de prix concernées
+    for price_col in ["Acquisition", "currentPrice", "fiftyTwoWeekHigh", "Objectif_LT"]:
+        if price_col in df.columns:
+            df[price_col] = pd.to_numeric(df[price_col], errors='coerce') # S'assurer que la colonne est numérique
+            
+            # Appliquer la division seulement si le drapeau est vrai et que la valeur n'est ni NaN ni 0
+            mask_to_apply_division = needs_pence_to_pound_conversion & df[price_col].notna() & (df[price_col] != 0)
+            
+            if mask_to_apply_division.any() and ticker_col_name is not None:
+                affected_tickers = df.loc[mask_to_apply_division, ticker_col_name].dropna().unique().tolist()
+                st.info(f"DEBUG (portfolio_display): Conversion pence-vers-livre appliquée pour les tickers : {affected_tickers} sur la colonne '{price_col}'.")
+
+            df.loc[mask_to_apply_division, price_col] = df.loc[mask_to_apply_division, price_col] / 100.0
+    
+    # DEBUG: Afficher les valeurs après la conversion pence-vers-livre pour HOC.L
+    if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
+        hoc_row_after = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
+        st.write(f"DEBUG (portfolio_display): HOC.L après conversion pence:")
+        st.write(f"  Acquisition: {hoc_row_after.get('Acquisition', 'N/A')}")
+        st.write(f"  currentPrice: {hoc_row_after.get('currentPrice', 'N/A')}")
+        st.write(f"  Facteur_Ajustement_FX: {hoc_row_after.get('Facteur_Ajustement_FX', 'N/A')}")
+
+
+    # Supprimer les colonnes temporaires
+    df.drop(columns=['devise_upper_for_check', 'original_devise_lower_for_gbp_check'], inplace=True)
+    # --- FIN DE LA GESTION DES PENCE BRITANNIQUES (GBp) ---
+
+    # Nettoyage final de la colonne Devise (après la détection des GBp)
+    if "Devise" in df.columns:
+        df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
+    else:
+        st.error("Colonne 'Devise' absente. Utilisation de la devise cible par défaut.")
+        df["Devise"] = devise_cible
 
     # GESTION DE LA COLONNE 'CATÉGORIES'
     if "Categories" in df.columns:  
@@ -561,3 +590,4 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
 
     else:
         st.info("Aucune donnée de portefeuille chargée pour calculer la répartition par catégories.")
+
