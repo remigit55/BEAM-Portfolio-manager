@@ -14,15 +14,7 @@ from historical_performance_calculator import reconstruct_historical_portfolio_v
 from utils import format_fr
 from portfolio_display import convertir
 
-def display_performance_history():
-    if "Devise" in df_current_portfolio.columns:
-        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
-
-    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
-    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
-    st.session_state.fx_rates = fetch_fx_rates(target_currency)
-
-    
+def display_performance_history():  
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres'.")
         return
@@ -34,6 +26,13 @@ def display_performance_history():
         )
     target_currency = st.session_state.get("devise_cible", "EUR")
     fx_rates = st.session_state.fx_rates
+
+    if "Devise" in df_current_portfolio.columns:
+        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
+
+    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
+    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
+    st.session_state.fx_rates = fetch_fx_rates(target_currency)
 
 # --- Nouvelle logique de taux FX (alignée sur portfolio_display.py) ---
 
