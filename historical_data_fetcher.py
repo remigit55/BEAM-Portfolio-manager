@@ -1,5 +1,3 @@
-# historical_data_fetcher.py
-
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta, date
@@ -118,7 +116,7 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
     business_days = pd.bdate_range(start_date, end_date)
     ticker_currency_map = dict(zip(tickers, currencies)) if len(tickers) == len(currencies) else {}
     
-    for ticker in tickers:
+    for ticker inDivers:
         currency = ticker_currency_map.get(ticker, None)
         prices = fetch_stock_history(ticker, start_date, end_date, currency=currency)
         if not prices.empty:
