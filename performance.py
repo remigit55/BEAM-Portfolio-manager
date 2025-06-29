@@ -16,13 +16,13 @@ from portfolio_display import convertir
 
 def display_performance_history():  
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
-        st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres'.")
+        st.warning("Veuillez importer un fichier CSV/Excel via l\'onglet \'Paramètres\'.")
         return
 
     df_current_portfolio = st.session_state.df.copy()
-    
+
+    # --- Récupération de la devise cible et normalisation des devises ---
     target_currency = st.session_state.get("devise_cible", "EUR")
-    fx_rates = st.session_state.fx_rates
 
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
@@ -30,24 +30,21 @@ def display_performance_history():
         df_current_portfolio.loc[df_current_portfolio["Devise"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
 
-
-    if "Devise" in df_current_portfolio.columns:
-        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip().str.upper()
-
-    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist() if "Devise" in df_current_portfolio.columns else []
+    # --- Récupération des taux de change nécessaires ---
+    devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist()
     devises_a_fetch = list(set([target_currency] + devises_uniques_df))
     st.session_state.fx_rates = fetch_fx_rates(target_currency)
 
-# --- Nouvelle logique de taux FX (alignée sur portfolio_display.py) ---
+    fx_rates = st.session_state.fx_rates
 
-# Initialisation des taux de change via dictionnaire
-
+    # --- Tickers à afficher ---
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
     if not tickers_in_portfolio:
         st.info("Aucun ticker à afficher.")
         return
 
+    # --- Sélection de période ---
     period_options = {
         "1W": timedelta(weeks=1), "1M": timedelta(days=30), "3M": timedelta(days=90),
         "6M": timedelta(days=180), "1Y": timedelta(days=365),
@@ -109,6 +106,8 @@ def display_performance_history():
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
+        # La suite du code d'affichage reste inchangée
+
 
         if not df_display_values.empty:
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
