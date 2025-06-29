@@ -25,14 +25,7 @@ def display_performance_history():
 from data_fetcher import fetch_fx_rates
 
 # Initialisation des taux de change via dictionnaire
-if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-    # Récupérer toutes les devises présentes dans le portefeuille
-    devises_uniques_df = df_current_portfolio["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df_current_portfolio.columns else []
-    devises_a_fetch = list(set([target_currency] + devises_uniques_df))
-    st.session_state.fx_rates = fetch_fx_rates(target_currency)
-
-fx_rates = st.session_state.fx_rates
-        st.error("Les taux de change historiques sont manquants.")
+    # --- Nouvelle logique de taux FX (alignée sur portfolio_display.py) ---    from data_fetcher import fetch_fx_rates        # Initialisation des taux de change via dictionnaire    if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:        devises_uniques_df = df_current_portfolio["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df_current_portfolio.columns else []        devises_a_fetch = list(set([target_currency] + devises_uniques_df))        st.session_state.fx_rates = fetch_fx_rates(target_currency)        fx_rates = st.session_state.fx_rates        st.error("Les taux de change historiques sont manquants.")
         return
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
