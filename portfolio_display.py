@@ -7,8 +7,12 @@ import streamlit.components.v1 as components
 import datetime
 import pytz
 
-from utils import safe_escape, format_fr
-from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
+try:
+    from utils import safe_escape, format_fr
+    from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
+except ImportError as e:
+    st.error(f"Erreur d'importation dans portfolio_display.py : {e}")
+    raise
 
 def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_cat="Catégorie", colonne_valeur="Valeur Actuelle"):
     if "Minières" not in allocations_reelles or "Minières" not in objectifs:
@@ -54,7 +58,7 @@ def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustmen
     Applique également un facteur d'ajustement supplémentaire au taux de change.
     Retourne la valeur convertie et le taux utilisé (après ajustement).
     """
-    if pd.isnull(val):
+    if pd.isna(val):
         return np.nan, np.nan
 
     source_devise = str(source_devise).strip().upper()
@@ -74,14 +78,14 @@ def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustmen
     elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)):
         taux_scalar = float(fx_rates_or_scalar)
     else:
-        st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
+        st.warning(f"Type de taux de change inattendu pour {source_devise} vers {devise_cible}: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
         taux_scalar = 1.0
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
         st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
         return val, np.nan
     
-    if pd.notnull(fx_adjustment_factor) and fx_adjustment_factor != 0:
+    if pd.notna(fx_adjustment_factor) and fx_adjustment_factor != 0:
         taux_scalar /= fx_adjustment_factor
         
     return val * taux_scalar, taux_scalar
@@ -106,8 +110,12 @@ def afficher_portefeuille():
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
         devises_uniques_df = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
         devises_a_fetch = list(set([devise_cible] + devises_uniques_df))
-        st.session_state.fx_rates = fetch_fx_rates(devise_cible)
-    
+        try:
+            st.session_state.fx_rates = fetch_fx_rates(devise_cible)
+        except Exception as e:
+            st.error(f"Erreur lors de la récupération des taux de change : {e}")
+            st.session_state.fx_rates = {}
+
     fx_rates = st.session_state.fx_rates
 
     devises_uniques = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
@@ -131,7 +139,6 @@ def afficher_portefeuille():
         df['original_devise_lower_for_gbp_check'] = df['Devise'].astype(str).str.strip().str.lower()
         needs_pence_to_pound_conversion = df['original_devise_lower_for_gbp_check'].apply(is_pence_denominated)
         
-        # Debug logging for specific ticker (e.g., HOC.L)
         ticker_col_name = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
         if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
             hoc_row_before = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
@@ -153,7 +160,6 @@ def afficher_portefeuille():
 
                 df.loc[mask_to_apply_division, price_col] = df.loc[mask_to_apply_division, price_col] / 100.0
     
-        # Debug logging after conversion
         if ticker_col_name and 'HOC.L' in df[ticker_col_name].values:
             hoc_row_after = df[df[ticker_col_name] == 'HOC.L'].iloc[0]
             st.write(f"DEBUG (portfolio_display): HOC.L après conversion pence:")
@@ -260,7 +266,7 @@ def afficher_portefeuille():
     )
 
     df["Valeur Acquisition_fmt"] = [
-        f"{format_fr(val, 2)} {dev}" if pd.notnull(val) else ""
+        f"{format_fr(val, 2)} {dev}" if pd.notna(val) else ""
         for val, dev in zip(df["Valeur Acquisition"], df["Devise"])
     ]
 
@@ -306,20 +312,20 @@ def afficher_portefeuille():
     df_disp.columns = final_labels  
 
     format_dict_portfolio = {
-        "Quantité": lambda x: format_fr(x, 0) if pd.notnull(x) else "",
-        "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Taux FX (Source/Cible)": lambda x: format_fr(x, 6) if pd.notnull(x) else "N/A",
-        "Prix Actuel": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur Actuelle ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        f"Gain/Perte ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
-        "Haut 52 Semaines": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur H52 ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Objectif LT": lambda x: format_fr(x, 4) if pd.notnull(x) else "",
-        f"Valeur LT ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "",
-        "Momentum (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notnull(x) else "",
-        "Z-Score": lambda x: format_fr(x, 2) if pd.notnull(x) else "",
+        "Quantité": lambda x: format_fr(x, 0) if pd.notna(x) else "",
+        "Prix d'Acquisition (Source)": lambda x: format_fr(x, 4) if pd.notna(x) else "",
+        f"Valeur Acquisition ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "",
+        "Taux FX (Source/Cible)": lambda x: format_fr(x, 6) if pd.notna(x) else "N/A",
+        "Prix Actuel": lambda x: format_fr(x, 4) if pd.notna(x) else "",
+        f"Valeur Actuelle ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "",
+        f"Gain/Perte ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "",
+        "Gain/Perte (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notna(x) else "",
+        "Haut 52 Semaines": lambda x: format_fr(x, 4) if pd.notna(x) else "",
+        f"Valeur H52 ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "",
+        "Objectif LT": lambda x: format_fr(x, 4) if pd.notna(x) else "",
+        f"Valeur LT ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "",
+        "Momentum (%)": lambda x: f"{format_fr(x, 2)} %" if pd.notna(x) else "",
+        "Z-Score": lambda x: format_fr(x, 2) if pd.notna(x) else "",
     }
 
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
@@ -487,7 +493,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             "Part Actuelle (%)": lambda x: f"{format_fr(x, 2)} %",
             "Cible (%)": lambda x: f"{format_fr(x, 2)} %",
             "Écart à l'objectif (%)": lambda x: f"{format_fr(x, 2)} %",
-            f"Ajustement Nécessaire ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notnull(x) else "N/A"
+            f"Ajustement Nécessaire ({devise_cible})": lambda x: f"{format_fr(x, 2)} {devise_cible}" if pd.notna(x) else "N/A"
         }
 
         filtered_format_dict_category = {k: v for k, v in format_dict_category.items() if k in df_disp_cat.columns}
