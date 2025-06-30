@@ -109,9 +109,8 @@ def display_performance_history():
 
     with st.spinner("Récupération et conversion des cours..."):
         all_ticker_data = []
-        fetch_start_date = start_date_table - timedelta(days=400)  # 400 jours pour couvrir MA200
+        fetch_start_date = start_date_table - timedelta(days=max(200, selected_period_td.days // 2) + 200)
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
-        all_business_days = pd.bdate_range(start=fetch_start_date, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
             ticker_devise = target_currency
@@ -131,10 +130,9 @@ def display_performance_history():
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if data.empty:
                 # Si aucune donnée, créer un DataFrame avec des prix à 0
-                data = pd.Series(0.0, index=all_business_days)
+                data = pd.Series(0.0, index=business_days_for_display)
             else:
-                # Réindexer pour inclure toutes les dates, remplir les valeurs manquantes
-                data = data.reindex(all_business_days).ffill().bfill()
+                data = data.dropna().reindex(business_days_for_display).ffill().bfill()
 
             for date_idx, price in data.items():
                 fx_key = ticker_devise
@@ -149,47 +147,37 @@ def display_performance_history():
         df_display_values = pd.DataFrame(all_ticker_data)
         
         if not df_display_values.empty:
-            # Calculer la valeur totale sur toutes les données disponibles
+            # Graphique : Valeur totale du portefeuille avec MA50 et MA200
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
 
             # Calcul des moyennes mobiles pour Valeur Totale
-            df_total_daily_value['MA50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).mean()
-            df_total_daily_value['MA200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).mean()
-
-            # Vérifier si MA200 est calculable
-            if df_total_daily_value['Date'].min() > (end_date_table - timedelta(days=200)):
-                st.warning("⚠️ Données historiques insuffisantes pour calculer MA200 sur l'ensemble de la période. Essayez une période plus récente ou vérifiez les données des tickers.")
-
-            # Filtrer pour l'affichage
-            df_total_daily_value_display = df_total_daily_value[
-                (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
-                (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
-            ]
+            df_total_daily_value['MA50'] = df_total_daily_value['Valeur Totale'].rolling(window=50).mean()
+            df_total_daily_value['MA200'] = df_total_daily_value['Valeur Totale'].rolling(window=200).mean()
 
             st.markdown("---")
             st.markdown("#### Performance du Portefeuille")
             fig_total = go.Figure()
             fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['Valeur Totale'],
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['Valeur Totale'],
                 mode='lines',
                 name=f'Valeur Totale ({target_currency})',
                 hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
             ))
             fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['MA50'],
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['MA50'],
                 mode='lines',
                 name='MA50',
                 line=dict(color='orange', dash='dash'),
                 hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
             ))
             fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['MA200'],
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['MA200'],
                 mode='lines',
                 name='MA200',
                 line=dict(color='green', dash='dash'),
@@ -199,8 +187,7 @@ def display_performance_history():
                 title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
                 xaxis_title="Date",
                 yaxis_title=f"Valeur Totale ({target_currency})",
-                hovermode="x unified",
-                showlegend=True
+                hovermode="x unified"
             )
             st.plotly_chart(fig_total, use_container_width=True)
 
@@ -212,41 +199,37 @@ def display_performance_history():
 
             df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
             window_size = 20
-            df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size, min_periods=1).std() * (252**0.5)
-            df_total_daily_value['Volatilité_MA50'] = df_total_daily_value['Volatilité'].rolling(window=50, min_periods=1).mean()
-            df_total_daily_value['Volatilité_MA200'] = df_total_daily_value['Volatilité'].rolling(window=200, min_periods=1).mean()
+            df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5)
+            df_total_daily_value['Volatilité_MA50'] = df_total_daily_value['Volatilité'].rolling(window=50).mean()
+            df_total_daily_value['Volatilité_MA200'] = df_total_daily_value['Volatilité'].rolling(window=200).mean()
 
             if not df_total_daily_value['Volatilité'].dropna().empty:
-                df_volatility_display = df_total_daily_value[
-                    (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
-                    (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
-                ]
                 fig_volatility = go.Figure()
                 fig_volatility.add_trace(go.Scatter(
-                    x=df_volatility_display['Date'],
-                    y=df_volatility_display['Volatilité'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Volatilité'],
                     mode='lines',
                     name='Volatilité Annualisée',
                     hovertemplate='%{x|%d/%m/%Y}<br>Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
-                    x=df_volatility_display['Date'],
-                    y=df_volatility_display['Volatilité_MA50'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Volatilité_MA50'],
                     mode='lines',
                     name='MA50 (Volatilité)',
                     line=dict(color='orange', dash='dash'),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
-                    x=df_volatility_display['Date'],
-                    y=df_volatility_display['Volatilité_MA200'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Volatilité_MA200'],
                     mode='lines',
                     name='MA200 (Volatilité)',
                     line=dict(color='green', dash='dash'),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
-                    x=[df_volatility_display['Date'].min(), df_volatility_display['Date'].max()],
+                    x=[df_total_daily_value['Date'].min(), df_total_daily_value['Date'].max()],
                     y=[target_volatility, target_volatility],
                     mode='lines',
                     name='Objectif Volatilité',
@@ -257,8 +240,7 @@ def display_performance_history():
                     title=f"Volatilité Annualisée (Fenêtre de {window_size} jours)",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
-                    hovermode="x unified",
-                    showlegend=True
+                    hovermode="x unified"
                 )
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
@@ -266,39 +248,35 @@ def display_performance_history():
             st.markdown("---")
             st.markdown("#### Momentum du Portefeuille (Z-score)")
             z_score_window = 20
-            df_total_daily_value['MA_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).mean()
-            df_total_daily_value['STD_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).std()
+            df_total_daily_value['MA_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window).mean()
+            df_total_daily_value['STD_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window).std()
             df_total_daily_value['Z-score'] = (
                 (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z']) / 
                 df_total_daily_value['STD_Z']
             ).fillna(0)
-            df_total_daily_value['Z-score_MA50'] = df_total_daily_value['Z-score'].rolling(window=50, min_periods=1).mean()
-            df_total_daily_value['Z-score_MA200'] = df_total_daily_value['Z-score'].rolling(window=200, min_periods=1).mean()
+            df_total_daily_value['Z-score_MA50'] = df_total_daily_value['Z-score'].rolling(window=50).mean()
+            df_total_daily_value['Z-score_MA200'] = df_total_daily_value['Z-score'].rolling(window=200).mean()
 
             if not df_total_daily_value['Z-score'].dropna().empty:
-                df_z_score_display = df_total_daily_value[
-                    (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
-                    (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
-                ]
                 fig_z_score = go.Figure()
                 fig_z_score.add_trace(go.Scatter(
-                    x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Z-score'],
                     mode='lines',
                     name='Z-score',
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score: %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
-                    x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_MA50'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Z-score_MA50'],
                     mode='lines',
                     name='MA50 (Z-score)',
                     line=dict(color='orange', dash='dash'),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
-                    x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_MA200'],
+                    x=df_total_daily_value['Date'],
+                    y=df_total_daily_value['Z-score_MA200'],
                     mode='lines',
                     name='MA200 (Z-score)',
                     line=dict(color='green', dash='dash'),
@@ -308,8 +286,7 @@ def display_performance_history():
                     title=f"Z-score du Portefeuille (Fenêtre de {z_score_window} jours)",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
-                    hovermode="x unified",
-                    showlegend=True
+                    hovermode="x unified"
                 )
                 st.plotly_chart(fig_z_score, use_container_width=True)
 
