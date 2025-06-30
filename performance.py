@@ -23,9 +23,8 @@ def display_performance_history():
 
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
-        if "H" in df_current_portfolio.columns:
-            df_current_portfolio["Facteur_Ajustement_FX"] = df_current_portfolio["H"].astype(str).str.replace(" ", "", regex=False).str.replace(",", ".", regex=False)
-            df_current_portfolio["Facteur_Ajustement_FX"] = pd.to_numeric(df_current_portfolio["Facteur_Ajustement_FX"], errors="coerce").fillna(1.0)
+        if "B" in df_current_portfolio.columns:
+            df_current_portfolio.loc[df_current_portfolio["B"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
         else:
             df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
