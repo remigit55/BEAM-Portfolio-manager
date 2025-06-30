@@ -7,6 +7,7 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 import yfinance as yf
+import numpy as np
 
 from period_selector_component import period_selector
 from historical_data_fetcher import fetch_stock_history, fetch_historical_fx_rates
