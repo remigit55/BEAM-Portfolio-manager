@@ -171,7 +171,6 @@ def display_performance_history():
             ]
 
             st.markdown("---")
-            st.markdown("#### Performance du Portefeuille")
             fig_total = go.Figure()
             fig_total.add_trace(go.Scatter(
                 x=df_total_daily_value_display['Date'],
@@ -232,7 +231,6 @@ def display_performance_history():
 
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
             st.markdown("---")
-            st.markdown("#### Volatilité Quotidienne du Portefeuille")
             # Utiliser la valeur de target_volatility définie dans parametres.py
             target_volatility = st.session_state.get("target_volatility", 0.15)
 
@@ -280,7 +278,7 @@ def display_performance_history():
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
-                    title=f"Volatilité | Fenêtre de {window_size} jours",
+                    title=f"Volatilité journalière du portefeuille | Fenêtre de {window_size} jours",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
@@ -290,7 +288,6 @@ def display_performance_history():
 
             # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
             st.markdown("---")
-            st.markdown("#### Momentum du Portefeuille")
             # Calcul du Z-score pour une fenêtre de 70 jours
             df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
             df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
@@ -335,7 +332,7 @@ def display_performance_history():
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (36 mois): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title="Momentum | Z-scores sur 70 jours et 36 mois",
+                    title="Momentum du portefeuille | Z-scores sur 70 jours et 36 mois",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
@@ -363,5 +360,5 @@ def display_performance_history():
 
             format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
 
-            st.markdown(f"##### Valeur Actuelle du Portefeuille | en {target_currency}")
+
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
