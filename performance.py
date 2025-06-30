@@ -21,15 +21,15 @@ def display_performance_history():
 
     df_current_portfolio = st.session_state.df.copy()
 
-    # --- Récupération de la devise cible et normalisation des devises ---
-    target_currency = st.session_state.get("devise_cible", "EUR")
-
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
         df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
         df_current_portfolio.loc[df_current_portfolio["Devise"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
 
+    # --- Récupération de la devise cible et normalisation des devises ---
+    target_currency = st.session_state.get("devise_cible", "EUR")
+    
     # --- Récupération des taux de change nécessaires ---
     devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist()
     devises_a_fetch = list(set([target_currency] + devises_uniques_df))
