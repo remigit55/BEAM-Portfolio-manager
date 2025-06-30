@@ -48,34 +48,42 @@ def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_or_s
 
 def display_performance_history():  
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
-        st.warning("Veuillez importer un fichier CSV/Excel via l\'onglet \'Paramètres\'.")
+        st.warning("Veuillez importer un fichier CSV/Excel via l'onglet 'Paramètres'.")
         return
 
     df_current_portfolio = st.session_state.df.copy()
     
+    # Debugging: Inspect DataFrame columns and Devise values
+    st.write("Colonnes du DataFrame:", df_current_portfolio.columns.tolist())
+    if "Devise" in df_current_portfolio.columns:
+        st.write("Valeurs uniques dans 'Devise':", df_current_portfolio["Devise"].unique())
+    
+    # Initialize columns and handle GBp
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
         df_current_portfolio["Devise_Originale"] = df_current_portfolio["Devise"]
-        # df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
-        
-        # Facteur d'ajustement basé sur la valeur ORIGINALE
+        # Set adjustment factor based on Devise_Originale
         df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
         df_current_portfolio.loc[
-            df_current_portfolio["Devise_Originale"] == "GBp",
+            df_current_portfolio["Devise_Originale"].str.strip().str.upper() == "GBP",
             "Facteur_Ajustement_FX"
         ] = 0.01
+        # Pop-up for GBp detection
+        if (df_current_portfolio["Devise_Originale"].str.strip().str.upper() == "GBP").any():
+            st.warning("Devise GBp détectée dans la colonne 'Devise_Originale'. Facteur d'ajustement fixé à 0.01.")
+        else:
+            st.info("Aucune devise 'GBp' trouvée dans la colonne 'Devise_Originale'.")
     
     # --- Récupération de la devise cible ---
     target_currency = st.session_state.get("devise_cible", "EUR")
-
     
     # --- Récupération des taux de change nécessaires ---
     devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist()
     devises_a_fetch = list(set([target_currency] + devises_uniques_df))
     st.session_state.fx_rates = fetch_fx_rates(target_currency)
-
     fx_rates = st.session_state.fx_rates
-
+    st.write("Taux de change disponibles:", fx_rates)
+    
     # --- Tickers à afficher ---
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
 
@@ -122,16 +130,17 @@ def display_performance_history():
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             if not ticker_row.empty:
                 if "Devise_Originale" in ticker_row.columns and pd.notnull(ticker_row["Devise_Originale"].iloc[0]):
-                    ticker_devise = str(ticker_row["Devise_Originale"].iloc[0]).strip()
-                    if ticker_devise == "GBp":
-                        fx_adjustment_factor = 0.01
+                    ticker_devise = str(ticker_row["Devise_Originale"].iloc[0]).strip().upper()
+                    if ticker_devise == "GBP":
+                        # Note: If fetch_stock_history returns prices in GBP, set fx_adjustment_factor to 1.0
+                        # If it returns prices in GBp, use 0.01
+                        fx_adjustment_factor = 0.01  # Assuming prices are in GBp
                         ticker_devise = "GBP"
+                        st.write(f"GBp détecté pour {ticker}, Facteur_Ajustement_FX: {fx_adjustment_factor}, Devise ajustée: {ticker_devise}")
                     else:
                         fx_adjustment_factor = 1.0
                 if "Quantité" in ticker_row.columns:
                     quantity = pd.to_numeric(ticker_row["Quantité"], errors='coerce').iloc[0] or 0.0
-                if "Facteur_Ajustement_FX" in ticker_row.columns:
-                    fx_adjustment_factor = pd.to_numeric(ticker_row["Facteur_Ajustement_FX"], errors='coerce').iloc[0] or 1.0
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
@@ -139,7 +148,9 @@ def display_performance_history():
                 for date_idx, price in filtered_data.items():
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
-                    converted_price, _ = convertir_valeur_performance(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    st.write(f"Ticker: {ticker}, Date: {date_idx}, Price: {price}, Devise: {fx_key}, FX Rate: {fx_rate_for_date}, FX Adjustment: {fx_adjustment_factor}")
+                    converted_price, taux_scalar = convertir_valeur_performance(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    st.write(f"Converted Price for {ticker} on {date_idx}: {converted_price}")
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
@@ -147,9 +158,7 @@ def display_performance_history():
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
-        # La suite du code d'affichage reste inchangée
-
-
+        
         if not df_display_values.empty:
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
