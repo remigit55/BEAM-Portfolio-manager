@@ -288,20 +288,25 @@ def display_performance_history():
                 )
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
-            # Graphique : Z-score (Momentum) avec MA50 et MA200
+            # Graphique : Z-score (Momentum) avec Z-score_50 et Z-score_200
             st.markdown("---")
             st.markdown("#### Momentum du Portefeuille")
-            z_score_window = 70
-            df_total_daily_value['MA_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).mean()
-            df_total_daily_value['STD_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).std()
-            df_total_daily_value['Z-score'] = (
-                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z']) / 
-                df_total_daily_value['STD_Z']
+            # Calcul du Z-score pour une fenêtre de 50 jours
+            df_total_daily_value['MA_Z_50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).mean()
+            df_total_daily_value['STD_Z_50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).std()
+            df_total_daily_value['Z-score_50'] = (
+                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_50']) / 
+                df_total_daily_value['STD_Z_50']
             ).fillna(0)
-            df_total_daily_value['Z-score_MA50'] = df_total_daily_value['Z-score'].rolling(window=50, min_periods=1).mean()
-            df_total_daily_value['Z-score_MA200'] = df_total_daily_value['Z-score'].rolling(window=200, min_periods=1).mean()
+            # Calcul du Z-score pour une fenêtre de 200 jours
+            df_total_daily_value['MA_Z_200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).mean()
+            df_total_daily_value['STD_Z_200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).std()
+            df_total_daily_value['Z-score_200'] = (
+                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_200']) / 
+                df_total_daily_value['STD_Z_200']
+            ).fillna(0)
 
-            if not df_total_daily_value['Z-score'].dropna().empty:
+            if not df_total_daily_value['Z-score_50'].dropna().empty and not df_total_daily_value['Z-score_200'].dropna().empty:
                 df_z_score_display = df_total_daily_value[
                     (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
                     (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
@@ -309,35 +314,30 @@ def display_performance_history():
                 fig_z_score = go.Figure()
                 fig_z_score.add_trace(go.Scatter(
                     x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score'],
+                    y=df_z_score_display['Z-score_50'],
                     mode='lines',
-                    name='Z-score',
-                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score: %{y:.2f}<extra></extra>'
+                    name='Z-score (50 jours)',
+                    line=dict(color='blue'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (50 jours): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
                     x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_MA50'],
+                    y=df_z_score_display['Z-score_200'],
                     mode='lines',
-                    name='MA50 (Z-score)',
-                    line=dict(color='orange', dash='dash'),
-                    hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
-                ))
-                fig_z_score.add_trace(go.Scatter(
-                    x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_MA200'],
-                    mode='lines',
-                    name='MA200 (Z-score)',
-                    line=dict(color='green', dash='dash'),
-                    hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
+                    name='Z-score (200 jours)',
+                    line=dict(color='green'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (200 jours): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title=f"Momentum | Z-score sur une fenêtre de {z_score_window} jours",
+                    title="Momentum | Z-scores sur 50 et 200 jours",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
                     showlegend=True
                 )
                 st.plotly_chart(fig_z_score, use_container_width=True)
+            else:
+                st.warning("⚠️ Aucune donnée disponible pour calculer les Z-scores sur la période sélectionnée.")
 
             # Tableau des valeurs actuelles par ticker
             st.markdown("---")
