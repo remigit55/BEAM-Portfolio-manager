@@ -14,6 +14,37 @@ from historical_performance_calculator import reconstruct_historical_portfolio_v
 from utils import format_fr
 from portfolio_display import convertir
 
+def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
+    """
+    Fonction locale pour performance.py.
+    Applique le facteur d'ajustement sur la valeur (ex: GBp -> GBP = x0.01),
+    puis applique le taux de conversion.
+    """
+    if pd.isnull(val):
+        return np.nan, np.nan
+
+    source_devise = str(source_devise).strip().upper()
+    devise_cible = str(devise_cible).strip().upper()
+
+    if source_devise == devise_cible:
+        return val * fx_adjustment_factor, 1.0
+
+    taux_scalar = np.nan
+    if isinstance(fx_rates_or_scalar, dict):
+        taux_scalar = float(fx_rates_or_scalar.get(source_devise, np.nan))
+    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)):
+        taux_scalar = float(fx_rates_or_scalar)
+    else:
+        st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
+        taux_scalar = 1.0
+
+    if pd.isna(taux_scalar) or taux_scalar == 0:
+        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
+        return val, np.nan
+
+    valeur_ajustee = val * fx_adjustment_factor
+    return valeur_ajustee * taux_scalar, taux_scalar
+
 def display_performance_history():  
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Veuillez importer un fichier CSV/Excel via l\'onglet \'Paramètres\'.")
@@ -107,7 +138,7 @@ def display_performance_history():
                 for date_idx, price in filtered_data.items():
                     fx_key = ticker_devise
                     fx_rate_for_date = fx_rates.get(fx_key, 1.0)
-                    converted_price, _ = convertir(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
+                    converted_price, _ = convertir_valeur_performance(price, ticker_devise, target_currency, fx_rate_for_date, fx_adjustment_factor)
                     all_ticker_data.append({
                         "Date": date_idx,
                         "Ticker": ticker,
