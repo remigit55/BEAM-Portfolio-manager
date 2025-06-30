@@ -23,19 +23,12 @@ def display_performance_history():
 
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
-        if "B" in df_current_portfolio.columns:
-            df_current_portfolio["B"] = df_current_portfolio["B"].astype(str).str.strip().str.upper()
-            st.write("Valeurs uniques dans la colonne 'B':", df_current_portfolio["B"].unique())
-            if (df_current_portfolio["B"] == "GBP").any():
-                st.warning("Devise GBp détectée dans la colonne 'B'. Facteur d'ajustement fixé à 0.01.")
-                df_current_portfolio.loc[df_current_portfolio["B"] == "GBP", "Facteur_Ajustement_FX"] = 0.01
-            else:
-                st.info("Aucune valeur 'GBp' trouvée dans la colonne 'B'.")
-                df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
-        else:
-            st.info("La colonne 'B' n'existe pas dans le DataFrame.")
-            df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
+        df_current_portfolio["Devise_Originale"] = df_current_portfolio["Devise"]  # <-- On garde l'originale
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
+    
+        # Facteur d'ajustement basé sur la valeur ORIGINALE
+        df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
+        df_current_portfolio.loc[df_current_portfolio["Devise_Originale"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
 
     # --- Récupération de la devise cible et normalisation des devises ---
     target_currency = st.session_state.get("devise_cible", "EUR")
