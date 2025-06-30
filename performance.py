@@ -109,7 +109,7 @@ def display_performance_history():
 
     with st.spinner("Récupération et conversion des cours..."):
         all_ticker_data = []
-        fetch_start_date = start_date_table - timedelta(days=400)  # 400 jours pour couvrir MA200
+        fetch_start_date = start_date_table - timedelta(days=3*365)  # Charger 3 ans supplémentaires
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
         all_business_days = pd.bdate_range(start=fetch_start_date, end=end_date_table)
 
@@ -288,25 +288,31 @@ def display_performance_history():
                 )
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
-            # Graphique : Z-score (Momentum) avec Z-score_50 et Z-score_200
+            # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
             st.markdown("---")
             st.markdown("#### Momentum du Portefeuille")
-            # Calcul du Z-score pour une fenêtre de 50 jours
-            df_total_daily_value['MA_Z_50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).mean()
-            df_total_daily_value['STD_Z_50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).std()
-            df_total_daily_value['Z-score_50'] = (
-                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_50']) / 
-                df_total_daily_value['STD_Z_50']
+            # Calcul du Z-score pour une fenêtre de 70 jours
+            df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
+            df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
+            df_total_daily_value['Z-score_70'] = (
+                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_70']) / 
+                df_total_daily_value['STD_Z_70']
             ).fillna(0)
-            # Calcul du Z-score pour une fenêtre de 200 jours
-            df_total_daily_value['MA_Z_200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).mean()
-            df_total_daily_value['STD_Z_200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).std()
-            df_total_daily_value['Z-score_200'] = (
-                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_200']) / 
-                df_total_daily_value['STD_Z_200']
+            # Calcul du Z-score pour une fenêtre de 36 mois (~756 jours ouvrables)
+            z_score_36mois_window = 36 * 21  # 21 jours ouvrables par mois
+            df_total_daily_value['MA_Z_36mois'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_36mois_window, min_periods=1).mean()
+            df_total_daily_value['STD_Z_36mois'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_36mois_window, min_periods=1).std()
+            df_total_daily_value['Z-score_36mois'] = (
+                (df_total_daily_value['Valeur Totale'] - df_total_daily_value['MA_Z_36mois']) / 
+                df_total_daily_value['STD_Z_36mois']
             ).fillna(0)
 
-            if not df_total_daily_value['Z-score_50'].dropna().empty and not df_total_daily_value['Z-score_200'].dropna().empty:
+            # Vérifier si les données couvrent au moins 36 mois
+            min_date_z = df_total_daily_value['Date'].min()
+            if pd.notna(min_date_z) and min_date_z > pd.Timestamp(end_date_table - timedelta(days=3*365)):
+                st.warning("⚠️ Données historiques insuffisantes pour calculer le Z-score sur 36 mois. Essayez une période plus récente ou vérifiez les données des tickers.")
+
+            if not df_total_daily_value['Z-score_70'].dropna().empty and not df_total_daily_value['Z-score_36mois'].dropna().empty:
                 df_z_score_display = df_total_daily_value[
                     (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
                     (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
@@ -314,22 +320,22 @@ def display_performance_history():
                 fig_z_score = go.Figure()
                 fig_z_score.add_trace(go.Scatter(
                     x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_50'],
+                    y=df_z_score_display['Z-score_70'],
                     mode='lines',
-                    name='Z-score (50 jours)',
+                    name='Z-score (70 jours)',
                     line=dict(color='blue'),
-                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (50 jours): %{y:.2f}<extra></extra>'
+                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (70 jours): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
                     x=df_z_score_display['Date'],
-                    y=df_z_score_display['Z-score_200'],
+                    y=df_z_score_display['Z-score_36mois'],
                     mode='lines',
-                    name='Z-score (200 jours)',
+                    name='Z-score (36 mois)',
                     line=dict(color='green'),
-                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (200 jours): %{y:.2f}<extra></extra>'
+                    hovertemplate='%{x|%d/%m/%Y}<br>Z-score (36 mois): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title="Momentum | Z-scores sur 50 et 200 jours",
+                    title="Momentum | Z-scores sur 70 jours et 36 mois",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
