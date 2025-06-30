@@ -110,7 +110,7 @@ def afficher_portefeuille():
 
     # Initialisation ou rafraîchissement des taux de change
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        devises_uniques_df = df["Devise"].dropna().str.strip().str.strip().unique().tolist() if "Devise" in df.columns else []
+        devises_uniques_df = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
         devises_a_fetch = list(set([devise_cible] + devises_uniques_df))
         st.session_state.fx_rates = fetch_fx_rates(devise_cible)
     
