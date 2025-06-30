@@ -54,9 +54,9 @@ def display_performance_history():
     df_current_portfolio = st.session_state.df.copy()
     
     # Debugging: Inspect DataFrame columns and Devise values
-    st.write("Colonnes du DataFrame:", df_current_portfolio.columns.tolist())
-    if "Devise" in df_current_portfolio.columns:
-        st.write("Valeurs uniques dans 'Devise':", df_current_portfolio["Devise"].unique())
+    # st.write("Colonnes du DataFrame:", df_current_portfolio.columns.tolist())
+    # if "Devise" in df_current_portfolio.columns:
+    #    st.write("Valeurs uniques dans 'Devise':", df_current_portfolio["Devise"].unique())
     
     # Initialize columns and handle GBp
     if "Devise" in df_current_portfolio.columns:
