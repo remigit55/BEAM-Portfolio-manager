@@ -334,3 +334,23 @@ def display_performance_history():
 
             st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
+
+            # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Clôture
+            st.markdown("##### Indicateurs du Portefeuille")
+            if not df_total_daily_value_display.empty:
+                high_value = df_total_daily_value_display['Valeur Totale'].max()
+                low_value = df_total_daily_value_display['Valeur Totale'].min()
+                open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+
+                cols = st.columns(4)
+                with cols[0]:
+                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
+                with cols[1]:
+                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 2)} {target_currency}")
+                with cols[2]:
+                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
+                with cols[3]:
+                    st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}")
+            else:
+                st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
