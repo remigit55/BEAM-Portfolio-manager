@@ -89,8 +89,13 @@ def display_performance_history():
 
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             if not ticker_row.empty:
-                if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
-                    ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
+                if "Devise_Originale" in ticker_row.columns and pd.notnull(ticker_row["Devise_Originale"].iloc[0]):
+                    ticker_devise = str(ticker_row["Devise_Originale"].iloc[0]).strip()
+                    if ticker_devise == "GBp":
+                        fx_adjustment_factor = 0.01
+                        ticker_devise = "GBP"
+                    else:
+                        fx_adjustment_factor = 1.0
                 if "Quantité" in ticker_row.columns:
                     quantity = pd.to_numeric(ticker_row["Quantité"], errors='coerce').iloc[0] or 0.0
                 if "Facteur_Ajustement_FX" in ticker_row.columns:
