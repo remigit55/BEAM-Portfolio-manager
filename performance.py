@@ -197,7 +197,7 @@ def display_performance_history():
                 hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
             ))
             fig_total.update_layout(
-                title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
+                title=f"Valeur Totale du Portefeuille par Jour | en {target_currency}",
                 xaxis_title="Date",
                 yaxis_title=f"Valeur Totale ({target_currency})",
                 hovermode="x unified",
