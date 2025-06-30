@@ -170,6 +170,8 @@ def display_performance_history():
                 (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
             ]
 
+            st.markdown("---")
+            st.markdown("#### Performance du Portefeuille")
             fig_total = go.Figure()
             fig_total.add_trace(go.Scatter(
                 x=df_total_daily_value_display['Date'],
@@ -229,7 +231,8 @@ def display_performance_history():
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
 
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
-            # st.markdown("---")
+            st.markdown("---")
+            st.markdown("#### Volatilité Quotidienne du Portefeuille")
             # Utiliser la valeur de target_volatility définie dans parametres.py
             target_volatility = st.session_state.get("target_volatility", 0.15)
 
@@ -277,7 +280,7 @@ def display_performance_history():
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
-                    title=f"Volatilité journalière du portefeuille | Fenêtre de {window_size} jours",
+                    title=f"Volatilité | Fenêtre de {window_size} jours",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
@@ -286,7 +289,8 @@ def display_performance_history():
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
             # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
-            # st.markdown("---")
+            st.markdown("---")
+            st.markdown("#### Momentum du Portefeuille")
             # Calcul du Z-score pour une fenêtre de 70 jours
             df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
             df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
@@ -331,13 +335,41 @@ def display_performance_history():
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (36 mois): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title="Momentum du portefeuille | Z-scores sur 70 jours et 36 mois",
+                    title="Momentum | Z-scores sur 70 jours et 36 mois",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
                     showlegend=True
                 )
                 st.plotly_chart(fig_z_score, use_container_width=True)
+
+                # Ajout des indicateurs Signal, Action, Justification
+                latest_z_score = df_z_score_display[df_z_score_display['Date'] == df_z_score_display['Date'].max()]
+                if not latest_z_score.empty:
+                    z_score_70 = latest_z_score['Z-score_70'].iloc[0]
+                    z_score_36mois = latest_z_score['Z-score_36mois'].iloc[0]
+
+                    # Déterminer le Signal
+                    if z_score_70 > 1 and z_score_36mois > 0:
+                        signal = "Haussier"
+                        action = "Acheter"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) > 1 et Z-score_36mois ({z_score_36mois:.2f}) > 0 : Momentum court terme fort avec tendance long terme positive."
+                    elif z_score_70 < -1 and z_score_36mois < 0:
+                        signal = "Baissier"
+                        action = "Vendre"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) < -1 et Z-score_36mois ({z_score_36mois:.2f}) < 0 : Momentum court terme faible avec tendance long terme négative."
+                    else:
+                        signal = "Neutre"
+                        action = "Conserver"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) et Z-score_36mois ({z_score_36mois:.2f}) ne montrent pas d'alignement clair pour une action décisive."
+
+                    cols = st.columns(3)
+                    with cols[0]:
+                        st.metric(label="Signal", value=signal)
+                    with cols[1]:
+                        st.metric(label="Action", value=action)
+                    with cols[2]:
+                        st.metric(label="Justification", value=justification)
             else:
                 st.warning("⚠️ Aucune donnée disponible pour calculer les Z-scores sur la période sélectionnée.")
 
