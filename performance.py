@@ -206,7 +206,6 @@ def display_performance_history():
             st.plotly_chart(fig_total, use_container_width=True)
 
             # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Clôture
-            st.markdown("##### Indicateurs du Portefeuille")
             if not df_total_daily_value_display.empty:
                 high_value = df_total_daily_value_display['Valeur Totale'].max()
                 low_value = df_total_daily_value_display['Valeur Totale'].min()
