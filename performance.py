@@ -291,7 +291,7 @@ def display_performance_history():
             # Graphique : Z-score (Momentum) avec MA50 et MA200
             st.markdown("---")
             st.markdown("#### Momentum du Portefeuille")
-            z_score_window = 20
+            z_score_window = 70
             df_total_daily_value['MA_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).mean()
             df_total_daily_value['STD_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).std()
             df_total_daily_value['Z-score'] = (
