@@ -114,6 +114,22 @@ def afficher_parametres_globaux():
 
     # --- 4. Autres Réglages ---
     st.markdown("#### Autres Réglages")
+    
+    # Ajout du paramètre pour l'objectif de volatilité
+    st.write("Définir l'objectif de volatilité annualisée pour le portefeuille.")
+    target_volatility = st.number_input(
+        "Objectif de volatilité annualisée (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=st.session_state.get("target_volatility", 15.0),
+        step=0.1,
+        key="target_volatility_input"
+    )
+    if target_volatility != st.session_state.get("target_volatility", 15.0):
+        st.session_state.target_volatility = target_volatility / 100  # Convertir en décimal
+        st.success(f"✅ Objectif de volatilité défini à {target_volatility:.1f}%.")
+        st.rerun()
+
     st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
 
     st.markdown("---")
@@ -125,4 +141,3 @@ def afficher_parametres_globaux():
         st.write(f"Dernière mise à jour des données : **{st.session_state['last_yfinance_update']}**")
     else:
         st.info("Aucune donnée yfinance n'a été chargée pour le moment.")
-
