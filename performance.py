@@ -20,16 +20,23 @@ def display_performance_history():
         return
 
     df_current_portfolio = st.session_state.df.copy()
-
-    # --- Récupération de la devise cible et normalisation des devises ---
-    target_currency = st.session_state.get("devise_cible", "EUR")
-
+    
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
+        df_current_portfolio["Devise_Originale"] = df_current_portfolio["Devise"]
+        # df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
+        
+        # Facteur d'ajustement basé sur la valeur ORIGINALE
         df_current_portfolio["Facteur_Ajustement_FX"] = 1.0
-        df_current_portfolio.loc[df_current_portfolio["Devise"] == "GBp", "Facteur_Ajustement_FX"] = 0.01
-        df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
+        df_current_portfolio.loc[
+            df_current_portfolio["Devise_Originale"] == "GBp",
+            "Facteur_Ajustement_FX"
+        ] = 0.01
+    
+    # --- Récupération de la devise cible ---
+    target_currency = st.session_state.get("devise_cible", "EUR")
 
+    
     # --- Récupération des taux de change nécessaires ---
     devises_uniques_df = df_current_portfolio["Devise"].dropna().unique().tolist()
     devises_a_fetch = list(set([target_currency] + devises_uniques_df))
@@ -82,15 +89,12 @@ def display_performance_history():
 
             ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
             if not ticker_row.empty:
-                if "Devise_Originale" in ticker_row.columns and pd.notnull(ticker_row["Devise_Originale"].iloc[0]):
-                    ticker_devise = str(ticker_row["Devise_Originale"].iloc[0]).strip()
-                    if ticker_devise == "GBp":
-                        fx_adjustment_factor = 0.01
-                        ticker_devise = "GBP"
-                    else:
-                        fx_adjustment_factor = 1.0
+                if "Devise" in ticker_row.columns and pd.notnull(ticker_row["Devise"].iloc[0]):
+                    ticker_devise = str(ticker_row["Devise"].iloc[0]).strip().upper()
                 if "Quantité" in ticker_row.columns:
                     quantity = pd.to_numeric(ticker_row["Quantité"], errors='coerce').iloc[0] or 0.0
+                if "Facteur_Ajustement_FX" in ticker_row.columns:
+                    fx_adjustment_factor = pd.to_numeric(ticker_row["Facteur_Ajustement_FX"], errors='coerce').iloc[0] or 1.0
 
             data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
             if not data.empty:
@@ -103,7 +107,6 @@ def display_performance_history():
                         "Date": date_idx,
                         "Ticker": ticker,
                         f"Valeur Actuelle ({target_currency})": converted_price * quantity
-                    })": converted_price * quantity
                     })
 
         df_display_values = pd.DataFrame(all_ticker_data)
