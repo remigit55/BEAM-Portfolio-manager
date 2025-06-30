@@ -353,15 +353,15 @@ def display_performance_history():
                     if z_score_70 > 1 and z_score_36mois > 0:
                         signal = "Haussier"
                         action = "Acheter"
-                        justification = f"Z-score_70 ({z_score_70:.2f}) > 1 et Z-score_36mois ({z_score_36mois:.2f}) > 0 : Momentum court terme fort avec tendance long terme positive."
+                        justification = f"Momentum court terme fort avec tendance long terme positive."
                     elif z_score_70 < -1 and z_score_36mois < 0:
                         signal = "Baissier"
                         action = "Vendre"
-                        justification = f"Z-score_70 ({z_score_70:.2f}) < -1 et Z-score_36mois ({z_score_36mois:.2f}) < 0 : Momentum court terme faible avec tendance long terme négative."
+                        justification = f"Momentum court terme faible avec tendance long terme négative."
                     else:
                         signal = "Neutre"
                         action = "Conserver"
-                        justification = f"Z-score_70 ({z_score_70:.2f}) et Z-score_36mois ({z_score_36mois:.2f}) ne montrent pas d'alignement clair pour une action décisive."
+                        justification = f"Pas d'alignement clair pour une action décisive."
 
                     cols = st.columns(3)
                     with cols[0]:
