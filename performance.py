@@ -170,7 +170,6 @@ def display_performance_history():
                 (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
             ]
 
-            st.markdown("---")
             fig_total = go.Figure()
             fig_total.add_trace(go.Scatter(
                 x=df_total_daily_value_display['Date'],
@@ -230,7 +229,7 @@ def display_performance_history():
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
 
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
-            st.markdown("---")
+            # st.markdown("---")
             # Utiliser la valeur de target_volatility définie dans parametres.py
             target_volatility = st.session_state.get("target_volatility", 0.15)
 
@@ -287,7 +286,7 @@ def display_performance_history():
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
             # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
-            st.markdown("---")
+            # st.markdown("---")
             # Calcul du Z-score pour une fenêtre de 70 jours
             df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
             df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
@@ -360,5 +359,6 @@ def display_performance_history():
 
             format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
 
-
+            st.markdown("---")
+            st.markdown(f"##### Valeur Actuelle du Portefeuille | en {target_currency}")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
