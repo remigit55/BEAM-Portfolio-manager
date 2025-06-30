@@ -109,7 +109,7 @@ def display_performance_history():
 
     with st.spinner("Récupération et conversion des cours..."):
         all_ticker_data = []
-        fetch_start_date = start_date_table - timedelta(days=max(200, selected_period_td.days // 2))
+        fetch_start_date = start_date_table - timedelta(days=max(200, selected_period_td.days // 2) + 200)
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
