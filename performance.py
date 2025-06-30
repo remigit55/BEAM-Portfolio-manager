@@ -205,11 +205,12 @@ def display_performance_history():
             )
             st.plotly_chart(fig_total, use_container_width=True)
 
-            # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Clôture
+            # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Valeur Moyenne, Clôture
             if not df_total_daily_value_display.empty:
                 high_value = df_total_daily_value_display['Valeur Totale'].max()
                 low_value = df_total_daily_value_display['Valeur Totale'].min()
                 open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                mean_value = df_total_daily_value_display['Valeur Totale'].mean()
                 close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
                 # Calcul de la variation en pourcentage pour Clôture
                 if pd.notna(open_value) and pd.notna(close_value) and open_value != 0:
@@ -218,7 +219,7 @@ def display_performance_history():
                 else:
                     delta_str = "N/A"
 
-                cols = st.columns(4)
+                cols = st.columns(5)
                 with cols[0]:
                     st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
                 with cols[1]:
@@ -226,6 +227,8 @@ def display_performance_history():
                 with cols[2]:
                     st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
                 with cols[3]:
+                    st.metric(label="Valeur Moyenne", value=f"{format_fr(mean_value, 2)} {target_currency}")
+                with cols[4]:
                     st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}", delta=delta_str)
             else:
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
@@ -361,7 +364,7 @@ def display_performance_history():
                     else:
                         signal = "Neutre"
                         action = "Conserver"
-                        justification = f"Pas d'alignement clair pour une action"
+                        justification = f"Pas d'alignement clair pour une action décisive"
 
                     cols = st.columns([1, 1, 3])
                     with cols[0]:
