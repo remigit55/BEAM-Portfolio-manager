@@ -109,7 +109,7 @@ def display_performance_history():
 
     with st.spinner("Récupération et conversion des cours..."):
         all_ticker_data = []
-        fetch_start_date = start_date_table - timedelta(days=max(30, selected_period_td.days // 2))
+        fetch_start_date = start_date_table - timedelta(days=max(200, selected_period_td.days // 2))
         business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
 
         for ticker in tickers_in_portfolio:
@@ -191,9 +191,20 @@ def display_performance_history():
             )
             st.plotly_chart(fig_total, use_container_width=True)
 
-            # Graphique : Volatilité avec MA50 et MA200
+            # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
             st.markdown("---")
             st.markdown("#### Volatilité Quotidienne du Portefeuille")
+            # Paramètre pour l'objectif de volatilité
+            target_volatility = st.number_input(
+                "Définir l'objectif de volatilité annualisée (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=st.session_state.get("target_volatility", 15.0),
+                step=0.1,
+                key="target_volatility_input"
+            )
+            st.session_state.target_volatility = target_volatility / 100  # Convertir en décimal
+
             df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
             window_size = 20
             df_total_daily_value['Volatilité'] = df_total_daily_value['Rendement Quotidien'].rolling(window=window_size).std() * (252**0.5)
@@ -224,6 +235,14 @@ def display_performance_history():
                     name='MA200 (Volatilité)',
                     line=dict(color='green', dash='dash'),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.4f}<extra></extra>'
+                ))
+                fig_volatility.add_trace(go.Scatter(
+                    x=[df_total_daily_value['Date'].min(), df_total_daily_value['Date'].max()],
+                    y=[st.session_state.target_volatility, st.session_state.target_volatility],
+                    mode='lines',
+                    name='Objectif Volatilité',
+                    line=dict(color='red', dash='dot'),
+                    hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
                     title=f"Volatilité Annualisée (Fenêtre de {window_size} jours)",
