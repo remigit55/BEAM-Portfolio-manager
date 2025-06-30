@@ -280,7 +280,7 @@ def display_performance_history():
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
-                    title=f"Volatilité Annualisée (Fenêtre de {window_size} jours)",
+                    title=f"Volatilité Annualisée | Fenêtre de {window_size} jours",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
@@ -331,7 +331,7 @@ def display_performance_history():
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title=f"Z-score du Portefeuille (Fenêtre de {z_score_window} jours)",
+                    title=f"Z-score du Portefeuille | Fenêtre de {z_score_window} jours",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
@@ -357,5 +357,5 @@ def display_performance_history():
 
             format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
 
-            st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
+            st.markdown("##### Valeur Actuelle du Portefeuille | en {target_currency}")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
