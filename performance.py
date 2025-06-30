@@ -23,7 +23,7 @@ def display_performance_history():
     
     if "Devise" in df_current_portfolio.columns:
         df_current_portfolio["Devise"] = df_current_portfolio["Devise"].astype(str).str.strip()
-        df_current_portfolio["Devise_Originale"] = df_current_portfolio["Devise"]  # <-- Sauvegarde avant upper
+        df_current_portfolio["Devise_Originale"] = df_current_portfolio["Devise"]
         # df_current_portfolio["Devise"] = df_current_portfolio["Devise"].str.upper()
         
         # Facteur d'ajustement basé sur la valeur ORIGINALE
