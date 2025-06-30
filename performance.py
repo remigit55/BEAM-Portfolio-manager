@@ -207,10 +207,10 @@ def display_performance_history():
 
             # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Valeur Moyenne, Clôture
             if not df_total_daily_value_display.empty:
-                high_value = df_total_daily_value_display['Valeur Totale'].max()
-                low_value = df_total_daily_value_display['Valeur Totale'].min()
                 open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                low_value = df_total_daily_value_display['Valeur Totale'].min()
                 mean_value = df_total_daily_value_display['Valeur Totale'].mean()
+                high_value = df_total_daily_value_display['Valeur Totale'].max()
                 close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
                 # Calcul de la variation en pourcentage pour Clôture
                 if pd.notna(open_value) and pd.notna(close_value) and open_value != 0:
