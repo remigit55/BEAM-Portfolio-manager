@@ -105,22 +105,35 @@ def afficher_portefeuille():
     # Assurez-vous que 'LT' est renommé en 'Objectif_LT'
     if "LT" in df.columns and "Objectif_LT" not in df.columns:
         df.rename(columns={"LT": "Objectif_LT"}, inplace=True)
-
+    
     devise_cible = st.session_state.get("devise_cible", "EUR")
-
-    # Initialisation ou rafraîchissement des taux de change
+    
+    # --- Étape 1 : récupérer les devises sans les upper pour ne pas écraser "GBp" ---
     if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        devises_uniques_df = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
-        devises_a_fetch = list(set([devise_cible] + devises_uniques_df))
+        devises_uniques_df = df["Devise"].dropna().astype(str).str.strip().unique().tolist() if "Devise" in df.columns else []
+    
+        # --- Étape 2 : créer la version upper uniquement pour la requête des taux ---
+        devises_uppercase = [d.upper() for d in devises_uniques_df]
+        devises_a_fetch = list(set([devise_cible.upper()] + devises_uppercase))
+    
+        # --- Étape 3 : récupérer les taux ---
         st.session_state.fx_rates = fetch_fx_rates(devise_cible)
     
     fx_rates = st.session_state.fx_rates
-
-    # Vérifier les taux manquants
-    devises_uniques = df["Devise"].dropna().str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
-    missing_rates = [devise for devise in devises_uniques if fx_rates.get(devise) is None and devise != devise_cible.upper()]
+    
+    # --- Vérification des taux manquants (on utilise ici les uppercase uniquement pour la vérification) ---
+    devises_utilisees_upper = df["Devise"].dropna().astype(str).str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
+    missing_rates = [
+        devise for devise in devises_utilisees_upper
+        if fx_rates.get(devise) is None and devise != devise_cible.upper()
+    ]
+    
     if missing_rates:
-        st.warning(f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. Les valeurs ne seront pas converties pour ces devises.")
+        st.warning(
+            f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. "
+            f"Les valeurs ne seront pas converties pour ces devises."
+        )
+
 
     # Nettoyage et migration des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
