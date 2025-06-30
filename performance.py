@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 from data_fetcher import fetch_fx_rates
@@ -143,23 +144,48 @@ def display_performance_history():
         df_display_values = pd.DataFrame(all_ticker_data)
         
         if not df_display_values.empty:
-            # Graphique : Valeur totale du portefeuille
+            # Graphique : Valeur totale du portefeuille avec MA50 et MA200
             df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})"].sum().reset_index()
             df_total_daily_value.columns = ['Date', 'Valeur Totale']
             df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
             df_total_daily_value = df_total_daily_value.sort_values('Date')
 
+            # Calcul des moyennes mobiles
+            df_total_daily_value['MA50'] = df_total_daily_value['Valeur Totale'].rolling(window=50).mean()
+            df_total_daily_value['MA200'] = df_total_daily_value['Valeur Totale'].rolling(window=200).mean()
+
             st.markdown("---")
             st.markdown("#### Performance du Portefeuille")
-            fig_total = px.line(
-                df_total_daily_value,
-                x="Date",
-                y="Valeur Totale",
+            fig_total = go.Figure()
+            fig_total.add_trace(go.Scatter(
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['Valeur Totale'],
+                mode='lines',
+                name=f'Valeur Totale ({target_currency})',
+                hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
+            ))
+            fig_total.add_trace(go.Scatter(
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['MA50'],
+                mode='lines',
+                name='MA50',
+                line=dict(color='orange', dash='dash'),
+                hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
+            ))
+            fig_total.add_trace(go.Scatter(
+                x=df_total_daily_value['Date'],
+                y=df_total_daily_value['MA200'],
+                mode='lines',
+                name='MA200',
+                line=dict(color='green', dash='dash'),
+                hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
+            ))
+            fig_total.update_layout(
                 title=f"Valeur Totale du Portefeuille par Jour ({target_currency})",
-                labels={"Valeur Totale": f"Valeur Totale ({target_currency})", "Date": "Date"},
-                hover_data={"Valeur Totale": ':.2f'}
+                xaxis_title="Date",
+                yaxis_title=f"Valeur Totale ({target_currency})",
+                hovermode="x unified"
             )
-            fig_total.update_layout(hovermode="x unified")
             st.plotly_chart(fig_total, use_container_width=True)
 
             # Graphique : Volatilité
