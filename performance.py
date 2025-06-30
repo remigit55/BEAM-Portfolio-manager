@@ -205,6 +205,32 @@ def display_performance_history():
             )
             st.plotly_chart(fig_total, use_container_width=True)
 
+            # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Clôture
+            st.markdown("##### Indicateurs du Portefeuille")
+            if not df_total_daily_value_display.empty:
+                high_value = df_total_daily_value_display['Valeur Totale'].max()
+                low_value = df_total_daily_value_display['Valeur Totale'].min()
+                open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                # Calcul de la variation en pourcentage pour Clôture
+                if pd.notna(open_value) and pd.notna(close_value) and open_value != 0:
+                    percentage_change = ((close_value - open_value) / open_value) * 100
+                    delta_str = f"{percentage_change:+.2f}%"
+                else:
+                    delta_str = "N/A"
+
+                cols = st.columns(4)
+                with cols[0]:
+                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
+                with cols[1]:
+                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 2)} {target_currency}")
+                with cols[2]:
+                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
+                with cols[3]:
+                    st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}", delta=delta_str)
+            else:
+                st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
+
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
             st.markdown("---")
             st.markdown("#### Volatilité Quotidienne du Portefeuille")
@@ -334,23 +360,3 @@ def display_performance_history():
 
             st.markdown("##### Valeur Actuelle du Portefeuille par Ticker (avec conversion)")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
-
-            # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Clôture
-            st.markdown("##### Indicateurs du Portefeuille")
-            if not df_total_daily_value_display.empty:
-                high_value = df_total_daily_value_display['Valeur Totale'].max()
-                low_value = df_total_daily_value_display['Valeur Totale'].min()
-                open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
-                close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
-
-                cols = st.columns(4)
-                with cols[0]:
-                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
-                with cols[1]:
-                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 2)} {target_currency}")
-                with cols[2]:
-                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
-                with cols[3]:
-                    st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}")
-            else:
-                st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
