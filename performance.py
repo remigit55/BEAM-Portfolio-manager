@@ -197,7 +197,7 @@ def display_performance_history():
                 hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
             ))
             fig_total.update_layout(
-                title=f"Valeur Totale du Portefeuille par Jour | en {target_currency}",
+                title=f"Valeur du Portefeuille | par jour en {target_currency}",
                 xaxis_title="Date",
                 yaxis_title=f"Valeur Totale ({target_currency})",
                 hovermode="x unified",
@@ -280,7 +280,7 @@ def display_performance_history():
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
-                    title=f"Volatilité Annualisée | Fenêtre de {window_size} jours",
+                    title=f"Volatilité | Fenêtre de {window_size} jours",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
@@ -290,7 +290,7 @@ def display_performance_history():
 
             # Graphique : Z-score (Momentum) avec MA50 et MA200
             st.markdown("---")
-            st.markdown("#### Momentum du Portefeuille (Z-score)")
+            st.markdown("#### Momentum du Portefeuille")
             z_score_window = 20
             df_total_daily_value['MA_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).mean()
             df_total_daily_value['STD_Z'] = df_total_daily_value['Valeur Totale'].rolling(window=z_score_window, min_periods=1).std()
@@ -331,7 +331,7 @@ def display_performance_history():
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
-                    title=f"Z-score du Portefeuille | Fenêtre de {z_score_window} jours",
+                    title=f"Momentum | Z-score sur une fenêtre de {z_score_window} jours",
                     xaxis_title="Date",
                     yaxis_title="Z-score",
                     hovermode="x unified",
