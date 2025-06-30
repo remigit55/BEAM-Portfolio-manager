@@ -194,16 +194,8 @@ def display_performance_history():
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
             st.markdown("---")
             st.markdown("#### Volatilité Quotidienne du Portefeuille")
-            # Paramètre pour l'objectif de volatilité
-            target_volatility = st.number_input(
-                "Définir l'objectif de volatilité annualisée (%)",
-                min_value=0.0,
-                max_value=100.0,
-                value=st.session_state.get("target_volatility", 15.0),
-                step=0.1,
-                key="target_volatility_input"
-            )
-            st.session_state.target_volatility = target_volatility / 100  # Convertir en décimal
+            # Utiliser la valeur de target_volatility définie dans parametres.py
+            target_volatility = st.session_state.get("target_volatility", 0.15)
 
             df_total_daily_value['Rendement Quotidien'] = df_total_daily_value['Valeur Totale'].pct_change()
             window_size = 20
@@ -238,7 +230,7 @@ def display_performance_history():
                 ))
                 fig_volatility.add_trace(go.Scatter(
                     x=[df_total_daily_value['Date'].min(), df_total_daily_value['Date'].max()],
-                    y=[st.session_state.target_volatility, st.session_state.target_volatility],
+                    y=[target_volatility, target_volatility],
                     mode='lines',
                     name='Objectif Volatilité',
                     line=dict(color='red', dash='dot'),
