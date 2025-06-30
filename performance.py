@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
+from data_fetcher import fetch_fx_rates
 import numpy as np
 
 from period_selector_component import period_selector
