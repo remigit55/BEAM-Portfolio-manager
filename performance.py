@@ -497,7 +497,7 @@ def display_performance_history():
                         action = "Conserver"
                         justification = "Pas d'alignement clair pour une action décisive"
 
-                    cols = st.columns([1, 1, 2])
+                    cols = st.columns([1, 1, 3])
                     with cols[0]:
                         st.metric(label="Signal", value=signal)
                     with cols[1]:
