@@ -320,15 +320,15 @@ def display_performance_history():
                     delta_str = "N/A"
                 cols = st.columns(5)
                 with cols[0]:
-                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
+                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 0)} {target_currency}")
                 with cols[1]:
-                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 2)} {target_currency}")
+                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 0)} {target_currency}")
                 with cols[2]:
-                    st.metric(label="Valeur Moyenne", value=f"{format_fr(mean_value, 2)} {target_currency}")
+                    st.metric(label="Valeur Moyenne", value=f"{format_fr(mean_value, 0)} {target_currency}")
                 with cols[3]:
-                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
+                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 0)} {target_currency}")
                 with cols[4]:
-                    st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}", delta=delta_str)
+                    st.metric(label="Clôture", value=f"{format_fr(close_value, 0)} {target_currency}", delta=delta_str)
             else:
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
 
