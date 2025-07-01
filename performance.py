@@ -330,7 +330,7 @@ def display_performance_history():
                 yaxis2_title="RSI",
                 yaxis3_title="MACD",
                 xaxis3_title="",
-                title_x=0.5,
+                title_x=0.0,
                 margin=dict(t=50, b=50)
             )
             fig_total.update_yaxes(range=[0, 100], row=2, col=1)  # RSI entre 0 et 100
