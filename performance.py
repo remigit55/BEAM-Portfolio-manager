@@ -237,7 +237,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['Valeur Totale'],
                     mode='lines',
                     name=f'Valeur Totale ({target_currency})',
-                    line=dict(color='#363636'),
+                    line=dict(color='#363636', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
                 ),
                 row=1, col=1
@@ -248,7 +248,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MA50'],
                     mode='lines',
                     name='MA50',
-                    line=dict(color='orange', dash='dash'),
+                    line=dict(color='orange', dash='dash', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
                 ),
                 row=1, col=1
@@ -259,7 +259,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MA200'],
                     mode='lines',
                     name='MA200',
-                    line=dict(color='green', dash='dash'),
+                    line=dict(color='green', dash='dash', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
                 ),
                 row=1, col=1
@@ -272,17 +272,17 @@ def display_performance_history():
                     y=df_total_daily_value_display['RSI'],
                     mode='lines',
                     name='RSI (14)',
-                    line=dict(color='#363636'),
+                    line=dict(color='#363636', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>RSI: %{y:.2f}<extra></extra>'
                 ),
                 row=2, col=1
             )
             fig_total.add_hline(
-                y=70, line_dash="dash", line_color="grey", annotation_text="Surachat (70)",
+                y=70, line_dash="dash", line_color="grey", width=1, annotation_text="Surachat (70)",
                 annotation_position="right", row=2, col=1
             )
             fig_total.add_hline(
-                y=30, line_dash="dash", line_color="grey", annotation_text="Survente (30)",
+                y=30, line_dash="dash", line_color="grey", width=1, annotation_text="Survente (30)",
                 annotation_position="right", row=2, col=1
             )
 
@@ -293,7 +293,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MACD'],
                     mode='lines',
                     name='MACD',
-                    line=dict(color='#363636'),
+                    line=dict(color='#363636', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>MACD: %{y:.2f}<extra></extra>'
                 ),
                 row=3, col=1
@@ -304,7 +304,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MACD_Signal'],
                     mode='lines',
                     name='Signal',
-                    line=dict(color='#A49B6D'),
+                    line=dict(color='#A49B6D', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Signal: %{y:.2f}<extra></extra>'
                 ),
                 row=3, col=1
@@ -388,7 +388,7 @@ def display_performance_history():
                     y=df_volatility_display['Volatilité'],
                     mode='lines',
                     name='Volatilité Annualisée',
-                    line=dict(color='#363636'),
+                    line=dict(color='#363636', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
@@ -396,7 +396,7 @@ def display_performance_history():
                     y=df_volatility_display['Volatilité_MA50'],
                     mode='lines',
                     name='MA50 (Volatilité)',
-                    line=dict(color='orange', dash='dash'),
+                    line=dict(color='orange', dash='dash', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
@@ -404,7 +404,7 @@ def display_performance_history():
                     y=df_volatility_display['Volatilité_MA200'],
                     mode='lines',
                     name='MA200 (Volatilité)',
-                    line=dict(color='green', dash='dash'),
+                    line=dict(color='green', dash='dash', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
@@ -412,7 +412,7 @@ def display_performance_history():
                     y=[target_volatility, target_volatility],
                     mode='lines',
                     name='Objectif Volatilité',
-                    line=dict(color='red', dash='dot'),
+                    line=dict(color='red', dash='dot', width=1),
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
@@ -459,7 +459,7 @@ def display_performance_history():
                     y=df_z_score_display['Z-score_70'],
                     mode='lines',
                     name='Z-score (70 jours)',
-                    line=dict(color='#363636'),
+                    line=dict(color='#363636', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (70 jours): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
@@ -467,7 +467,7 @@ def display_performance_history():
                     y=df_z_score_display['Z-score_36mois'],
                     mode='lines',
                     name='Z-score (36 mois)',
-                    line=dict(color='green'),
+                    line=dict(color='green', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (36 mois): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
