@@ -324,11 +324,12 @@ def display_performance_history():
                 height=800,  # Augmenter la hauteur pour accueillir les sous-graphiques
                 showlegend=True,
                 hovermode="x unified",
-                xaxis_title="Date",
+                title=f"Valeur du Portefeuille | par jour en {target_currency}",
+                xaxis_title="",
                 yaxis_title=f"Valeur Totale ({target_currency})",
                 yaxis2_title="RSI",
                 yaxis3_title="MACD",
-                xaxis3_title="Date",
+                xaxis3_title="",
                 title_x=0.5,
                 margin=dict(t=50, b=50)
             )
@@ -414,7 +415,7 @@ def display_performance_history():
                 ))
                 fig_volatility.update_layout(
                     title=f"Volatilité | Fenêtre de {window_size} jours",
-                    xaxis_title="Date",
+                    xaxis_title="",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
                     showlegend=True
@@ -469,7 +470,7 @@ def display_performance_history():
                 ))
                 fig_z_score.update_layout(
                     title="Momentum | Z-scores sur 70 jours et 36 mois",
-                    xaxis_title="Date",
+                    xaxis_title="",
                     yaxis_title="Z-score",
                     hovermode="x unified",
                     showlegend=True
