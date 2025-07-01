@@ -298,7 +298,7 @@ def display_performance_history():
                 hovermode="x unified",
                 title=f"Valeur du Portefeuille | par jour en {target_currency}",
                 xaxis_title="",
-                yaxis_title=f"Valeur Totale ({target_currency})",
+                yaxis_title=f"Valeur",
                 yaxis2_title="RSI",
                 yaxis3_title="MACD",
                 xaxis3_title="",
