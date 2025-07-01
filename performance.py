@@ -93,7 +93,7 @@ def display_performance_history():
         "20Y": timedelta(days=365 * 20)
     }
     period_labels = list(period_options.keys())
-    current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1W")
+    current_selected_label = st.session_state.get("selected_ticker_table_period_label", "1Y")
     if current_selected_label not in period_labels:
         current_selected_label = "1W"
     default_period_index = period_labels.index(current_selected_label)
