@@ -163,7 +163,7 @@ def display_performance_history():
                 (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
                 (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
             ]
-            st.markdown("---")
+            # st.markdown("---")
             st.markdown("#### Performance du Portefeuille")
             fig_total = make_subplots(
                 rows=3, cols=1,
@@ -494,5 +494,5 @@ def display_performance_history():
 
             format_dict = {col: lambda x: f"{format_fr(x, 2)} {target_currency}" if pd.notnull(x) else "N/A" for col in df_final_display.columns if "Valeur Actuelle (" in col}
 
-            st.markdown(f"##### Valeur Actuelle du Portefeuille | en {target_currency}")
+            st.markdown(f"#### Valeur Actuelle du Portefeuille | en {target_currency}")
             st.dataframe(df_final_display.style.format(format_dict), use_container_width=True, hide_index=True)
