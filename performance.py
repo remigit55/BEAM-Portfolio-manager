@@ -434,7 +434,7 @@ def display_performance_history():
                     y=df_z_score_display['Z-score_36mois'],
                     mode='lines',
                     name='Z-score (36 mois)',
-                    line=dict(color='green', width=1),
+                    line=dict(color='#A49B6D', width=1),
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (36 mois): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.update_layout(
