@@ -278,11 +278,11 @@ def display_performance_history():
                 row=2, col=1
             )
             fig_total.add_hline(
-                y=70, line_dash="dash", line_color="grey", annotation_text="Surachat (70)",
+                y=70, line_dash="dash", line_color="#E8E8E8", annotation_text="Surachat (70)",
                 annotation_position="right", row=2, col=1
             )
             fig_total.add_hline(
-                y=30, line_dash="dash", line_color="grey", annotation_text="Survente (30)",
+                y=30, line_dash="dash", line_color="#E8E8E8", annotation_text="Survente (30)",
                 annotation_position="right", row=2, col=1
             )
 
@@ -304,7 +304,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MACD_Signal'],
                     mode='lines',
                     name='Signal',
-                    line=dict(color='orange'),
+                    line=dict(color='#A49B6D'),
                     hovertemplate='%{x|%d/%m/%Y}<br>Signal: %{y:.2f}<extra></extra>'
                 ),
                 row=3, col=1
