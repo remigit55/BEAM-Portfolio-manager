@@ -278,11 +278,11 @@ def display_performance_history():
                 row=2, col=1
             )
             fig_total.add_hline(
-                y=70, line_dash="dash", line_color="grey", width=1, annotation_text="Surachat (70)",
+                y=70, line_dash="dash", line_color="grey", annotation_text="Surachat (70)",
                 annotation_position="right", row=2, col=1
             )
             fig_total.add_hline(
-                y=30, line_dash="dash", line_color="grey", width=1, annotation_text="Survente (30)",
+                y=30, line_dash="dash", line_color="grey", annotation_text="Survente (30)",
                 annotation_position="right", row=2, col=1
             )
 
