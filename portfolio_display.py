@@ -444,12 +444,12 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
     with col1:
         st.metric(
             label=f"**Valeur d'Acquisition ({devise_cible})**",
-            value=f"{format_fr(total_valeur, 2)} {devise_cible}"
+            value=f"{format_fr(total_valeur, 0)} {devise_cible}"
         )
     with col2:
         st.metric(
             label=f"**Valeur Actuelle ({devise_cible})**",
-            value=f"{format_fr(total_actuelle, 2)} {devise_cible}"
+            value=f"{format_fr(total_actuelle, 0)} {devise_cible}"
         )
     
     if total_valeur != 0 and pd.notna(total_valeur) and pd.notna(total_actuelle):
@@ -458,7 +458,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         with col3:
             st.metric(
                 label="**Gain/Perte Total**",
-                value=f"{format_fr(gain_perte_abs, 2)} {devise_cible}",
+                value=f"{format_fr(gain_perte_abs, 0)} {devise_cible}",
                 delta=f"{format_fr(pourcentage_gain_perte, 2)} %"
             )
     else:
@@ -470,7 +470,7 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
             )
 
     with col4:
-        lt_display = format_fr(total_lt, 2) if pd.notna(total_lt) else "N/A"
+        lt_display = format_fr(total_lt, 0) if pd.notna(total_lt) else "N/A"
         st.metric(
             label=f"**Objectif LT ({devise_cible})**",  
             value=f"{lt_display} {devise_cible}"
