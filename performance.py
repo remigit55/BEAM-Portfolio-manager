@@ -237,6 +237,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['Valeur Totale'],
                     mode='lines',
                     name=f'Valeur Totale ({target_currency})',
+                    line=dict(color='#363636'),
                     hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
                 ),
                 row=1, col=1
@@ -271,7 +272,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['RSI'],
                     mode='lines',
                     name='RSI (14)',
-                    line=dict(color='blue'),
+                    line=dict(color='#363636'),
                     hovertemplate='%{x|%d/%m/%Y}<br>RSI: %{y:.2f}<extra></extra>'
                 ),
                 row=2, col=1
@@ -292,7 +293,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['MACD'],
                     mode='lines',
                     name='MACD',
-                    line=dict(color='blue'),
+                    line=dict(color='#363636'),
                     hovertemplate='%{x|%d/%m/%Y}<br>MACD: %{y:.2f}<extra></extra>'
                 ),
                 row=3, col=1
@@ -387,6 +388,7 @@ def display_performance_history():
                     y=df_volatility_display['Volatilité'],
                     mode='lines',
                     name='Volatilité Annualisée',
+                    line=dict(color='#363636'),
                     hovertemplate='%{x|%d/%m/%Y}<br>Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.add_trace(go.Scatter(
@@ -457,7 +459,7 @@ def display_performance_history():
                     y=df_z_score_display['Z-score_70'],
                     mode='lines',
                     name='Z-score (70 jours)',
-                    line=dict(color='blue'),
+                    line=dict(color='#363636'),
                     hovertemplate='%{x|%d/%m/%Y}<br>Z-score (70 jours): %{y:.2f}<extra></extra>'
                 ))
                 fig_z_score.add_trace(go.Scatter(
