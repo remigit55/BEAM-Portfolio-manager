@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from pandas.tseries.offsets import BDay
 from data_fetcher import fetch_fx_rates
@@ -11,6 +12,44 @@ from historical_data_fetcher import fetch_stock_history, fetch_historical_fx_rat
 from historical_performance_calculator import reconstruct_historical_portfolio_value
 from utils import format_fr
 from portfolio_display import convertir
+
+def calculate_rsi(data, periods=14):
+    """
+    Calcule le RSI (Relative Strength Index) sur une série de données.
+    
+    Args:
+        data (pd.Series): Série de données (par exemple, Valeur Totale).
+        periods (int): Période pour le calcul du RSI (défaut : 14).
+    
+    Returns:
+        pd.Series: RSI calculé.
+    """
+    delta = data.diff()
+    gain = delta.where(delta > 0, 0).rolling(window=periods, min_periods=1).mean()
+    loss = -delta.where(delta < 0, 0).rolling(window=periods, min_periods=1).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.fillna(50)  # Remplir NaN avec 50 pour éviter des erreurs initiales
+
+def calculate_macd(data, fast_period=12, slow_period=26, signal_period=9):
+    """
+    Calcule le MACD (Moving Average Convergence Divergence).
+    
+    Args:
+        data (pd.Series): Série de données (par exemple, Valeur Totale).
+        fast_period (int): Période pour l'EMA rapide (défaut : 12).
+        slow_period (int): Période pour l'EMA lente (défaut : 26).
+        signal_period (int): Période pour la ligne de signal (défaut : 9).
+    
+    Returns:
+        tuple: (macd, signal, histogramme)
+    """
+    ema_fast = data.ewm(span=fast_period, adjust=False).mean()
+    ema_slow = data.ewm(span=slow_period, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal = macd.ewm(span=signal_period, adjust=False).mean()
+    hist = macd - signal
+    return macd, signal, hist
 
 def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
     """
@@ -159,6 +198,12 @@ def display_performance_history():
             df_total_daily_value['MA50'] = df_total_daily_value['Valeur Totale'].rolling(window=50, min_periods=1).mean()
             df_total_daily_value['MA200'] = df_total_daily_value['Valeur Totale'].rolling(window=200, min_periods=1).mean()
 
+            # Calcul du RSI et du MACD
+            df_total_daily_value['RSI'] = calculate_rsi(df_total_daily_value['Valeur Totale'], periods=14)
+            df_total_daily_value['MACD'], df_total_daily_value['MACD_Signal'], df_total_daily_value['MACD_Hist'] = calculate_macd(
+                df_total_daily_value['Valeur Totale'], fast_period=12, slow_period=26, signal_period=9
+            )
+
             # Vérifier si MA200 est calculable
             min_date = df_total_daily_value['Date'].min()
             if pd.notna(min_date) and min_date > pd.Timestamp(end_date_table - timedelta(days=200)):
@@ -172,45 +217,130 @@ def display_performance_history():
 
             st.markdown("---")
             st.markdown("#### Performance du Portefeuille")
-            fig_total = go.Figure()
-            fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['Valeur Totale'],
-                mode='lines',
-                name=f'Valeur Totale ({target_currency})',
-                hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
-            ))
-            fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['MA50'],
-                mode='lines',
-                name='MA50',
-                line=dict(color='orange', dash='dash'),
-                hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
-            ))
-            fig_total.add_trace(go.Scatter(
-                x=df_total_daily_value_display['Date'],
-                y=df_total_daily_value_display['MA200'],
-                mode='lines',
-                name='MA200',
-                line=dict(color='green', dash='dash'),
-                hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
-            ))
+            # Créer une figure avec sous-graphiques
+            fig_total = make_subplots(
+                rows=3, cols=1,
+                row_heights=[0.6, 0.2, 0.2],
+                shared_xaxes=True,
+                vertical_spacing=0.05,
+                subplot_titles=[
+                    f"Valeur du Portefeuille | par jour en {target_currency}",
+                    "RSI (14 jours)",
+                    "MACD (12, 26, 9)"
+                ]
+            )
+
+            # Graphique principal : Valeur Totale, MA50, MA200
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['Valeur Totale'],
+                    mode='lines',
+                    name=f'Valeur Totale ({target_currency})',
+                    hovertemplate='%{x|%d/%m/%Y}<br>Valeur: %{y:.2f}<extra></extra>'
+                ),
+                row=1, col=1
+            )
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['MA50'],
+                    mode='lines',
+                    name='MA50',
+                    line=dict(color='orange', dash='dash'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>MA50: %{y:.2f}<extra></extra>'
+                ),
+                row=1, col=1
+            )
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['MA200'],
+                    mode='lines',
+                    name='MA200',
+                    line=dict(color='green', dash='dash'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>MA200: %{y:.2f}<extra></extra>'
+                ),
+                row=1, col=1
+            )
+
+            # Sous-graphique RSI
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['RSI'],
+                    mode='lines',
+                    name='RSI (14)',
+                    line=dict(color='purple'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>RSI: %{y:.2f}<extra></extra>'
+                ),
+                row=2, col=1
+            )
+            fig_total.add_hline(
+                y=70, line_dash="dash", line_color="red", annotation_text="Surachat (70)",
+                annotation_position="right", row=2, col=1
+            )
+            fig_total.add_hline(
+                y=30, line_dash="dash", line_color="green", annotation_text="Survente (30)",
+                annotation_position="right", row=2, col=1
+            )
+
+            # Sous-graphique MACD
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['MACD'],
+                    mode='lines',
+                    name='MACD',
+                    line=dict(color='blue'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>MACD: %{y:.2f}<extra></extra>'
+                ),
+                row=3, col=1
+            )
+            fig_total.add_trace(
+                go.Scatter(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['MACD_Signal'],
+                    mode='lines',
+                    name='Signal',
+                    line=dict(color='orange', dash='dash'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>Signal: %{y:.2f}<extra></extra>'
+                ),
+                row=3, col=1
+            )
+            fig_total.add_trace(
+                go.Bar(
+                    x=df_total_daily_value_display['Date'],
+                    y=df_total_daily_value_display['MACD_Hist'],
+                    name='Histogramme MACD',
+                    marker_color=df_total_daily_value_display['MACD_Hist'].apply(lambda x: 'green' if x >= 0 else 'red'),
+                    hovertemplate='%{x|%d/%m/%Y}<br>Hist: %{y:.2f}<extra></extra>'
+                ),
+                row=3, col=1
+            )
+
+            # Mise à jour du layout
             fig_total.update_layout(
-                title=f"Valeur du Portefeuille | par jour en {target_currency}",
+                height=800,  # Augmenter la hauteur pour accueillir les sous-graphiques
+                showlegend=True,
+                hovermode="x unified",
                 xaxis_title="Date",
                 yaxis_title=f"Valeur Totale ({target_currency})",
-                hovermode="x unified",
-                showlegend=True
+                yaxis2_title="RSI",
+                yaxis3_title="MACD",
+                xaxis3_title="Date",
+                title_x=0.5,
+                margin=dict(t=50, b=50)
             )
+            fig_total.update_yaxes(range=[0, 100], row=2, col=1)  # RSI entre 0 et 100
             st.plotly_chart(fig_total, use_container_width=True)
 
             # Ajout des indicateurs Plus Haut, Plus Bas, Ouverture, Valeur Moyenne, Clôture
             if not df_total_daily_value_display.empty:
-                open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
-                low_value = df_total_daily_value_display['Valeur Totale'].min()
-                mean_value = df_total_daily_value_display['Valeur Totale'].mean()
                 high_value = df_total_daily_value_display['Valeur Totale'].max()
+                low_value = df_total_daily_value_display['Valeur Totale'].min()
+                open_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].min(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
+                mean_value = df_total_daily_value_display['Valeur Totale'].mean()
                 close_value = df_total_daily_value_display.loc[df_total_daily_value_display['Date'] == df_total_daily_value_display['Date'].max(), 'Valeur Totale'].iloc[0] if not df_total_daily_value_display.empty else np.nan
                 # Calcul de la variation en pourcentage pour Clôture
                 if pd.notna(open_value) and pd.notna(close_value) and open_value != 0:
@@ -221,21 +351,21 @@ def display_performance_history():
 
                 cols = st.columns(5)
                 with cols[0]:
-                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 0)} {target_currency}")
+                    st.metric(label="Ouverture", value=f"{format_fr(open_value, 2)} {target_currency}")
                 with cols[1]:
-                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 0)} {target_currency}")
+                    st.metric(label="Plus Bas", value=f"{format_fr(low_value, 2)} {target_currency}")
                 with cols[2]:
-                    st.metric(label="Valeur Moyenne", value=f"{format_fr(mean_value, 0)} {target_currency}")
+                    st.metric(label="Valeur Moyenne", value=f"{format_fr(mean_value, 2)} {target_currency}")
                 with cols[3]:
-                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 0)} {target_currency}")
+                    st.metric(label="Plus Haut", value=f"{format_fr(high_value, 2)} {target_currency}")
                 with cols[4]:
-                    st.metric(label="Clôture", value=f"{format_fr(close_value, 0)} {target_currency}", delta=delta_str)
+                    st.metric(label="Clôture", value=f"{format_fr(close_value, 2)} {target_currency}", delta=delta_str)
             else:
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
 
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
-            # st.markdown("---")
-            # st.markdown("#### Volatilité Quotidienne du Portefeuille")
+            st.markdown("---")
+            st.markdown("#### Volatilité Quotidienne du Portefeuille")
             # Utiliser la valeur de target_volatility définie dans parametres.py
             target_volatility = st.session_state.get("target_volatility", 0.15)
 
@@ -283,7 +413,7 @@ def display_performance_history():
                     hovertemplate='Objectif Volatilité: %{y:.4f}<extra></extra>'
                 ))
                 fig_volatility.update_layout(
-                    title=f"Volatilité quotidienne du portefeuille | Fenêtre de {window_size} jours",
+                    title=f"Volatilité | Fenêtre de {window_size} jours",
                     xaxis_title="Date",
                     yaxis_title="Volatilité Annualisée",
                     hovermode="x unified",
@@ -292,8 +422,8 @@ def display_performance_history():
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
             # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
-            # st.markdown("---")
-            # st.markdown("#### Momentum du Portefeuille")
+            st.markdown("---")
+            st.markdown("#### Momentum du Portefeuille")
             # Calcul du Z-score pour une fenêtre de 70 jours
             df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
             df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
@@ -356,17 +486,17 @@ def display_performance_history():
                     if z_score_70 > 1 and z_score_36mois > 0:
                         signal = "Haussier"
                         action = "Acheter"
-                        justification = f"Court terme fort avec long terme positif"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) > 1 et Z-score_36mois ({z_score_36mois:.2f}) > 0 : Momentum court terme fort avec tendance long terme positive."
                     elif z_score_70 < -1 and z_score_36mois < 0:
                         signal = "Baissier"
                         action = "Vendre"
-                        justification = f"Court terme faible avec long terme négatif"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) < -1 et Z-score_36mois ({z_score_36mois:.2f}) < 0 : Momentum court terme faible avec tendance long terme négative."
                     else:
                         signal = "Neutre"
                         action = "Conserver"
-                        justification = f"Pas d'alignement clair pour une action décisive"
+                        justification = f"Z-score_70 ({z_score_70:.2f}) et Z-score_36mois ({z_score_36mois:.2f}) ne montrent pas d'alignement clair pour une action décisive."
 
-                    cols = st.columns([1, 1, 3])
+                    cols = st.columns([1, 1, 2])
                     with cols[0]:
                         st.metric(label="Signal", value=signal)
                     with cols[1]:
