@@ -271,7 +271,7 @@ def display_performance_history():
                     y=df_total_daily_value_display['RSI'],
                     mode='lines',
                     name='RSI (14)',
-                    line=dict(color='purple'),
+                    line=dict(color='blue'),
                     hovertemplate='%{x|%d/%m/%Y}<br>RSI: %{y:.2f}<extra></extra>'
                 ),
                 row=2, col=1
