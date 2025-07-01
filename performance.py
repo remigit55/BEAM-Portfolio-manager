@@ -224,9 +224,9 @@ def display_performance_history():
                 shared_xaxes=True,
                 vertical_spacing=0.05,
                 subplot_titles=[
-                    f"Valeur du Portefeuille | par jour en {target_currency}",
-                    "RSI (14 jours)",
-                    "MACD (12, 26, 9)"
+                    "",
+                    "",
+                    ""
                 ]
             )
 
@@ -364,8 +364,8 @@ def display_performance_history():
                 st.warning("⚠️ Aucune donnée disponible pour calculer les indicateurs sur la période sélectionnée.")
 
             # Graphique : Volatilité avec MA50, MA200 et objectif de volatilité
-            st.markdown("---")
-            st.markdown("#### Volatilité Quotidienne du Portefeuille")
+            # st.markdown("---")
+            # st.markdown("#### Volatilité Quotidienne du Portefeuille")
             # Utiliser la valeur de target_volatility définie dans parametres.py
             target_volatility = st.session_state.get("target_volatility", 0.15)
 
@@ -422,8 +422,8 @@ def display_performance_history():
                 st.plotly_chart(fig_volatility, use_container_width=True)
 
             # Graphique : Z-score (Momentum) avec Z-score_70 et Z-score_36mois
-            st.markdown("---")
-            st.markdown("#### Momentum du Portefeuille")
+            # st.markdown("---")
+            # st.markdown("#### Momentum du Portefeuille")
             # Calcul du Z-score pour une fenêtre de 70 jours
             df_total_daily_value['MA_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).mean()
             df_total_daily_value['STD_Z_70'] = df_total_daily_value['Valeur Totale'].rolling(window=70, min_periods=1).std()
