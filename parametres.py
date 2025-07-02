@@ -149,7 +149,7 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
 
         st.markdown(f"**Total alloué : {total_alloc_input:.2f}%**")
 
-        submitted = st.form_submit_button("Enregistrer les objectifs", key="save_allocations_button")
+        submitted = st.form_submit_button("Enregistrer les objectifs", key="submit_allocations_form_button")
         if submitted:
             if abs(total_alloc_input - 100.0) > 0.1: # Allow for slight floating point inaccuracies
                 st.error("❌ La somme des allocations doit faire exactement 100 %. Vous avez actuellement {:.2f} %.".format(total_alloc_input))
