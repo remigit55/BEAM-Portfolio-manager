@@ -11,93 +11,98 @@ import pytz
 from utils import safe_escape, format_fr
 
 # Import des fonctions de récupération de données
+# Ces imports devraient être dans votre fichier principal (streamlit_app.py)
+# ou gérés via st.cache_data si elles sont appelées directement ici et sont coûteuses.
+# Pour l'instant, je les laisse comme dans votre base, mais attention au contexte d'appel.
 from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 
-def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_cat="Catégorie", colonne_valeur="Valeur Actuelle"):
+def calculer_reallocation_miniere(df, allocations_reelles, objectifs, colonne_cat="Catégories", colonne_valeur="Valeur_Actuelle_conv"):
+    """
+    Calcule l'ajustement nécessaire pour la catégorie "Minières"
+    en se basant sur la dérive d'une autre catégorie majeure.
+    """
     if "Minières" not in allocations_reelles or "Minières" not in objectifs:
-        return None
+        return np.nan # Retourne NaN si les clés ne sont pas présentes
 
-    # Calcul des dérives relatives hors Minières
-    derive_abs = {
-        cat: abs(allocations_reelles[cat] - objectifs.get(cat, 0))
-        for cat in allocations_reelles
-        if cat != "Minières" and cat in objectifs
-    }
+    # Calcul des dérives absolues hors Minières pour trouver la catégorie de référence
+    derive_abs = {}
+    for cat in allocations_reelles:
+        if cat != "Minières" and cat in objectifs:
+            derive_abs[cat] = abs(allocations_reelles[cat] - objectifs[cat])
 
     if not derive_abs:
-        return None
+        return np.nan # Aucune autre catégorie pour se baser
 
-    # Catégorie avec la plus forte dérive absolue
+    # Catégorie avec la plus forte dérive absolue (peut être sous ou sur-pondérée)
     cat_ref = max(derive_abs, key=derive_abs.get)
 
     valeur_cat_ref = df[df[colonne_cat] == cat_ref][colonne_valeur].sum()
-    objectif_cat_ref = objectifs[cat_ref]
-    objectif_miniere = objectifs["Minières"]
+    objectif_cat_ref_pct = objectifs[cat_ref] # Objectif en pourcentage (ex: 0.25)
+    objectif_miniere_pct = objectifs["Minières"] # Objectif Minières en pourcentage (ex: 0.41)
+
+    if objectif_cat_ref_pct == 0:
+        return np.nan # Évite la division par zéro
+
+    # Calcule la taille théorique du portefeuille basée sur la catégorie de référence
+    # Si la catégorie de référence est sur-pondérée, cela donnera une valeur de portefeuille plus petite,
+    # et vice-versa.
+    if allocations_reelles[cat_ref] > objectifs[cat_ref]: # Si la catégorie de référence est sur-pondérée
+        # On estime la taille du portefeuille si cette catégorie était à son objectif
+        # => cela indique une surpondération globale par rapport aux objectifs
+        # et donc potentiellement un besoin de réduire la taille des Minières.
+        theoretical_portfolio_total = valeur_cat_ref / objectifs[cat_ref]
+    else: # Si la catégorie de référence est sous-pondérée
+        # On estime la taille du portefeuille si cette catégorie était à son objectif
+        # => cela indique une sous-pondération globale par rapport aux objectifs
+        # et donc potentiellement un besoin d'augmenter la taille des Minières.
+        theoretical_portfolio_total = valeur_cat_ref / objectifs[cat_ref]
+
+    # Valeur cible recalculée pour Minières basée sur cette taille théorique
+    valeur_cible_miniere = theoretical_portfolio_total * objectif_miniere_pct
     valeur_actuelle_miniere = df[df[colonne_cat] == "Minières"][colonne_valeur].sum()
 
-    if objectif_cat_ref == 0:
-        return None
+    # L'ajustement nécessaire est la différence entre la valeur cible et la valeur actuelle des Minières
+    return valeur_cible_miniere - valeur_actuelle_miniere
 
-    # Valeur cible recalculée pour Minières
-    valeur_cible_miniere = (valeur_cat_ref / objectif_cat_ref) * objectif_miniere
-
-    # Si sous-pondération, on propose une réallocation
-    if allocations_reelles["Minières"] < objectif_miniere:
-        return valeur_cible_miniere - valeur_actuelle_miniere
-    else:
-        return 0
-
-def convertir(val, source_devise, devise_cible, fx_rates_or_scalar, fx_adjustment_factor=1.0):
+def convertir(val, source_devise, devise_cible, fx_rates, fx_adjustment_factor=1.0):
     """
     Convertit une valeur d'une devise source vers la devise cible en utilisant les taux de change fournis.
-    Peut accepter un dictionnaire de taux de change (clé: devise source, valeur: taux)
-    ou un taux scalaire direct.
+    `fx_rates` est un dictionnaire où les clés sont les codes de devises (ex: "USD")
+    et les valeurs sont le taux de conversion de cette devise vers la `devise_cible`.
     Applique également un facteur d'ajustement supplémentaire au taux de change.
     Retourne la valeur convertie et le taux utilisé (après ajustement).
     """
     if pd.isnull(val):
-        return np.nan, np.nan  # Retourne NaN pour la valeur et le taux si la valeur est NaN
+        return np.nan, np.nan
 
-    source_devise = str(source_devise).strip().upper()  # Nettoyer et normaliser
+    source_devise = str(source_devise).strip().upper()
     devise_cible = str(devise_cible).strip().upper()
     
     if source_devise == devise_cible:
-        return val, 1.0  # Si c'est la même devise, pas de conversion, taux = 1.0
+        return val, 1.0
 
-    taux_scalar = np.nan
-    if isinstance(fx_rates_or_scalar, dict):
-        # Si c'est un dictionnaire, on cherche le taux par la devise source
-        fx_key = source_devise
-        raw_taux = fx_rates_or_scalar.get(fx_key)
-        try:
-            taux_scalar = float(raw_taux)
-        except (TypeError, ValueError):
-            taux_scalar = np.nan
-    elif isinstance(fx_rates_or_scalar, (float, int, np.floating, np.integer)):
-        # Si c'est un scalaire, on l'utilise directement
-        taux_scalar = float(fx_rates_or_scalar)
-    else:
-        st.warning(f"Type de taux de change inattendu: {type(fx_rates_or_scalar)}. Utilisation de 1.0.")
-        taux_scalar = 1.0  # Valeur par défaut si le type est inattendu
-
-    if pd.isna(taux_scalar) or taux_scalar == 0:
-        st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
-        return val, np.nan  # Retourne la valeur originale et un taux NaN
+    taux_scalar = fx_rates.get(source_devise)
     
+    if pd.isna(taux_scalar) or taux_scalar == 0:
+        # st.warning(f"Pas de conversion pour {source_devise} vers {devise_cible}: taux manquant ou invalide ({taux_scalar}).")
+        return val, np.nan # Retourne la valeur originale et un taux NaN
+
     # Appliquer le facteur d'ajustement au taux de change
     if pd.notnull(fx_adjustment_factor) and fx_adjustment_factor != 0:
         taux_scalar /= fx_adjustment_factor
         
-    return val * taux_scalar, taux_scalar  # Retourne la valeur convertie ET le taux utilisé
+    return val * taux_scalar, taux_scalar
 
 def afficher_portefeuille():
     """
     Affiche le portefeuille de l'utilisateur, gère les calculs et l'affichage.
-    Récupère les données externes via des fonctions dédiées.
+    Récupère les données externes via des fonctions dédiées (attend que ces fonctions
+    soient appelées avant, ou les appelle si elles ne sont pas mises en cache).
     Retourne les totaux convertis pour la synthèse.
     """
     if "df" not in st.session_state or st.session_state.df is None or st.session_state.df.empty:
         st.warning("Aucune donnée de portefeuille n’a encore été importée.")
+        # Retourne des valeurs nulles pour éviter des erreurs dans la synthèse
         return None, None, None, None
 
     df = st.session_state.df.copy()
@@ -108,18 +113,10 @@ def afficher_portefeuille():
     
     devise_cible = st.session_state.get("devise_cible", "EUR")
     
-    # --- Étape 1 : récupérer les devises sans les upper pour ne pas écraser "GBp" ---
-    if "fx_rates" not in st.session_state or st.session_state.fx_rates is None:
-        devises_uniques_df = df["Devise"].dropna().astype(str).str.strip().unique().tolist() if "Devise" in df.columns else []
-    
-        # --- Étape 2 : créer la version upper uniquement pour la requête des taux ---
-        devises_uppercase = [d.upper() for d in devises_uniques_df]
-        devises_a_fetch = list(set([devise_cible.upper()] + devises_uppercase))
-    
-        # --- Étape 3 : récupérer les taux ---
-        st.session_state.fx_rates = fetch_fx_rates(devise_cible)
-    
-    fx_rates = st.session_state.fx_rates
+    # Récupération des taux de change, s'ils ne sont pas déjà en cache ou obsolètes
+    # Ces appels sont maintenant gérés par streamlit_app.py et les résultats
+    # sont stockés dans st.session_state.
+    fx_rates = st.session_state.get("fx_rates", {})
     
     # --- Vérification des taux manquants (on utilise ici les uppercase uniquement pour la vérification) ---
     devises_utilisees_upper = df["Devise"].dropna().astype(str).str.strip().str.upper().unique().tolist() if "Devise" in df.columns else []
@@ -133,7 +130,6 @@ def afficher_portefeuille():
             f"Taux de change manquants pour les devises : {', '.join(missing_rates)}. "
             f"Les valeurs ne seront pas converties pour ces devises."
         )
-
 
     # Nettoyage et migration des colonnes numériques
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
@@ -150,69 +146,43 @@ def afficher_portefeuille():
 
     # Nettoyage de la colonne Devise
     if "Devise" in df.columns:
-        df["Devise"] = df["Devise"].astype(str).str.strip().str.upper().fillna(devise_cible)
+        df["Devise"] = df["Devise"].astype(str).str.strip().fillna(devise_cible) # Pas de .upper() ici pour GBp
     else:
         st.error("Colonne 'Devise' absente. Utilisation de la devise cible par défaut.")
         df["Devise"] = devise_cible
 
     # GESTION DE LA COLONNE 'CATÉGORIES'
-    if "Categories" in df.columns:  
-        df["Catégories"] = df["Categories"].astype(str).fillna("").str.strip()  
+    if "Catégories" in df.columns:  
+        df["Catégories"] = df["Catégories"].astype(str).fillna("").str.strip()  
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
-    elif any(col.strip().lower() in ["categories", "catégorie", "category"] for col in df.columns):
-        cat_col = next(col for col in df.columns if col.strip().lower() in ["categories", "catégorie", "category"])
-        df["Catégories"] = df[cat_col].astype(str).fillna("").str.strip()
+    elif "Categories" in df.columns: # Gérer les fautes de frappe "Categories"
+        df.rename(columns={"Categories": "Catégories"}, inplace=True)
+        df["Catégories"] = df["Catégories"].astype(str).fillna("").str.strip()
+        df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
+    elif any(col.strip().lower() in ["catégorie", "category"] for col in df.columns):
+        cat_col = next(col for col in df.columns if col.strip().lower() in ["catégorie", "category"])
+        df.rename(columns={cat_col: "Catégories"}, inplace=True)
+        df["Catégories"] = df["Catégories"].astype(str).fillna("").str.strip()
         df["Catégories"] = df["Catégories"].replace("", np.nan).fillna("Non classé")
     else:
-        st.warning("ATTENTION: Aucune colonne 'Categories' ou équivalente introuvable. 'Catégories' sera 'Non classé'.")
+        st.warning("ATTENTION: Aucune colonne 'Catégories' ou équivalente introuvable. 'Catégories' sera 'Non classé'.")
         df["Catégories"] = "Non classé"
 
     # Déterminer la colonne Ticker
     ticker_col = "Ticker" if "Ticker" in df.columns else "Tickers" if "Tickers" in df.columns else None
     
-    # Initialisation des caches
-    if "ticker_data_cache" not in st.session_state:
-        st.session_state.ticker_data_cache = {}
-    if "momentum_results_cache" not in st.session_state:
-        st.session_state.momentum_results_cache = {}
+    # Les données Yahoo et Momentum sont supposées être déjà dans st.session_state
+    # ou être rafraîchies par le fichier principal via data_fetcher
+    
+    df["shortName"] = df[ticker_col].map(lambda t: st.session_state.get("yahoo_data", {}).get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}") if pd.notnull(t) else "")
+    df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.get("yahoo_data", {}).get(t, {}).get("currentPrice", np.nan) if pd.notnull(t) else np.nan)
+    df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: st.session_state.get("yahoo_data", {}).get(t, {}).get("fiftyTwoWeekHigh", np.nan) if pd.notnull(t) else np.nan)
 
-    # Récupération des données pour chaque ticker
-    if ticker_col and not df[ticker_col].dropna().empty:
-        unique_tickers = df[ticker_col].dropna().unique()
-        for ticker in unique_tickers:
-            if ticker not in st.session_state.ticker_data_cache:
-                st.session_state.ticker_data_cache[ticker] = fetch_yahoo_data(ticker)
-            if ticker not in st.session_state.momentum_results_cache:
-                st.session_state.momentum_results_cache[ticker] = fetch_momentum_data(ticker)
-
-        # Obtenir l'heure actuelle en UTC
-        utc_now = datetime.datetime.now(datetime.timezone.utc)
-        try:
-            paris_tz = pytz.timezone('Europe/Paris')
-            local_time = utc_now.astimezone(paris_tz)
-            st.session_state["last_yfinance_update"] = local_time.strftime("%d/%m/%Y à %H:%M:%S")
-        except pytz.UnknownTimeZoneError:
-            st.warning("Erreur de fuseau horaire 'Europe/Paris'. Affichage en UTC.")
-            st.session_state["last_yfinance_update"] = datetime.datetime.now().strftime("%d/%m/%Y à %H:%M:%S")
-        
-        df["shortName"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("shortName", f"https://finance.yahoo.com/quote/{t}"))
-        df["currentPrice"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("currentPrice", np.nan))
-        df["fiftyTwoWeekHigh"] = df[ticker_col].map(lambda t: st.session_state.ticker_data_cache.get(t, {}).get("fiftyTwoWeekHigh", np.nan))
-
-        df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Momentum (%)", np.nan))
-        df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Z-Score", np.nan))
-        df["Signal"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
-        df["Action"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Action", ""))
-        df["Justification"] = df[ticker_col].map(lambda t: st.session_state.momentum_results_cache.get(t, {}).get("Justification", ""))
-    else:
-        df["shortName"] = ""
-        df["currentPrice"] = np.nan
-        df["fiftyTwoWeekHigh"] = np.nan
-        df["Momentum (%)"] = np.nan
-        df["Z-Score"] = np.nan
-        df["Signal"] = ""
-        df["Action"] = ""
-        df["Justification"] = ""
+    df["Momentum (%)"] = df[ticker_col].map(lambda t: st.session_state.get("momentum_data", {}).get(t, {}).get("Momentum (%)", np.nan) if pd.notnull(t) else np.nan)
+    df["Z-Score"] = df[ticker_col].map(lambda t: st.session_state.get("momentum_data", {}).get(t, {}).get("Z-Score", np.nan) if pd.notnull(t) else np.nan)
+    df["Signal"] = df[ticker_col].map(lambda t: st.session_state.get("momentum_data", {}).get(t, {}).get("Action", "") if pd.notnull(t) else "")
+    df["Action"] = df[ticker_col].map(lambda t: st.session_state.get("momentum_data", {}).get(t, {}).get("Action", "") if pd.notnull(t) else "")
+    df["Justification"] = df[ticker_col].map(lambda t: st.session_state.get("momentum_data", {}).get(t, {}).get("Justification", "") if pd.notnull(t) else "")
 
     # Calcul des valeurs du portefeuille
     df["Valeur Acquisition"] = df["Quantité"] * df["Acquisition"]
@@ -221,20 +191,21 @@ def afficher_portefeuille():
     df["Valeur_LT"] = df["Quantité"] * df["Objectif_LT"]
 
     # Conversion des valeurs à la devise cible
+    # Utilisez la devise source en upper pour la recherche dans fx_rates
     df[['Valeur_conv', 'Taux_FX_Acquisition']] = df.apply(
-        lambda x: convertir(x["Valeur Acquisition"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur Acquisition"], x["Devise"].upper(), devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_Actuelle_conv', 'Taux_FX_Actuel']] = df.apply(
-        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_Actuelle"], x["Devise"].upper(), devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_H52_conv', 'Taux_FX_H52']] = df.apply(
-        lambda x: convertir(x["Valeur_H52"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_H52"], x["Devise"].upper(), devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
     df[['Valeur_LT_conv', 'Taux_FX_LT']] = df.apply(
-        lambda x: convertir(x["Valeur_LT"], x["Devise"], devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
+        lambda x: convertir(x["Valeur_LT"], x["Devise"].upper(), devise_cible, fx_rates, x["Facteur_Ajustement_FX"]), 
         axis=1, result_type='expand'
     )
 
@@ -253,7 +224,6 @@ def afficher_portefeuille():
     )
 
     # Formatage des colonnes pour l'affichage
-    # Les colonnes avec "_fmt" seront celles affichées dans le dataframe final
     for col_name, dec_places in [
         ("Quantité", 0), ("Acquisition", 4), ("currentPrice", 4),
         ("fiftyTwoWeekHigh", 4), ("Objectif_LT", 4),
@@ -263,18 +233,15 @@ def afficher_portefeuille():
     ]:
         if col_name in df.columns:
             if col_name == "Valeur Acquisition":
-                # Formatage avec la devise source correspondante
                 df[f"{col_name}_fmt"] = [
                     f"{format_fr(val, dec_places)} {dev}" if pd.notnull(val) else ""
                     for val, dev in zip(df[col_name], df["Devise"])
                 ]
             elif col_name in ["Valeur_Actuelle", "Valeur_H52", "Valeur_LT"]:
-                # Utiliser les valeurs converties pour l'affichage en devise cible
                 conv_col = f"{col_name}_conv"
                 if conv_col in df.columns:
                     df[f"{col_name}_fmt"] = df[conv_col].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
                 else:
-                    # Fallback si la colonne convertie n'existe pas (ne devrait pas arriver avec le code actuel)
                     df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
             elif col_name == "Gain/Perte":
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)} {devise_cible}" if pd.notnull(x) else "")
@@ -286,11 +253,11 @@ def afficher_portefeuille():
                 df[f"{col_name}_fmt"] = df[col_name].apply(lambda x: f"{format_fr(x, dec_places)}" if pd.notnull(x) else "")
 
     # Définition des colonnes à afficher et de leurs libellés
-    cols = [
+    cols_to_select = [
         ticker_col, "shortName", "Catégories", "Devise", 
         "Quantité_fmt", "Acquisition_fmt", 
         "Valeur Acquisition_fmt",  
-        "Valeur_conv",  # Cette colonne contient la valeur d'acquisition convertie en devise cible
+        "Valeur_conv", # Cette colonne contient la valeur d'acquisition convertie en devise cible
         "Taux_FX_Acquisition_fmt", 
         "currentPrice_fmt", "Valeur_Actuelle_fmt", "Gain/Perte_fmt", "Gain/Perte (%)_fmt",
         "fiftyTwoWeekHigh_fmt", "Valeur_H52_fmt", "Objectif_LT_fmt", "Valeur_LT_fmt",
@@ -309,10 +276,9 @@ def afficher_portefeuille():
         "Signal", "Action", "Justification"
     ]
 
-    # Sélection des colonnes existantes avec priorité aux colonnes formatées
     existing_cols_in_df = []
     existing_labels = []
-    for i, col_name in enumerate(cols):
+    for i, col_name in enumerate(cols_to_select):
         if col_name == ticker_col and ticker_col is not None:
             if ticker_col in df.columns:
                 existing_cols_in_df.append(ticker_col)
@@ -337,10 +303,6 @@ def afficher_portefeuille():
     df_disp = df[existing_cols_in_df].copy()
     df_disp.columns = existing_labels  
 
-    # Définition du dictionnaire de formatage pour st.dataframe.style.format
-    # Note: Puisque nous pré-formatons les colonnes avec "_fmt", le .style.format
-    # doit simplement s'assurer que ces colonnes sont traitées comme des chaînes.
-    # Pour les colonnes non-fmt (comme 'shortName', 'Signal', etc.), on peut les convertir en str.
     format_dict_portfolio = {
         "Quantité": lambda x: x,
         "Prix d'Acquisition (Source)": lambda x: x,
@@ -366,11 +328,8 @@ def afficher_portefeuille():
         "Justification": lambda x: str(x) if pd.notnull(x) else ""
     }
 
-    # Filtrer le dictionnaire de formatage
     filtered_format_dict_portfolio = {k: v for k, v in format_dict_portfolio.items() if k in df_disp.columns}
 
-    # Définition des colonnes numériques et textuelles pour l'alignement CSS
-    # Mise à jour de la liste des colonnes numériques selon votre demande
     numeric_columns = [
         "Quantité", "Prix d'Acquisition (Source)", "Valeur Acquisition (Source)",
         f"Valeur Acquisition ({devise_cible})", "Taux FX (Source/Cible)", "Prix Actuel",
@@ -384,32 +343,30 @@ def afficher_portefeuille():
         [data-testid="stDataFrame"] * { box-sizing: border-box; }
         [data-testid="stDataFrame"] div[role="grid"] table {
             width: 100% !important;
-            table-layout: auto; /* Permet aux colonnes de s'ajuster en largeur */
+            table-layout: auto;
         }
     """
     for i, label in enumerate(df_disp.columns):
-        col_idx = i + 1 # nth-child est 1-indexé
+        col_idx = i + 1
         if label in numeric_columns:
-            # Target both header and data cells, and their potential inner divs
             css_alignments += f"""
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}) > div,
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) > div {{
                     text-align: right !important;
-                    white-space: nowrap !important; /* Empêche le texte de se couper */
+                    white-space: nowrap !important;
                     padding-right: 10px !important;
                 }}
             """
         elif label in text_columns:
-            # Target both header and data cells, and their potential inner divs
             css_alignments += f"""
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table tbody tr td:nth-child({col_idx}) > div,
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}),
                 [data-testid="stDataFrame"] div[role="grid"] table thead tr th:nth-child({col_idx}) > div {{
                     text-align: left !important;
-                    white-space: normal !important; /* Permet au texte de se couper */
+                    white-space: normal !important;
                     padding-left: 10px !important;
                 }}
             """
@@ -420,7 +377,6 @@ def afficher_portefeuille():
         </style>
     """, unsafe_allow_html=True)
 
-    # Affichage du tableau du portefeuille
     st.markdown("##### Détail du Portefeuille")
     st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True)
 
@@ -503,13 +459,30 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
         # Regroupe par la colonne "Catégories"
         category_values = df.groupby('Catégories')['Valeur_Actuelle_conv'].sum()
         
-        # Calcul de la base pour l'objectif
+        # Calcul de la base pour l'objectif des Minières
         current_minieres_value = category_values.get("Minières", 0.0)
         target_minieres_pct = target_allocations.get("Minières", 0.0)
-        theoretical_portfolio_total_from_minieres = current_minieres_value / target_minieres_pct if target_minieres_pct > 0 else total_actuelle
 
-        if pd.isna(theoretical_portfolio_total_from_minieres) or np.isinf(theoretical_portfolio_total_from_minieres) or theoretical_portfolio_total_from_minieres <= 0:
-            theoretical_portfolio_total_from_minieres = total_actuelle  
+        # Calculer la base théorique du portefeuille *hors Minières*
+        # On somme les valeurs actuelles des catégories qui ont un objectif ciblé, sauf "Minières"
+        non_miniere_categories_with_targets = [cat for cat in target_allocations if cat != "Minières"]
+        
+        sum_current_values_non_miniere = 0.0
+        sum_target_pct_non_miniere = 0.0
+
+        for cat in non_miniere_categories_with_targets:
+            sum_current_values_non_miniere += category_values.get(cat, 0.0)
+            sum_target_pct_non_miniere += target_allocations.get(cat, 0.0)
+
+        # Calcul de la taille théorique du portefeuille basée sur les catégories non-minières
+        # Si la somme des pourcentages cibles hors Minières est 0, ou si la somme des valeurs est 0
+        # on se base sur la valeur totale actuelle du portefeuille
+        theoretical_portfolio_total_from_non_minieres = total_actuelle # Fallback
+        if sum_target_pct_non_miniere > 0:
+            theoretical_portfolio_total_from_non_minieres = sum_current_values_non_miniere / sum_target_pct_non_miniere
+        elif total_actuelle == 0: # Si le portefeuille est vide, la base est 0
+             theoretical_portfolio_total_from_non_minieres = 0.0
+
 
         results_data = []
 
@@ -523,19 +496,17 @@ def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt)
                 current_value_cat = 0.0
 
             current_pct = (current_value_cat / total_actuelle) if total_actuelle > 0 else 0.0
-            target_value_for_category = target_pct * theoretical_portfolio_total_from_minieres
             
-            # Logique spécifique pour la réallocation des Minières
-            if category == "Minières":
-                temp_allocations_reelles = {
-                    cat: (category_values.get(cat, 0.0) / total_actuelle) if total_actuelle > 0 else 0.0
-                    for cat in all_relevant_categories
-                }
-                value_to_adjust = calculer_reallocation_miniere(df, temp_allocations_reelles, target_allocations, "Catégories", "Valeur_Actuelle_conv")
-                if value_to_adjust is None:
-                    value_to_adjust = np.nan
-            else:
+            # Ajustement nécessaire
+            value_to_adjust = np.nan
+            if theoretical_portfolio_total_from_non_minieres > 0:
+                target_value_for_category = target_pct * theoretical_portfolio_total_from_non_minieres
                 value_to_adjust = target_value_for_category - current_value_cat
+            elif target_pct > 0: # Si portefeuille cible > 0 mais actuel est 0
+                value_to_adjust = target_pct * total_actuelle # sera 0 si total_actuelle est 0
+            else: # Si objectif est 0
+                value_to_adjust = -current_value_cat # On veut réduire à 0
+
             
             results_data.append({
                 "Catégories": category,
