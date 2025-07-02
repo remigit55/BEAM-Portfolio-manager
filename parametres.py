@@ -10,19 +10,20 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     st.write("DEBUG: Entering afficher_parametres_globaux")
     st.write("DEBUG: load_or_reload_portfolio type:", type(load_or_reload_portfolio))
     st.write("DEBUG: Session state keys:", list(st.session_state.keys()))
+    st.write("DEBUG: Session state values:", {k: type(v).__name__ for k, v in st.session_state.items()})
     st.header("Paramètres Globaux")
 
     # Section pour charger le portefeuille
     st.subheader("Chargement du portefeuille")
     source_type = st.radio("Source des données du portefeuille", ["Fichier Excel/CSV", "Google Sheets"], key="source_type")
-    st.write("DEBUG: Selected source_type:", source_type)
+    st.write("DEBUG: Selected source_type:", source_type, "type:", type(source_type))
 
     if source_type == "Fichier Excel/CSV":
         uploaded_file = st.file_uploader("Choisir un fichier Excel ou CSV", type=["csv", "xlsx"], key="portfolio_file")
-        st.write("DEBUG: uploaded_file:", uploaded_file)
+        st.write("DEBUG: uploaded_file:", uploaded_file, "type:", type(uploaded_file))
         if uploaded_file is not None:
             try:
-                st.write("DEBUG: Calling load_or_reload_portfolio with source_type='fichier', uploaded_file=", uploaded_file.name)
+                st.write("DEBUG: Calling load_or_reload_portfolio with source_type='fichier', uploaded_file=", getattr(uploaded_file, 'name', 'Unknown'))
                 load_or_reload_portfolio(source_type="fichier", uploaded_file=uploaded_file)
             except Exception as e:
                 st.error(f"Erreur lors du chargement du fichier: {e}")
@@ -37,22 +38,18 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
             value=st.session_state.get("google_sheets_url", ""),
             key="google_sheets_url_input"
         )
-        st.write("DEBUG: google_sheets_url:", google_sheets_url)
-        if google_sheets_url and google_sheets_url != st.session_state.get("google_sheets_url", ""):
-            if not isinstance(google_sheets_url, str) or not google_sheets_url.strip():
-                st.error("Erreur: L'URL de Google Sheets doit être une chaîne non vide.")
-                st.write("DEBUG: Invalid google_sheets_url type or empty")
-            else:
-                try:
-                    st.write("DEBUG: Calling load_or_reload_portfolio with source_type='google_sheets', google_sheets_url=", google_sheets_url)
-                    st.session_state.google_sheets_url = google_sheets_url
-                    load_or_reload_portfolio(source_type="google_sheets", google_sheets_url=google_sheets_url)
-                except Exception as e:
-                    st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
-                    st.write("DEBUG: Exception in load_or_reload_portfolio (google_sheets):", str(e))
+        st.write("DEBUG: google_sheets_url:", google_sheets_url, "type:", type(google_sheets_url))
+        if google_sheets_url and isinstance(google_sheets_url, str) and google_sheets_url.strip() and google_sheets_url != st.session_state.get("google_sheets_url", ""):
+            try:
+                st.write("DEBUG: Calling load_or_reload_portfolio with source_type='google_sheets', google_sheets_url=", google_sheets_url)
+                st.session_state.google_sheets_url = google_sheets_url
+                load_or_reload_portfolio(source_type="google_sheets", google_sheets_url=google_sheets_url)
+            except Exception as e:
+                st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
+                st.write("DEBUG: Exception in load_or_reload_portfolio (google_sheets):", str(e))
         else:
             st.info("Veuillez fournir une URL Google Sheets valide.")
-            st.write("DEBUG: No Google Sheets URL provided or unchanged")
+            st.write("DEBUG: No valid Google Sheets URL provided or unchanged")
 
     # Section pour la devise cible
     st.subheader("Devise cible")
@@ -68,7 +65,7 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     if devise_cible != current_devise:
         st.write("DEBUG: Devise cible changed to:", devise_cible)
         st.session_state.devise_cible = devise_cible
-        st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)  # Force FX rates update
+        st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
         st.rerun()
 
     # Section pour la volatilité cible
@@ -91,14 +88,14 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     # Section pour les allocations cibles
     st.subheader("Allocations cibles par catégorie")
     if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Catégorie' in st.session_state.df.columns:
-        categories = st.session_state.df['Catégorie'].unique().tolist()
+        categories = st.session_state.df['Catégorie'].dropna().astype(str).unique().tolist()
         st.write("DEBUG: Categories found in DataFrame:", categories)
     else:
         categories = []
         st.write("DEBUG: No valid categories found in DataFrame")
 
     target_allocations = st.session_state.target_allocations.copy() if isinstance(st.session_state.target_allocations, dict) else {}
-    st.write("DEBUG: Current target_allocations:", target_allocations)
+    st.write("DEBUG: Current target_allocations:", target_allocations, "type:", type(target_allocations))
 
     for category in categories:
         if not isinstance(category, str):
