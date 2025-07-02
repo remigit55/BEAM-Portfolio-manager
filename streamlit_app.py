@@ -184,7 +184,8 @@ if st.session_state.df is not None:
     current_prices = fetch_current_yahoo_data()
     momentum_data = fetch_current_momentum_data()
     fx_rates = fetch_current_fx_rates()
-    devise_cible = st.session_state.devise_cible
+    # LA LIGNE 'devise_cible = st.session_state.devise_cible' A ÉTÉ SUPPRIMÉE ICI
+
     df_portfolio = st.session_state.df.copy()
 
     # Fusionner les prix actuels et le momentum avec le DataFrame du portefeuille
@@ -195,14 +196,14 @@ if st.session_state.df is not None:
     # Appliquer les taux de change pour les valeurs d'acquisition et actuelles
     # Convertir 'Acquisition' à la devise cible si Devise est différente
     df_portfolio['Acquisition (Devise Cible)'] = df_portfolio.apply(
-        lambda row: convertir(row['Acquisition'], row['Devise'], devise_cible, fx_rates)
-        if row['Devise'] != devise_cible else row['Acquisition'], axis=1
+        lambda row: convertir(row['Acquisition'], row['Devise'], st.session_state.devise_cible, fx_rates)
+        if row['Devise'] != st.session_state.devise_cible else row['Acquisition'], axis=1
     )
 
     # Calcul de la valeur actuelle unitaire et totale dans la devise cible
     df_portfolio['Valeur Actuelle Unitaire'] = df_portfolio.apply(
-        lambda row: convertir(row['Prix Actuel'], row['Devise'], devise_cible, fx_rates)
-        if row['Devise'] != devise_cible else row['Prix Actuel'], axis=1
+        lambda row: convertir(row['Prix Actuel'], row['Devise'], st.session_state.devise_cible, fx_rates)
+        if row['Devise'] != st.session_state.devise_cible else row['Prix Actuel'], axis=1
     )
     df_portfolio['Valeur Actuelle'] = df_portfolio['Quantité'] * df_portfolio['Valeur Actuelle Unitaire']
 
@@ -246,12 +247,12 @@ if st.session_state.df is not None:
 
         with st.spinner("Sauvegarde des totaux quotidiens du portefeuille..."):
             save_daily_totals(
-                current_date, 
-                total_acquisition_value, 
-                total_current_value, 
-                total_h52_value, 
-                total_lt_value, 
-                devise_cible
+                current_date,
+                total_acquisition_value,
+                total_current_value,
+                total_h52_value,
+                total_lt_value,
+                st.session_state.devise_cible # <<<--- MODIFIÉ
             )
         st.session_state.df_historical_totals = load_historical_data() # Recharger l'historique après sauvegarde
         st.info(f"Totaux quotidiens du {current_date.strftime('%Y-%m-%d')} enregistrés.")
@@ -261,27 +262,27 @@ if st.session_state.df is not None:
 
 # --- Onglets de l'application ---
 onglets = st.tabs([
-    "📊 Synthèse Globale", "📈 Portefeuille Détaillé", "🚀 Performance Historique",
-    "🧾 OD Comptables", "🔄 Transactions", "💱 Taux de Change", "⚙️ Paramètres"
+    "Synthèse", "Portefeuille", "Performance",
+    "OD Comptables", "Transactions", "Taux de Change", "Paramètres"
 ])
 
 with onglets[0]:
     afficher_synthese_globale(
         st.session_state.df,
         st.session_state.df_historical_totals,
-        devise_cible,
+        st.session_state.devise_cible, # <<<--- MODIFIÉ
         st.session_state.target_allocations,
         st.session_state.target_volatility
     )
 
 with onglets[1]:
-    afficher_portefeuille(st.session_state.df, devise_cible)
+    afficher_portefeuille(st.session_state.df, st.session_state.devise_cible) # <<<--- MODIFIÉ
 
     # Bouton pour enregistrer un snapshot manuel du portefeuille
     current_date = datetime.date.today()
     if st.button(f"Enregistrer le snapshot du portefeuille ({current_date.strftime('%Y-%m-%d')})", key="save_snapshot_btn"):
         with st.spinner("Enregistrement du snapshot quotidien du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
-            save_portfolio_snapshot(current_date, st.session_state.df, devise_cible)
+            save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible) # <<<--- MODIFIÉ
         st.session_state.portfolio_journal = load_portfolio_journal() # Recharger le journal après sauvegarde
         st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
 
