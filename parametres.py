@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import json
+import datetime
 
 def afficher_parametres_globaux(load_or_reload_portfolio):
     """
@@ -11,7 +11,22 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     st.write("DEBUG: load_or_reload_portfolio type:", type(load_or_reload_portfolio))
     st.write("DEBUG: Session state keys:", list(st.session_state.keys()))
     st.write("DEBUG: Session state values:", {k: type(v).__name__ for k, v in st.session_state.items()})
+    st.write("DEBUG: Full session state:", {k: str(v)[:100] + "..." if len(str(v)) > 100 else str(v) for k, v in st.session_state.items()})
     st.header("Paramètres Globaux")
+
+    # Initialize missing widget keys
+    if 'portfolio_file' not in st.session_state:
+        st.session_state.portfolio_file = None
+    if 'source_type' not in st.session_state:
+        st.session_state.source_type = "Fichier Excel/CSV"
+    if 'google_sheets_url_input' not in st.session_state:
+        st.session_state.google_sheets_url_input = ""
+    if 'devise_cible_select' not in st.session_state:
+        st.session_state.devise_cible_select = "EUR"
+    if 'target_volatility_input' not in st.session_state:
+        st.session_state.target_volatility_input = 15.0
+    if 'save_allocations' not in st.session_state:
+        st.session_state.save_allocations = False
 
     # Section pour charger le portefeuille
     st.subheader("Chargement du portefeuille")
@@ -109,7 +124,7 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
             max_value=100.0,
             value=float(target_allocations.get(category, 0.0)),
             step=1.0,
-            key=f"allocation_{safe_escape(category)}"
+            key=f"allocation_{category.replace(' ', '_').replace('/', '_')}"
         )
         target_allocations[category] = allocation
 
