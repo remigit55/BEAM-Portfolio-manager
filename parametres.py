@@ -14,27 +14,19 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     st.write("DEBUG: Full session state:", {k: str(v)[:100] + "..." if len(str(v)) > 100 else str(v) for k, v in st.session_state.items()})
     st.header("Paramètres Globaux")
 
-    # Initialize missing widget keys
-    if 'portfolio_file' not in st.session_state:
-        st.session_state.portfolio_file = None
-    if 'source_type' not in st.session_state:
-        st.session_state.source_type = "Fichier Excel/CSV"
-    if 'google_sheets_url_input' not in st.session_state:
-        st.session_state.google_sheets_url_input = ""
-    if 'devise_cible_select' not in st.session_state:
-        st.session_state.devise_cible_select = "EUR"
-    if 'target_volatility_input' not in st.session_state:
-        st.session_state.target_volatility_input = 15.0
-    if 'save_allocations' not in st.session_state:
-        st.session_state.save_allocations = False
-
     # Section pour charger le portefeuille
     st.subheader("Chargement du portefeuille")
     source_type = st.radio("Source des données du portefeuille", ["Fichier Excel/CSV", "Google Sheets"], key="source_type")
     st.write("DEBUG: Selected source_type:", source_type, "type:", type(source_type))
 
     if source_type == "Fichier Excel/CSV":
-        uploaded_file = st.file_uploader("Choisir un fichier Excel ou CSV", type=["csv", "xlsx"], key="portfolio_file")
+        # Use session state directly to avoid widget state assignment issues
+        if st.session_state.get("portfolio_file_trigger"):
+            uploaded_file = st.session_state.get("portfolio_file")
+            st.write("DEBUG: Using portfolio_file from session state:", uploaded_file, "type:", type(uploaded_file))
+        else:
+            uploaded_file = st.file_uploader("Choisir un fichier Excel ou CSV", type=["csv", "xlsx"], key="portfolio_file_trigger")
+            st.session_state.portfolio_file = uploaded_file
         st.write("DEBUG: uploaded_file:", uploaded_file, "type:", type(uploaded_file))
         if uploaded_file is not None:
             try:
