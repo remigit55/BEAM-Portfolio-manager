@@ -44,33 +44,28 @@ initialize_portfolio_journal_db()
 initialize_historical_data_db()
 
 
-# --- Initialisation des session_state ---
-if 'df' not in st.session_state:
+# Initialisation des variables d'état de session si elles n'existent pas
+# Assurez-vous que toutes les clés nécessaires existent avant utilisation
+if "df" not in st.session_state:
     st.session_state.df = None
-if 'fx_rates' not in st.session_state:
-    st.session_state.fx_rates = {}
-if 'last_update_time_fx' not in st.session_state:
-    st.session_state.last_update_time_fx = datetime.datetime.min # Pour forcer la 1ère maj
-if 'target_allocations' not in st.session_state:
-    st.session_state.target_allocations = {}
-if 'portfolio_journal' not in st.session_state:
-    st.session_state.portfolio_journal = load_portfolio_journal() # Charger le journal depuis SQLite
-if 'df_historical_totals' not in st.session_state:
-    st.session_state.df_historical_totals = load_historical_data() # Charger l'historique depuis SQLite
-if 'df_initial_import' not in st.session_state: # Pour garder une trace du DF initialement importé
-    st.session_state.df_initial_import = None
-if 'last_yahoo_update_time' not in st.session_state:
-    st.session_state.last_yahoo_update_time = datetime.datetime.min
-if 'last_momentum_update_time' not in st.session_state:
-    st.session_state.last_momentum_update_time = datetime.datetime.min
-if 'target_volatility' not in st.session_state:
-    st.session_state.target_volatility = 0.15 # 15% par défaut (en décimal)
-if 'google_sheets_url' not in st.session_state:
-    st.session_state.google_sheets_url = "" # Initialise l'URL Google Sheets
-if 'devise_cible' not in st.session_state:
-    st.session_state.devise_cible = "EUR"
-if "df_transactions" not in st.session_state: # Assurez-vous que les transactions sont aussi initialisées
+if "df_transactions" not in st.session_state:
     st.session_state.df_transactions = pd.DataFrame(columns=['Date', 'Type', 'Ticker', 'Quantité', 'Prix', 'Devise', 'Frais', 'Notes'])
+if "fx_rates" not in st.session_state:
+    st.session_state.fx_rates = {}
+if "last_update_time_fx" not in st.session_state:
+    st.session_state.last_update_time_fx = datetime.datetime.min
+if "last_yfinance_update" not in st.session_state:
+    st.session_state.last_yfinance_update = datetime.datetime.min
+if "data_source_type" not in st.session_state:
+    st.session_state.data_source_type = "file" # Valeur par défaut
+if "google_sheets_url" not in st.session_state:
+    st.session_state.google_sheets_url = ""
+if "devise_cible" not in st.session_state:
+    st.session_state.devise_cible = "EUR" # Initialisation avec une valeur par défaut
+if "target_allocations" not in st.session_state:
+    st.session_state.target_allocations = {} # Initialise les allocations cibles (si non déjà faites)
+if "target_volatility" not in st.session_state:
+    st.session_state.target_volatility = 0.15 # 15% par défaut (en décimal)
 
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
