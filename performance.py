@@ -30,24 +30,13 @@ def calculate_macd(data, fast_period=12, slow_period=26, signal_period=9):
     return macd, signal, hist
 
 def calculate_bollinger_bands(data, periods=20, num_std=2):
-    """
-    Calcule les bandes de Bollinger sur une série de données.
-    
-    Args:
-        data (pd.Series): Série de données (par exemple, Valeur Totale).
-        periods (int): Période pour la SMA et l'écart-type (défaut : 20).
-        num_std (float): Nombre d'écarts-types pour les bandes (défaut : 2).
-    
-    Returns:
-        tuple: (sma, upper_band, lower_band)
-    """
     sma = data.rolling(window=periods, min_periods=1).mean()
     std = data.rolling(window=periods, min_periods=1).std()
     upper_band = sma + num_std * std
     lower_band = sma - num_std * std
     return sma, upper_band, lower_band
 
-def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_df, date=None, fx_adjustment_factor=1.0):
+def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates, date=None, fx_adjustment_factor=1.0):
     """
     Convertit une valeur d'une devise source vers une devise cible en utilisant les taux de change.
     
@@ -55,7 +44,7 @@ def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_df, 
         val: Valeur à convertir.
         source_devise: Devise source (ex: USD).
         devise_cible: Devise cible (ex: EUR).
-        fx_rates_df: DataFrame de taux de change avec MultiIndex (Date, Currency_Pair) et colonne Rate.
+        fx_rates: Dict of {date: {currency_pair: rate}} for historical rates.
         date: Date pour sélectionner le taux de change historique (optionnel).
         fx_adjustment_factor: Facteur d'ajustement (ex: 0.01 pour GBP).
     
@@ -72,23 +61,20 @@ def convertir_valeur_performance(val, source_devise, devise_cible, fx_rates_df, 
     fx_key = f"{source_devise}{devise_cible}"
     taux_scalar = np.nan
 
-    if isinstance(fx_rates_df, pd.DataFrame) and date is not None:
-        try:
-            # Lookup rate using MultiIndex
-            date = pd.Timestamp(date)
-            if (date, fx_key) in fx_rates_df.index:
-                taux_scalar = float(fx_rates_df.loc[(date, fx_key), 'Rate'])
-        except Exception as e:
-            st.write(f"DEBUG: Error fetching historical rate for {fx_key} on {date}: {e}")
-    elif isinstance(fx_rates_df, dict):
-        taux_scalar = float(fx_rates_df.get(fx_key, np.nan))
-    elif isinstance(fx_rates_df, (float, int, np.floating, np.integer)):
-        taux_scalar = float(fx_rates_df)
+    if isinstance(fx_rates, dict) and date is not None:
+        date_key = pd.Timestamp(date).date()
+        if date_key in fx_rates and fx_key in fx_rates[date_key]:
+            taux_scalar = float(fx_rates[date_key][fx_key])
+        else:
+            st.warning(f"Taux de change non trouvé pour {fx_key} sur {date_key}. Utilisation du taux 1.0.")
+            taux_scalar = 1.0
+    elif isinstance(fx_rates, (float, int, np.floating, np.integer)):
+        taux_scalar = float(fx_rates)
     else:
+        st.warning(f"Format de taux de change invalide pour {fx_key}. Utilisation du taux 1.0.")
         taux_scalar = 1.0
 
     if pd.isna(taux_scalar) or taux_scalar == 0:
-        st.warning(f"Taux de change non trouvé pour {fx_key} sur {date}. Utilisation du taux 1.0.")
         return val, np.nan
     
     valeur_ajustee = val * fx_adjustment_factor
@@ -136,22 +122,18 @@ def display_performance_history():
     selected_period_td = period_options[selected_label]
     end_date_table = datetime.now().date()
     start_date_table = end_date_table - selected_period_td
-    # Use a shorter fetch period for indicators (e.g., max 200 days extra for MA200)
     fetch_start_date = start_date_table - timedelta(days=min(200, selected_period_td.days))
 
-    # Fetch and cache historical exchange rates
-    cache_key = f"fx_rates_{'_'.join(sorted(devises_a_fetch))}_{target_currency}_{fetch_start_date}_{end_date_table}"
+    # Determine interval for exchange rates (daily for <= 1Y, weekly for > 1Y)
+    interval = "1wk" if selected_period_td.days > 365 else "1d"
+
+    # Cache historical exchange rates
+    cache_key = f"fx_rates_{'_'.join(sorted(devises_a_fetch))}_{target_currency}_{fetch_start_date}_{end_date_table}_{interval}"
     if cache_key not in st.session_state:
         with st.spinner("Récupération des taux de change historiques..."):
-            historical_fx_rates = fetch_historical_fx_rates(devises_a_fetch, target_currency, fetch_start_date, end_date_table)
-            # Preprocess for faster lookups
-            if not historical_fx_rates.empty:
-                historical_fx_rates = historical_fx_rates.set_index(['Date', 'Currency_Pair'])
-                st.session_state[cache_key] = historical_fx_rates
-            else:
-                st.warning("Aucun taux de change historique disponible. Utilisation du taux 1.0.")
-                st.session_state[cache_key] = pd.DataFrame(columns=['Date', 'Currency_Pair', 'Rate']).set_index(['Date', 'Currency_Pair'])
-            st.write("DEBUG: Historical FX rates sample:", historical_fx_rates.head())
+            historical_fx_rates = fetch_historical_fx_rates(devises_a_fetch, target_currency, fetch_start_date, end_date_table, interval=interval)
+            st.session_state[cache_key] = historical_fx_rates
+            st.write("DEBUG: Historical FX rates sample:", {k: v for k, v in historical_fx_rates.items() if k in list(historical_fx_rates.keys())[:5]})
     historical_fx_rates = st.session_state[cache_key]
 
     tickers_in_portfolio = sorted(df_current_portfolio['Ticker'].dropna().unique().tolist()) if "Ticker" in df_current_portfolio.columns else []
@@ -160,70 +142,44 @@ def display_performance_history():
         return
 
     # Cache portfolio data
-    data_cache_key = f"portfolio_data_{'_'.join(sorted(tickers_in_portfolio))}_{target_currency}_{fetch_start_date}_{end_date_table}_{selected_label}"
+    data_cache_key = f"portfolio_data_{'_'.join(sorted(tickers_in_portfolio))}_{target_currency}_{fetch_start_date}_{end_date_table}_{interval}"
     if data_cache_key not in st.session_state:
         with st.spinner("Récupération et conversion des cours..."):
             all_ticker_data = []
             business_days_for_display = pd.bdate_range(start=start_date_table, end=end_date_table)
             all_business_days = pd.bdate_range(start=fetch_start_date, end=end_date_table)
 
-            # Prepare portfolio metadata
-            ticker_info = df_current_portfolio[['Ticker', 'Devise_Originale', 'Quantité', 'Facteur_Ajustement_FX']].dropna()
-            ticker_info['Devise_Originale'] = ticker_info['Devise_Originale'].str.strip().str.upper()
-            
-            # Vectorized price fetching and conversion
             for ticker in tickers_in_portfolio:
-                ticker_row = ticker_info[ticker_info['Ticker'] == ticker]
+                ticker_row = df_current_portfolio[df_current_portfolio["Ticker"] == ticker]
                 if ticker_row.empty:
                     continue
-                ticker_devise = ticker_row['Devise_Originale'].iloc[0]
+                ticker_devise = str(ticker_row['Devise_Originale'].iloc[0]).strip().upper()
                 quantity = pd.to_numeric(ticker_row['Quantité'].iloc[0], errors='coerce') or 0.0
                 fx_adjustment_factor = ticker_row['Facteur_Ajustement_FX'].iloc[0]
                 
-                # Fetch stock history
                 data = fetch_stock_history(ticker, fetch_start_date, end_date_table)
                 if data.empty:
                     data = pd.Series(0.0, index=all_business_days)
                 else:
                     data = data.reindex(all_business_days).ffill().bfill()
                 
-                # Create DataFrame for prices
-                df_ticker = pd.DataFrame({
-                    'Date': data.index,
-                    'Ticker': ticker,
-                    'Price': data.values,
-                    'Quantity': quantity,
-                    'Source_Devise': ticker_devise,
-                    'Facteur_Ajustement_FX': fx_adjustment_factor
-                })
-                df_ticker['Date'] = pd.to_datetime(df_ticker['Date'])
-                
-                # Merge with exchange rates
-                fx_key = f"{ticker_devise}{target_currency}"
-                if ticker_devise != target_currency:
-                    df_ticker['Currency_Pair'] = fx_key
-                    df_ticker = df_ticker.merge(
-                        historical_fx_rates.reset_index()[['Date', 'Currency_Pair', 'Rate']],
-                        on=['Date', 'Currency_Pair'],
-                        how='left'
+                for date_idx, price in data.items():
+                    converted_price, taux_scalar = convertir_valeur_performance(
+                        price, ticker_devise, target_currency, historical_fx_rates, date=date_idx, fx_adjustment_factor=fx_adjustment_factor
                     )
-                    df_ticker['Rate'] = df_ticker['Rate'].ffill().bfill().fillna(1.0)
-                else:
-                    df_ticker['Rate'] = 1.0
-                
-                # Apply conversions
-                df_ticker['Valeur_Ajustee'] = df_ticker['Price'] * df_ticker['Facteur_Ajustement_FX'] * df_ticker['Quantity']
-                df_ticker[f'Valeur Actuelle ({target_currency})'] = df_ticker['Valeur_Ajustee'] * df_ticker['Rate']
-                
-                all_ticker_data.append(df_ticker[['Date', 'Ticker', f'Valeur Actuelle ({target_currency})']])
-            
-            df_display_values = pd.concat(all_ticker_data, ignore_index=True)
+                    all_ticker_data.append({
+                        "Date": date_idx,
+                        "Ticker": ticker,
+                        f"Valeur Actuelle ({target_currency})": converted_price * quantity
+                    })
+
+            df_display_values = pd.DataFrame(all_ticker_data)
             st.session_state[data_cache_key] = df_display_values
     else:
         df_display_values = st.session_state[data_cache_key]
 
     if not df_display_values.empty:
-        df_total_daily_value = df_display_values.groupby('Date')[f'Valeur Actuelle ({target_currency})'].sum().reset_index()
+        df_total_daily_value = df_display_values.groupby('Date')[f"Valeur Actuelle ({target_currency})'].sum().reset_index()
         df_total_daily_value.columns = ['Date', 'Valeur Totale']
         df_total_daily_value['Date'] = pd.to_datetime(df_total_daily_value['Date'])
         df_total_daily_value = df_total_daily_value.sort_values('Date')
@@ -421,7 +377,7 @@ def display_performance_history():
         df_total_daily_value['Volatilité_MA50'] = df_total_daily_value['Volatilité'].rolling(window=50, min_periods=1).mean()
         df_total_daily_value['Volatilité_MA200'] = df_total_daily_value['Volatilité'].rolling(window=200, min_periods=1).mean()
 
-        if not df_df_total_daily_value['Volatilité'].dropna().empty:
+        if not df_total_daily_value['Volatilité'].dropna().empty:
             df_volatility_display = df_total_daily_value[
                 (df_total_daily_value['Date'] >= pd.Timestamp(start_date_table)) &
                 (df_total_daily_value['Date'] <= pd.Timestamp(end_date_table))
