@@ -72,6 +72,7 @@ initialize_historical_data_db()
 
 
 # --- Initialisation des session_state ---
+# Assurez-vous que les clés existent toujours AVANT de tenter de charger des données.
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'fx_rates' not in st.session_state:
@@ -83,21 +84,29 @@ if 'devise_cible' not in st.session_state:
 if 'target_allocations' not in st.session_state:
     st.session_state.target_allocations = {}
 
-# Initialisation robuste de portfolio_journal
+# Initialisation des objets vides pour garantir la présence des clés
 if 'portfolio_journal' not in st.session_state:
-    try:
-        st.session_state.portfolio_journal = load_portfolio_journal()
-    except Exception as e:
-        st.error(f"Erreur lors du chargement du journal du portefeuille: {e}. Initialisation à une liste vide.")
-        st.session_state.portfolio_journal = [] # Fallback to empty list
-
-# Initialisation robuste de df_historical_totals
+    st.session_state.portfolio_journal = [] # Initialise à une liste vide
 if 'df_historical_totals' not in st.session_state:
+    st.session_state.df_historical_totals = pd.DataFrame() # Initialise à un DataFrame vide
+
+# Tentative de chargement des données si les objets sont vides (première exécution)
+if not st.session_state.portfolio_journal: # Vérifie si c'est vide
     try:
-        st.session_state.df_historical_totals = load_historical_data()
+        loaded_journal = load_portfolio_journal()
+        if loaded_journal: # Met à jour uniquement si le chargement a réussi et a retourné des données
+            st.session_state.portfolio_journal = loaded_journal
     except Exception as e:
-        st.error(f"Erreur lors du chargement des totaux historiques: {e}. Initialisation à un DataFrame vide.")
-        st.session_state.df_historical_totals = pd.DataFrame() # Fallback to empty DataFrame
+        st.error(f"Erreur lors du chargement du journal du portefeuille: {e}. Le journal reste vide.")
+
+if st.session_state.df_historical_totals.empty: # Vérifie si c'est vide
+    try:
+        loaded_historical = load_historical_data()
+        if not loaded_historical.empty: # Met à jour uniquement si le chargement a réussi et a retourné des données
+            st.session_state.df_historical_totals = loaded_historical
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des totaux historiques: {e}. L'historique reste vide.")
+
 
 if 'df_initial_import' not in st.session_state: # Pour garder une trace du DF initialement importé
     st.session_state.df_initial_import = None
@@ -286,7 +295,7 @@ if st.session_state.df is not None:
         total_h52_value = df_portfolio['H52'].sum() if 'H52' in df_portfolio.columns else 0 # Assuming H52 will be calculated elsewhere
         total_lt_value = df_portfolio['Objectif_LT'].sum() if 'Objectif_LT' in df_portfolio.columns else 0 # Assuming LT will be calculated elsewhere
 
-        with st.spinner("Sauvegarde des totaux quotidiens du portefeuille..."):
+        with st.spinner("Sauvegarde des totaux quotidiens du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
             save_daily_totals(
                 current_date,
                 total_acquisition_value,
