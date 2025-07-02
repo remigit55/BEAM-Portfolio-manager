@@ -30,7 +30,7 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
                 st.write("DEBUG: Exception in load_or_reload_portfolio (fichier):", str(e))
         else:
             st.info("Veuillez charger un fichier Excel ou CSV.")
-            st.write("DEBUG: No file uploaded")
+            st.write("DEBUG: No file uploaded, skipping load_or_reload_portfolio")
 
     else:  # Google Sheets
         google_sheets_url = st.text_input(
@@ -49,7 +49,7 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
                 st.write("DEBUG: Exception in load_or_reload_portfolio (google_sheets):", str(e))
         else:
             st.info("Veuillez fournir une URL Google Sheets valide.")
-            st.write("DEBUG: No valid Google Sheets URL provided or unchanged")
+            st.write("DEBUG: No valid Google Sheets URL provided or unchanged, skipping load_or_reload_portfolio")
 
     # Section pour la devise cible
     st.subheader("Devise cible")
@@ -66,7 +66,8 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
         st.write("DEBUG: Devise cible changed to:", devise_cible)
         st.session_state.devise_cible = devise_cible
         st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
-        st.rerun()
+        # st.rerun()  # Commented out to avoid rerun loops during debugging
+        st.write("DEBUG: Devise cible updated, st.rerun() skipped for debugging")
 
     # Section pour la volatilité cible
     st.subheader("Volatilité cible")
@@ -83,7 +84,8 @@ def afficher_parametres_globaux(load_or_reload_portfolio):
     if target_volatility != current_volatility * 100:
         st.write("DEBUG: Target volatility changed to:", target_volatility)
         st.session_state.target_volatility = target_volatility / 100.0
-        st.rerun()
+        # st.rerun()  # Commented out to avoid rerun loops during debugging
+        st.write("DEBUG: Target volatility updated, st.rerun() skipped for debugging")
 
     # Section pour les allocations cibles
     st.subheader("Allocations cibles par catégorie")
