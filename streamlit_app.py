@@ -51,8 +51,6 @@ if 'fx_rates' not in st.session_state:
     st.session_state.fx_rates = {}
 if 'last_update_time_fx' not in st.session_state:
     st.session_state.last_update_time_fx = datetime.datetime.min # Pour forcer la 1ère maj
-if 'devise_cible' not in st.session_state:
-    st.session_state.devise_cible = "EUR"
 if 'target_allocations' not in st.session_state:
     st.session_state.target_allocations = {}
 if 'portfolio_journal' not in st.session_state:
@@ -69,6 +67,10 @@ if 'target_volatility' not in st.session_state:
     st.session_state.target_volatility = 0.15 # 15% par défaut (en décimal)
 if 'google_sheets_url' not in st.session_state:
     st.session_state.google_sheets_url = "" # Initialise l'URL Google Sheets
+if 'devise_cible' not in st.session_state:
+    st.session_state.devise_cible = "EUR"
+if "df_transactions" not in st.session_state: # Assurez-vous que les transactions sont aussi initialisées
+    st.session_state.df_transactions = pd.DataFrame(columns=['Date', 'Type', 'Ticker', 'Quantité', 'Prix', 'Devise', 'Frais', 'Notes'])
 
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
