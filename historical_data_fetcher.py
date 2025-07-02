@@ -58,13 +58,13 @@ def fetch_historical_fx_rates(source_currencies, target_currency, start_date, en
         end_date: End date for historical data.
     
     Returns:
-        pd.DataFrame: Columns ['Date', 'Currency_Pair', 'Rate'].
+        pd.DataFrame: MultiIndex (Date, Currency_Pair) with column 'Rate'.
     """
     fx_data = []
     for source_currency in source_currencies:
         if source_currency == target_currency:
             continue
-        pair = f"{source_currency}{target_currency}=X"  # e.g., USDEUR=X
+        pair = f"{source_currency}{target_currency}=X"
         try:
             ticker = yf.Ticker(pair)
             hist = ticker.history(start=start_date, end=end_date + timedelta(days=1), interval="1d", progress=False)
@@ -82,14 +82,13 @@ def fetch_historical_fx_rates(source_currencies, target_currency, start_date, en
     if fx_data:
         df = pd.concat(fx_data, ignore_index=True)
         df['Date'] = pd.to_datetime(df['Date'])
-        # Forward-fill missing rates to handle gaps
-        df = df.pivot(index='Date', columns='Currency_Pair', values='Rate').ffill().bfill().reset_index()
-        df = df.melt(id_vars=['Date'], var_name='Currency_Pair', value_name='Rate')
-        df = df.dropna(subset=['Rate'])
-        return df
+        df = df.set_index(['Date', 'Currency_Pair'])['Rate']
+        df = df.unstack().ffill().bfill().stack().reset_index(name='Rate')
+        df['Date'] = pd.to_datetime(df['Date'])
+        return df.set_index(['Date', 'Currency_Pair'])
     else:
         st.warning("Aucun taux de change historique récupéré. Retour d'un DataFrame vide.")
-        return pd.DataFrame(columns=['Date', 'Currency_Pair', 'Rate'])
+        return pd.DataFrame(columns=['Date', 'Currency_Pair', 'Rate']).set_index(['Date', 'Currency_Pair'])
 
 @st.cache_data(ttl=3600)
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
@@ -108,6 +107,6 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
             historical_prices[ticker] = prices
 
     historical_fx_df = fetch_historical_fx_rates(currencies, target_currency, start_date, end_date)
-    historical_fx = {row['Currency_Pair']: row['Rate'] for _, row in historical_fx_df.iterrows()}
+    historical_fx = {row['Currency_Pair']: row['Rate'] for _, row in historical_fx_df.reset_index().iterrows()}
             
     return historical_prices, historical_fx
