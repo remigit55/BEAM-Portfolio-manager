@@ -119,13 +119,18 @@ if 'df_historical_totals' in st.session_state and st.session_state.df_historical
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
     """Charge ou recharge le portefeuille en fonction de la source."""
     st.write("DEBUG: Entering load_or_reload_portfolio with source_type:", source_type)
+    st.write("DEBUG: uploaded_file:", uploaded_file)
+    st.write("DEBUG: google_sheets_url:", google_sheets_url)
     df_loaded = None
-    if source_type == "fichier" and uploaded_file:
+    if source_type == "fichier" and uploaded_file is not None:
         df_loaded, status = load_data(uploaded_file)
         if status != "success":
             st.error(f"Échec du chargement du fichier: {status}")
             return
     elif source_type == "google_sheets" and google_sheets_url:
+        if not isinstance(google_sheets_url, str) or not google_sheets_url.strip():
+            st.error("Erreur: L'URL de Google Sheets doit être une chaîne non vide.")
+            return
         df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
         if df_loaded is None:
             st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
@@ -427,4 +432,4 @@ with onglets[6]:
     afficher_parametres_globaux(load_or_reload_portfolio)
 
 st.markdown("---")
-st.caption(f"Dernière mise à jour de l'interface : {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+st.caption(f"Dernière mise à jour de l'interface : {datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y %H:%M:%S')}")
