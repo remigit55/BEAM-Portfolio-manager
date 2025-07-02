@@ -428,7 +428,7 @@ def afficher_portefeuille():
 
     return total_valeur, total_actuelle, total_h52, total_lt
 
-def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt, df_historical_totals, devise_cible, target_allocations, target_volatility):
+def afficher_synthese_globale(total_valeur, total_actuelle, total_h52, total_lt):
     """
     Affiche la synthèse globale du portefeuille, y compris les métriques clés et le tableau de répartition par Catégories.
     """
