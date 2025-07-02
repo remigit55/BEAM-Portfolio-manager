@@ -421,7 +421,7 @@ def afficher_portefeuille():
     """, unsafe_allow_html=True)
 
     # Affichage du tableau du portefeuille
-    st.markdown("##### Détail du Portefeuille")
+    # st.markdown("##### Détail du Portefeuille")
     st.dataframe(df_disp.style.format(filtered_format_dict_portfolio), use_container_width=True, hide_index=True)
 
     st.session_state.df = df  
