@@ -118,22 +118,35 @@ if 'df_historical_totals' in st.session_state and st.session_state.df_historical
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
     """Charge ou recharge le portefeuille en fonction de la source."""
-    st.write("DEBUG: Entering load_or_reload_portfolio with source_type:", source_type)
-    st.write("DEBUG: uploaded_file:", uploaded_file)
-    st.write("DEBUG: google_sheets_url:", google_sheets_url)
+    st.write("DEBUG: Entering load_or_reload_portfolio with source_type:", source_type, "type:", type(source_type))
+    st.write("DEBUG: uploaded_file:", uploaded_file, "type:", type(uploaded_file))
+    st.write("DEBUG: google_sheets_url:", google_sheets_url, "type:", type(google_sheets_url))
     df_loaded = None
     if source_type == "fichier" and uploaded_file is not None:
-        df_loaded, status = load_data(uploaded_file)
-        if status != "success":
-            st.error(f"Échec du chargement du fichier: {status}")
+        try:
+            df_loaded, status = load_data(uploaded_file)
+            if status != "success":
+                st.error(f"Échec du chargement du fichier: {status}")
+                st.write("DEBUG: load_data status:", status)
+                return
+        except Exception as e:
+            st.error(f"Erreur lors du chargement du fichier: {e}")
+            st.write("DEBUG: Exception in load_data:", str(e))
             return
     elif source_type == "google_sheets" and google_sheets_url:
         if not isinstance(google_sheets_url, str) or not google_sheets_url.strip():
             st.error("Erreur: L'URL de Google Sheets doit être une chaîne non vide.")
+            st.write("DEBUG: Invalid google_sheets_url")
             return
-        df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
-        if df_loaded is None:
-            st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
+        try:
+            df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
+            if df_loaded is None:
+                st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
+                st.write("DEBUG: load_portfolio_from_google_sheets returned None")
+                return
+        except Exception as e:
+            st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
+            st.write("DEBUG: Exception in load_portfolio_from_google_sheets:", str(e))
             return
 
     if df_loaded is not None and not df_loaded.empty:
@@ -144,6 +157,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
                 df_loaded.rename(columns={ticker_col: 'Ticker'}, inplace=True)
             else:
                 st.error(f"Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers', 'Symbol'). Colonnes trouvées: {df_loaded.columns.tolist()}")
+                st.write("DEBUG: Missing Ticker column, found columns:", df_loaded.columns.tolist())
                 st.session_state.df = pd.DataFrame()
                 return
         # Vérifier et initialiser les colonnes nécessaires
@@ -160,11 +174,16 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
                     df_loaded[col] = st.session_state.devise_cible
 
         # Nettoyage et conversion des colonnes
-        df_loaded['Quantité'] = pd.to_numeric(df_loaded['Quantité'], errors='coerce').fillna(0)
-        df_loaded['Acquisition'] = pd.to_numeric(df_loaded['Acquisition'], errors='coerce').fillna(0)
-        df_loaded['Objectif_LT'] = pd.to_numeric(df_loaded['Objectif_LT'], errors='coerce').fillna(0)
-        df_loaded['Catégorie'] = df_loaded['Catégorie'].astype(str).fillna('Non classé')
-        df_loaded['Devise'] = df_loaded['Devise'].astype(str).fillna(st.session_state.devise_cible)
+        try:
+            df_loaded['Quantité'] = pd.to_numeric(df_loaded['Quantité'], errors='coerce').fillna(0)
+            df_loaded['Acquisition'] = pd.to_numeric(df_loaded['Acquisition'], errors='coerce').fillna(0)
+            df_loaded['Objectif_LT'] = pd.to_numeric(df_loaded['Objectif_LT'], errors='coerce').fillna(0)
+            df_loaded['Catégorie'] = df_loaded['Catégorie'].astype(str).fillna('Non classé')
+            df_loaded['Devise'] = df_loaded['Devise'].astype(str).fillna(st.session_state.devise_cible)
+        except Exception as e:
+            st.error(f"Erreur lors du nettoyage des colonnes: {e}")
+            st.write("DEBUG: Exception in column cleaning:", str(e))
+            return
 
         st.session_state.df = df_loaded
         st.session_state.df_initial_import = df_loaded.copy()
@@ -178,6 +197,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
     else:
         st.session_state.df = pd.DataFrame()
         st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty. Check your data source.")
+        st.write("DEBUG: df_loaded:", df_loaded)
 
 # --- Récupération des données Yahoo Finance (prix actuels) ---
 def fetch_current_yahoo_data():
@@ -253,6 +273,7 @@ def fetch_current_fx_rates():
 
 # --- Chargement initial des données ---
 google_sheets_url_from_state = st.session_state.get("google_sheets_url", "")
+st.write("DEBUG: Initial google_sheets_url_from_state:", google_sheets_url_from_state)
 
 if st.session_state.df is None and google_sheets_url_from_state:
     with st.spinner("Chargement du portefeuille depuis Google Sheets..."):
@@ -428,6 +449,7 @@ with onglets[5]:
 
 with onglets[6]:
     from parametres import afficher_parametres_globaux
+    st.write("DEBUG: Before calling afficher_parametres_globaux, session state:", {k: type(v).__name__ for k, v in st.session_state.items()})
     st.write("DEBUG: Calling afficher_parametres_globaux with load_or_reload_portfolio")
     afficher_parametres_globaux(load_or_reload_portfolio)
 
