@@ -65,6 +65,8 @@ st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Configuration de l'actualisation automatique pour les données
 st_autorefresh(interval=600 * 1000, key="data_refresh_auto")
+if 'data_refresh_auto' not in st.session_state:
+    st.session_state.data_refresh_auto = 0
 
 # --- Initialisation des bases de données SQLite ---
 initialize_portfolio_journal_db()
@@ -101,19 +103,29 @@ if 'initial_portfolio_loaded_from_journal' not in st.session_state:
 # Tentative de chargement des données si les objets sont vides (première exécution)
 if 'portfolio_journal' in st.session_state and not st.session_state.portfolio_journal:
     try:
+        st.write("DEBUG: Loading portfolio journal")
         loaded_journal = load_portfolio_journal()
+        st.write("DEBUG: load_portfolio_journal returned:", loaded_journal, "type:", type(loaded_journal))
         if loaded_journal:
             st.session_state.portfolio_journal = loaded_journal
+        else:
+            st.write("DEBUG: No portfolio journal data loaded")
     except Exception as e:
-        st.error(f"Erreur lors du chargement du journal du portefeuille: {e}. Le journal reste vide.")
+        st.error(f"Erreur lors du chargement du journal du portefeuille: {e}")
+        st.write("DEBUG: Exception in load_portfolio_journal:", str(e))
 
 if 'df_historical_totals' in st.session_state and st.session_state.df_historical_totals.empty:
     try:
+        st.write("DEBUG: Loading historical data")
         loaded_historical = load_historical_data()
+        st.write("DEBUG: load_historical_data returned:", loaded_historical, "type:", type(loaded_historical))
         if not loaded_historical.empty:
             st.session_state.df_historical_totals = loaded_historical
+        else:
+            st.write("DEBUG: No historical data loaded")
     except Exception as e:
-        st.error(f"Erreur lors du chargement des totaux historiques: {e}. L'historique reste vide.")
+        st.error(f"Erreur lors du chargement des totaux historiques: {e}")
+        st.write("DEBUG: Exception in load_historical_data:", str(e))
 
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
@@ -125,9 +137,10 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
     if source_type == "fichier" and uploaded_file is not None:
         try:
             df_loaded, status = load_data(uploaded_file)
-            if status != "success":
+            st.write("DEBUG: load_data returned df_loaded:", df_loaded, "status:", status)
+            if status != "success" or df_loaded is None:
                 st.error(f"Échec du chargement du fichier: {status}")
-                st.write("DEBUG: load_data status:", status)
+                st.write("DEBUG: load_data failed with status:", status)
                 return
         except Exception as e:
             st.error(f"Erreur lors du chargement du fichier: {e}")
@@ -140,6 +153,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
             return
         try:
             df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
+            st.write("DEBUG: load_portfolio_from_google_sheets returned:", df_loaded)
             if df_loaded is None:
                 st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
                 st.write("DEBUG: load_portfolio_from_google_sheets returned None")
@@ -148,6 +162,9 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
             st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
             st.write("DEBUG: Exception in load_portfolio_from_google_sheets:", str(e))
             return
+    else:
+        st.write("DEBUG: No valid input provided for load_or_reload_portfolio, returning")
+        return
 
     if df_loaded is not None and not df_loaded.empty:
         # Vérifier la présence de la colonne 'Ticker'
@@ -193,7 +210,8 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
         st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
         st.success("Portefeuille chargé avec succès.")
-        st.rerun()
+        # st.rerun()  # Commented out to avoid rerun loops during debugging
+        st.write("DEBUG: Portfolio loaded, st.rerun() skipped for debugging")
     else:
         st.session_state.df = pd.DataFrame()
         st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty. Check your data source.")
@@ -275,25 +293,37 @@ def fetch_current_fx_rates():
 google_sheets_url_from_state = st.session_state.get("google_sheets_url", "")
 st.write("DEBUG: Initial google_sheets_url_from_state:", google_sheets_url_from_state)
 
-if st.session_state.df is None and google_sheets_url_from_state:
+if st.session_state.df.empty and google_sheets_url_from_state:
     with st.spinner("Chargement du portefeuille depuis Google Sheets..."):
-        load_or_reload_portfolio("google_sheets", google_sheets_url=google_sheets_url_from_state)
+        try:
+            st.write("DEBUG: Attempting to load portfolio from Google Sheets with URL:", google_sheets_url_from_state)
+            load_or_reload_portfolio("google_sheets", google_sheets_url=google_sheets_url_from_state)
+        except Exception as e:
+            st.error(f"Erreur lors du chargement initial depuis Google Sheets: {e}")
+            st.write("DEBUG: Exception in initial Google Sheets load:", str(e))
 
-if st.session_state.df is None:
+if st.session_state.df.empty:
     if 'portfolio_journal' in st.session_state and st.session_state.portfolio_journal and not st.session_state.get('initial_portfolio_loaded_from_journal', False):
         with st.spinner("Chargement du portefeuille depuis le dernier snapshot..."):
-            latest_snapshot = st.session_state.portfolio_journal[-1]
-            if not isinstance(latest_snapshot['portfolio_data'], pd.DataFrame):
-                st.error("Erreur: Le snapshot du journal ne contient pas un DataFrame valide.")
-            else:
-                st.session_state.df = latest_snapshot['portfolio_data']
-                st.session_state.devise_cible = latest_snapshot['target_currency']
-                st.session_state.df_initial_import = st.session_state.df.copy()
-                st.session_state.initial_portfolio_loaded_from_journal = True
-                st.success(f"Portefeuille chargé depuis le snapshot du {latest_snapshot['date'].strftime('%Y-%m-%d')}.")
-                st.rerun()
+            try:
+                latest_snapshot = st.session_state.portfolio_journal[-1]
+                st.write("DEBUG: Latest snapshot:", latest_snapshot, "type:", type(latest_snapshot))
+                if not isinstance(latest_snapshot['portfolio_data'], pd.DataFrame):
+                    st.error("Erreur: Le snapshot du journal ne contient pas un DataFrame valide.")
+                    st.write("DEBUG: Invalid portfolio_data type in snapshot:", type(latest_snapshot['portfolio_data']))
+                else:
+                    st.session_state.df = latest_snapshot['portfolio_data']
+                    st.session_state.devise_cible = latest_snapshot['target_currency']
+                    st.session_state.df_initial_import = st.session_state.df.copy()
+                    st.session_state.initial_portfolio_loaded_from_journal = True
+                    st.success(f"Portefeuille chargé depuis le snapshot du {latest_snapshot['date'].strftime('%Y-%m-%d')}.")
+                    # st.rerun()  # Commented out to avoid rerun loops during debugging
+                    st.write("DEBUG: Portfolio loaded from journal, st.rerun() skipped for debugging")
+            except Exception as e:
+                st.error(f"Erreur lors du chargement du snapshot: {e}")
+                st.write("DEBUG: Exception in portfolio journal load:", str(e))
 
-if st.session_state.df is None:
+if st.session_state.df.empty:
     st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
 
 # --- Traitement des données et affichage ---
@@ -450,6 +480,7 @@ with onglets[5]:
 with onglets[6]:
     from parametres import afficher_parametres_globaux
     st.write("DEBUG: Before calling afficher_parametres_globaux, session state:", {k: type(v).__name__ for k, v in st.session_state.items()})
+    st.write("DEBUG: Full session state before afficher_parametres_globaux:", {k: str(v)[:100] + "..." if len(str(v)) > 100 else str(v) for k, v in st.session_state.items()})
     st.write("DEBUG: Calling afficher_parametres_globaux with load_or_reload_portfolio")
     afficher_parametres_globaux(load_or_reload_portfolio)
 
