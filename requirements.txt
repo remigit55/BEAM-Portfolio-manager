@@ -16,3 +16,4 @@ matplotlib
 plotly
 Babel
 openpyxl
+SQLAlchemy
