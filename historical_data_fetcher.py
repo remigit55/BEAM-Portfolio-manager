@@ -47,7 +47,7 @@ def fetch_stock_history(Ticker, start_date, end_date):
         return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600)
-def fetch_historical_fx_rates(source_currencies, target_currency, start_date, end_date):
+def fetch_historical_fx_rates(source_currencies, target_currency, start_date, end_date, interval="1d"):
     """
     Récupère les taux de change historiques pour les paires de devises via Yahoo Finance.
     
@@ -56,39 +56,47 @@ def fetch_historical_fx_rates(source_currencies, target_currency, start_date, en
         target_currency: Target currency (e.g., 'EUR').
         start_date: Start date for historical data.
         end_date: End date for historical data.
+        interval: Data interval ('1d' for daily, '1wk' for weekly).
     
     Returns:
-        pd.DataFrame: MultiIndex (Date, Currency_Pair) with column 'Rate'.
+        dict: {date: {currency_pair: rate}}
     """
-    fx_data = []
+    fx_rates = {}
+    business_days = pd.bdate_range(start=start_date, end=end_date)
+    
     for source_currency in source_currencies:
         if source_currency == target_currency:
             continue
         pair = f"{source_currency}{target_currency}=X"
         try:
             ticker = yf.Ticker(pair)
-            hist = ticker.history(start=start_date, end=end_date + timedelta(days=1), interval="1d", progress=False)
+            hist = ticker.history(start=start_date, end=end_date + timedelta(days=1), interval=interval, progress=False)
             if not hist.empty:
                 hist = hist[['Close']].reset_index()
-                hist['Currency_Pair'] = f"{source_currency}{target_currency}"
                 hist['Date'] = pd.to_datetime(hist['Date']).dt.date
                 hist = hist.rename(columns={'Close': 'Rate'})
-                fx_data.append(hist[['Date', 'Currency_Pair', 'Rate']])
+                # Interpolate to daily rates if using weekly data
+                if interval == "1wk":
+                    hist = hist.set_index('Date').reindex(business_days).interpolate(method='linear').reset_index()
+                    hist['Date'] = hist['index']
+                    hist = hist.drop(columns=['index'])
+                for _, row in hist.iterrows():
+                    date = row['Date']
+                    if date not in fx_rates:
+                        fx_rates[date] = {}
+                    fx_rates[date][f"{source_currency}{target_currency}"] = row['Rate']
             else:
                 st.warning(f"Aucune donnée de taux de change pour {pair} entre {start_date} et {end_date}.")
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux pour {pair} : {builtins.str(type(e).__name__)} - {builtins.str(e)}")
     
-    if fx_data:
-        df = pd.concat(fx_data, ignore_index=True)
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.set_index(['Date', 'Currency_Pair'])['Rate']
-        df = df.unstack().ffill().bfill().stack().reset_index(name='Rate')
-        df['Date'] = pd.to_datetime(df['Date'])
-        return df.set_index(['Date', 'Currency_Pair'])
-    else:
-        st.warning("Aucun taux de change historique récupéré. Retour d'un DataFrame vide.")
-        return pd.DataFrame(columns=['Date', 'Currency_Pair', 'Rate']).set_index(['Date', 'Currency_Pair'])
+    # Ensure all business days have rates (fill missing with 1.0)
+    for date in business_days:
+        date = date.date()
+        if date not in fx_rates:
+            fx_rates[date] = {f"{c}{target_currency}": 1.0 for c in source_currencies if c != target_currency}
+    
+    return fx_rates
 
 @st.cache_data(ttl=3600)
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
@@ -106,7 +114,7 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
 
-    historical_fx_df = fetch_historical_fx_rates(currencies, target_currency, start_date, end_date)
-    historical_fx = {row['Currency_Pair']: row['Rate'] for _, row in historical_fx_df.reset_index().iterrows()}
+    interval = "1wk" if (end_date - start_date).days > 365 else "1d"
+    historical_fx = fetch_historical_fx_rates(currencies, target_currency, start_date, end_date, interval=interval)
             
     return historical_prices, historical_fx
