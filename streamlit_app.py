@@ -27,7 +27,7 @@ def convertir(montant, devise_source, devise_cible, fx_rates):
     if devise_source == devise_cible:
         return montant
     
-    # Construire la clé de converion (ex: USDCAD, EURUSD)
+    # Construire la clé de conversion (ex: USDCAD, EURUSD)
     taux_key = f"{devise_source}{devise_cible}"
     
     # Vérifier si le taux direct existe
@@ -49,7 +49,7 @@ from performance import display_performance_history
 from transactions import afficher_transactions
 from od_comptables import afficher_od_comptables
 from taux_change import afficher_tableau_taux_change
-from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data  # Assurez-vous que ces fonctions ont les @st.cache_data(ttl=...)
+from data_fetcher import fetch_fx_rates, fetch_yahoo_data, fetch_momentum_data
 from utils import safe_escape, format_fr
 from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal, initialize_portfolio_journal_db
 from historical_data_manager import save_daily_totals, load_historical_data, initialize_historical_data_db
@@ -116,23 +116,27 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
     """Charge ou recharge le portefeuille en fonction de la source."""
     df_loaded = None
     if source_type == "fichier" and uploaded_file:
-        df_loaded, _ = load_data(uploaded_file)
+        df_loaded, status = load_data(uploaded_file)
+        if status != "success":
+            st.error(f"Échec du chargement du fichier: {status}")
+            return
     elif source_type == "google_sheets" and google_sheets_url:
         df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
+        if df_loaded is None:
+            st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
+            return
 
     if df_loaded is not None and not df_loaded.empty:
-        st.session_state.df = df_loaded
-        st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
-        st.write("DEBUG (SUCCESS): Is st.session_state.df empty?", st.session_state.df.empty)
-    else:
-        st.session_state.df = pd.DataFrame()
-        st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty.")
-
-    if df_loaded is not None:
-        # Nettoyage et conversion des données après chargement
+        # Vérifier la présence de la colonne 'Ticker'
         if 'Ticker' not in df_loaded.columns:
-            st.error("Le fichier importé doit contenir une colonne 'Ticker'.")
-            return
+            ticker_col = next((col for col in df_loaded.columns if col.lower() in ['ticker', 'tickers']), None)
+            if ticker_col:
+                df_loaded.rename(columns={ticker_col: 'Ticker'}, inplace=True)
+            else:
+                st.error("Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers'). Colonnes trouvées: {}".format(df_loaded.columns.tolist()))
+                st.session_state.df = pd.DataFrame()
+                return
+        # Nettoyage et conversion des données
         df_loaded['Quantité'] = pd.to_numeric(df_loaded['Quantité'], errors='coerce').fillna(0)
         df_loaded['Acquisition'] = pd.to_numeric(df_loaded['Acquisition'], errors='coerce').fillna(0)
         df_loaded['Objectif_LT'] = pd.to_numeric(df_loaded['Objectif_LT'], errors='coerce').fillna(0)
@@ -144,11 +148,13 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.session_state.last_yahoo_update_time = datetime.datetime.now(datetime.timezone.utc)
         st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
 
+        st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
+        st.write("DEBUG (SUCCESS): Is st.session_state.df empty?", st.session_state.df.empty)
         st.success("Portefeuille chargé avec succès.")
         st.rerun()
     else:
-        st.warning("Impossible de charger le portefeuille. Veuillez vérifier la source.")
-        st.session_state.df = None
+        st.session_state.df = pd.DataFrame()
+        st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty. Check your data source.")
 
 # --- Récupération des données Yahoo Finance (prix actuels) ---
 def fetch_current_yahoo_data():
@@ -235,16 +241,13 @@ if st.session_state.df is None:
     st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
 
 # --- Traitement des données et affichage ---
-if st.session_state.df is not None:
+if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Ticker' in st.session_state.df.columns:
     current_prices = fetch_current_yahoo_data()
     momentum_data = fetch_current_momentum_data()
     fx_rates = fetch_current_fx_rates()
     df_portfolio = st.session_state.df.copy()
 
-    if isinstance(df_portfolio, pd.DataFrame) and not df_portfolio.empty:
-        st.write("DEBUG: Columns in df_portfolio before mapping:", df_portfolio.columns.tolist())
-    else:
-        st.write("DEBUG: df_portfolio is empty or not a DataFrame before mapping.")
+    st.write("DEBUG: Columns in df_portfolio before mapping:", df_portfolio.columns.tolist())
 
     df_portfolio['Prix Actuel'] = df_portfolio['Ticker'].map(current_prices)
     df_portfolio['Momentum'] = df_portfolio['Ticker'].map(momentum_data.get('momentum_score', {}))
@@ -306,9 +309,11 @@ if st.session_state.df is not None:
         st.info(f"Totaux quotidiens du {current_date.strftime('%Y-%m-%d')} enregistrés.")
     else:
         print(f"DEBUG: Totaux quotidiens déjà à jour pour {current_date}.")
+else:
+    st.warning("Aucune donnée de portefeuille valide ou colonne 'Ticker' manquante. Veuillez charger un fichier ou une URL Google Sheets valide.")
 
 # Example calculations
-if 'df' in st.session_state and not st.session_state.df.empty:
+if 'df' in st.session_state and isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Ticker' in st.session_state.df.columns:
     total_valeur = st.session_state.df['Valeur Totale'].sum() if 'Valeur Totale' in st.session_state.df.columns else 0.0
     total_actuelle = st.session_state.df['Valeur Actuelle'].sum() if 'Valeur Actuelle' in st.session_state.df.columns else 0.0
     total_h52 = st.session_state.df['Valeur H52'].sum() if 'Valeur H52' in st.session_state.df.columns else 0.0
@@ -356,19 +361,19 @@ with onglets[1]:
         st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
 
 with onglets[2]:
-    if st.session_state.df is None:
+    if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
         st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir les performances.")
     else:
         display_performance_history()
 
 with onglets[3]:
-    if st.session_state.df is None:
+    if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
         st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour générer les OD Comptables.")
     else:
         afficher_od_comptables()
 
 with onglets[4]:
-    if st.session_state.df is None:
+    if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
         st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour gérer les transactions.")
     else:
         afficher_transactions()
