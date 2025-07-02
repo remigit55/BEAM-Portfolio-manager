@@ -24,6 +24,10 @@ def convertir(montant, devise_source, devise_cible, fx_rates):
     if montant is None or pd.isna(montant):
         return 0.0
 
+    if not isinstance(devise_source, str) or not isinstance(devise_cible, str):
+        st.error(f"Invalid currency types: source={type(devise_source)}, cible={type(devise_cible)}")
+        return montant
+
     if devise_source == devise_cible:
         return montant
     
@@ -129,19 +133,31 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
     if df_loaded is not None and not df_loaded.empty:
         # Vérifier la présence de la colonne 'Ticker'
         if 'Ticker' not in df_loaded.columns:
-            ticker_col = next((col for col in df_loaded.columns if col.lower() in ['ticker', 'tickers']), None)
+            ticker_col = next((col for col in df_loaded.columns if col.lower() in ['ticker', 'tickers', 'symbol']), None)
             if ticker_col:
                 df_loaded.rename(columns={ticker_col: 'Ticker'}, inplace=True)
             else:
-                st.error("Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers'). Colonnes trouvées: {}".format(df_loaded.columns.tolist()))
+                st.error(f"Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers', 'Symbol'). Colonnes trouvées: {df_loaded.columns.tolist()}")
                 st.session_state.df = pd.DataFrame()
                 return
         # Nettoyage et conversion des données
+        required_columns = ['Quantité', 'Acquisition', 'Objectif_LT', 'Catégorie', 'Devise']
+        missing_columns = [col for col in required_columns if col not in df_loaded.columns]
+        if missing_columns:
+            st.warning(f"Colonnes manquantes dans les données importées: {missing_columns}. Initialisation avec des valeurs par défaut.")
+            for col in missing_columns:
+                if col in ['Quantité', 'Acquisition', 'Objectif_LT']:
+                    df_loaded[col] = 0.0
+                elif col == 'Catégorie':
+                    df_loaded[col] = 'Non classé'
+                elif col == 'Devise':
+                    df_loaded[col] = st.session_state.devise_cible
+
         df_loaded['Quantité'] = pd.to_numeric(df_loaded['Quantité'], errors='coerce').fillna(0)
         df_loaded['Acquisition'] = pd.to_numeric(df_loaded['Acquisition'], errors='coerce').fillna(0)
         df_loaded['Objectif_LT'] = pd.to_numeric(df_loaded['Objectif_LT'], errors='coerce').fillna(0)
         df_loaded['Catégorie'] = df_loaded['Catégorie'].fillna('Non classé')
-        df_loaded['Devise'] = df_loaded['Devise'].fillna(st.session_state.devise_cible)
+        df_loaded['Devise'] = df_loaded['Devise'].astype(str).fillna(st.session_state.devise_cible)
 
         st.session_state.df = df_loaded
         st.session_state.df_initial_import = df_loaded.copy()
@@ -150,6 +166,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
 
         st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
         st.write("DEBUG (SUCCESS): Is st.session_state.df empty?", st.session_state.df.empty)
+        st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
         st.success("Portefeuille chargé avec succès.")
         st.rerun()
     else:
@@ -172,6 +189,9 @@ def fetch_current_yahoo_data():
 
     print("DEBUG: Fetching Yahoo data from source...")
     current_prices = fetch_yahoo_data(tickers)
+    if not isinstance(current_prices, dict):
+        st.error("Erreur: fetch_yahoo_data n'a pas retourné un dictionnaire.")
+        return {}
     st.session_state.yahoo_data = current_prices
     st.session_state.last_yahoo_update_time = datetime.datetime.now(datetime.timezone.utc)
     return current_prices
@@ -192,6 +212,9 @@ def fetch_current_momentum_data():
 
     print("DEBUG: Fetching momentum data from source...")
     momentum_data = fetch_momentum_data(tickers)
+    if not isinstance(momentum_data, dict):
+        st.error("Erreur: fetch_momentum_data n'a pas retourné un dictionnaire.")
+        return {}
     st.session_state.momentum_data = momentum_data
     st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
     return momentum_data
@@ -208,6 +231,9 @@ def fetch_current_fx_rates():
         print("DEBUG: Fetching FX rates from source...")
         try:
             st.session_state.fx_rates = fetch_fx_rates(st.session_state.devise_cible)
+            if not isinstance(st.session_state.fx_rates, dict):
+                st.error("Erreur: fetch_fx_rates n'a pas retourné un dictionnaire.")
+                st.session_state.fx_rates = {}
             st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
             st.session_state.last_devise_cible_for_currency_update = st.session_state.devise_cible
             print(f"DEBUG: Taux de change mis à jour pour {st.session_state.devise_cible}")
@@ -230,12 +256,15 @@ if st.session_state.df is None:
     if 'portfolio_journal' in st.session_state and st.session_state.portfolio_journal and not st.session_state.get('initial_portfolio_loaded_from_journal', False):
         with st.spinner("Chargement du portefeuille depuis le dernier snapshot..."):
             latest_snapshot = st.session_state.portfolio_journal[-1]
-            st.session_state.df = latest_snapshot['portfolio_data']
-            st.session_state.devise_cible = latest_snapshot['target_currency']
-            st.session_state.df_initial_import = st.session_state.df.copy()
-            st.session_state.initial_portfolio_loaded_from_journal = True
-            st.success(f"Portefeuille chargé depuis le snapshot du {latest_snapshot['date'].strftime('%Y-%m-%d')}.")
-            st.rerun()
+            if not isinstance(latest_snapshot['portfolio_data'], pd.DataFrame):
+                st.error("Erreur: Le snapshot du journal ne contient pas un DataFrame valide.")
+            else:
+                st.session_state.df = latest_snapshot['portfolio_data']
+                st.session_state.devise_cible = latest_snapshot['target_currency']
+                st.session_state.df_initial_import = st.session_state.df.copy()
+                st.session_state.initial_portfolio_loaded_from_journal = True
+                st.success(f"Portefeuille chargé depuis le snapshot du {latest_snapshot['date'].strftime('%Y-%m-%d')}.")
+                st.rerun()
 
 if st.session_state.df is None:
     st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
@@ -248,6 +277,7 @@ if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.emp
     df_portfolio = st.session_state.df.copy()
 
     st.write("DEBUG: Columns in df_portfolio before mapping:", df_portfolio.columns.tolist())
+    st.write("DEBUG: DataFrame dtypes:", df_portfolio.dtypes.to_dict())
 
     df_portfolio['Prix Actuel'] = df_portfolio['Ticker'].map(current_prices)
     df_portfolio['Momentum'] = df_portfolio['Ticker'].map(momentum_data.get('momentum_score', {}))
@@ -326,6 +356,7 @@ else:
 
 if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty:
     st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
+    st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
 else:
     st.write("DEBUG: st.session_state.df is empty or not a DataFrame yet.")
 
@@ -351,14 +382,22 @@ with onglets[0]:
     )
 
 with onglets[1]:
-    afficher_portefeuille(st.session_state.df, st.session_state.devise_cible)
+    if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
+        st.warning("Aucune donnée de portefeuille valide ou colonne 'Ticker' manquante pour afficher le portefeuille.")
+    else:
+        st.write("DEBUG: Calling afficher_portefeuille with df columns:", st.session_state.df.columns.tolist())
+        st.write("DEBUG: devise_cible:", st.session_state.devise_cible)
+        afficher_portefeuille(st.session_state.df, st.session_state.devise_cible)
 
     current_date = datetime.date.today()
     if st.button(f"Enregistrer le snapshot du portefeuille ({current_date.strftime('%Y-%m-%d')})", key="save_snapshot_btn"):
-        with st.spinner("Enregistrement du snapshot quotidien du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
-            save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible)
-        st.session_state.portfolio_journal = load_portfolio_journal()
-        st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
+        if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
+            st.error("Impossible d'enregistrer le snapshot: aucune donnée de portefeuille valide.")
+        else:
+            with st.spinner("Enregistrement du snapshot quotidien du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
+                save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible)
+            st.session_state.portfolio_journal = load_portfolio_journal()
+            st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
 
 with onglets[2]:
     if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
