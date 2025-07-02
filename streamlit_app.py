@@ -9,9 +9,7 @@ import os
 import yfinance as yf
 import pytz
 import builtins
-import time # Importer le module time
 
-# Ensure str is callable, though this is usually not necessary
 if not callable(str):
     str = builtins.str
     builtins.str = str
@@ -57,22 +55,26 @@ from portfolio_journal import save_portfolio_snapshot, load_portfolio_journal, i
 from historical_data_manager import save_daily_totals, load_historical_data, initialize_historical_data_db # Ajout de save_daily_totals, load_historical_data, initialize_historical_data_db
 from streamlit_autorefresh import st_autorefresh
 from data_loader import load_data, save_data, load_portfolio_from_google_sheets # Importation correcte et unique
+import time # Importer le module time
 
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
 # Configuration de l'actualisation automatique pour les données
 # Le script entier sera relancé toutes les 600 secondes (60000 millisecondes)
+# N'oubliez pas que cela relance TOUTE l'application Streamlit.
 st_autorefresh(interval=600 * 1000, key="data_refresh_auto")
 
 # --- Initialisation des bases de données SQLite ---
+# Cette fonction est appelée une seule fois au début pour créer les tables si elles n'existent pas.
 initialize_portfolio_journal_db()
 initialize_historical_data_db()
+
 
 # --- Initialisation des session_state ---
 # Assurez-vous que les clés existent toujours AVANT de tenter de charger des données.
 if 'df' not in st.session_state:
-    st.session_state.df = None
+    st.session_state.df = pd.DataFrame()
 if 'fx_rates' not in st.session_state:
     st.session_state.fx_rates = {}
 if 'last_update_time_fx' not in st.session_state:
@@ -105,6 +107,7 @@ if st.session_state.df_historical_totals.empty: # Vérifie si c'est vide
     except Exception as e:
         st.error(f"Erreur lors du chargement des totaux historiques: {e}. L'historique reste vide.")
 
+
 if 'df_initial_import' not in st.session_state: # Pour garder une trace du DF initialement importé
     st.session_state.df_initial_import = None
 if 'last_yahoo_update_time' not in st.session_state:
@@ -124,6 +127,21 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         df_loaded, _ = load_data(uploaded_file)
     elif source_type == "google_sheets" and google_sheets_url:
         df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
+
+
+    if df_loaded is not None and not df_loaded.empty:
+        st.session_state.df = df_loaded
+        st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
+        st.write("DEBUG (SUCCESS): Is st.session_state.df empty?", st.session_state.df.empty)
+    else:
+        st.session_state.df = pd.DataFrame() # S'assurer qu'il est vide si le chargement échoue
+        st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty.")
+
+
+
+
+
+
 
     if df_loaded is not None:
         # Nettoyage et conversion des données après chargement
@@ -149,9 +167,15 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.warning("Impossible de charger le portefeuille. Veuillez vérifier la source.")
         st.session_state.df = None
 
+
 # --- Récupération des données Yahoo Finance (prix actuels) ---
 def fetch_current_yahoo_data():
-    tickers = st.session_state.df['Ticker'].dropna().unique().tolist() if st.session_state.df is not None else []
+    # Inside fetch_current_yahoo_data function
+    if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Ticker' in st.session_state.df.columns:
+        tickers = st.session_state.df['Ticker'].dropna().unique().tolist()
+    else:
+        tickers = [] # Return an empty list if df is not ready or 'Ticker' column is missing
+    # Optionally, you could add a st.warning("Portfolio data not yet loaded or 'Ticker' column missing.") here
 
     # Vérifier si la dernière mise à jour est trop récente (moins de 10 minutes)
     if (datetime.datetime.now() - st.session_state.last_yahoo_update_time).total_seconds() < 600 and 'yahoo_data' in st.session_state:
@@ -166,7 +190,11 @@ def fetch_current_yahoo_data():
 
 # --- Récupération des données de Momentum ---
 def fetch_current_momentum_data():
-    tickers = st.session_state.df['Ticker'].dropna().unique().tolist() if st.session_state.df is not None else []
+    # Inside fetch_current_momentum_data function (around line 178)
+    if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Ticker' in st.session_state.df.columns:
+        tickers = st.session_state.df['Ticker'].dropna().unique().tolist()
+    else:
+        tickers = [] # Return an empty list if df is not ready or 'Ticker' column is missing
 
     # Vérifier si la dernière mise à jour est trop récente (moins de 60 minutes)
     if (datetime.datetime.now() - st.session_state.last_momentum_update_time).total_seconds() < 3600 and 'momentum_data' in st.session_state:
@@ -178,6 +206,7 @@ def fetch_current_momentum_data():
     st.session_state.momentum_data = momentum_data
     st.session_state.last_momentum_update_time = datetime.datetime.now()
     return momentum_data
+
 
 # --- Récupération des Taux de Change ---
 def fetch_current_fx_rates():
@@ -195,6 +224,7 @@ def fetch_current_fx_rates():
     else:
         print("DEBUG: FX rates from cache (less than 10 mins old).")
     return st.session_state.fx_rates
+
 
 # --- Chargement initial des données ---
 # Récupérer l'URL de Google Sheets depuis session_state si elle existe
@@ -223,6 +253,10 @@ if st.session_state.df is None:
 if st.session_state.df is None:
     st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
 
+
+
+
+
 # --- Traitement des données et affichage ---
 if st.session_state.df is not None:
     # Récupérer les données actualisées
@@ -230,6 +264,20 @@ if st.session_state.df is not None:
     momentum_data = fetch_current_momentum_data()
     fx_rates = fetch_current_fx_rates()
     df_portfolio = st.session_state.df.copy()
+
+
+
+
+# Ajouter CE bloc de débogage APRES df_portfolio est défini
+if isinstance(df_portfolio, pd.DataFrame) and not df_portfolio.empty:
+    st.write("DEBUG: Columns in df_portfolio before mapping:", df_portfolio.columns.tolist())
+else:
+    st.write("DEBUG: df_portfolio is empty or not a DataFrame before mapping.")
+
+
+
+
+
 
     # Fusionner les prix actuels et le momentum avec le DataFrame du portefeuille
     df_portfolio['Prix Actuel'] = df_portfolio['Ticker'].map(current_prices)
@@ -259,18 +307,13 @@ if st.session_state.df is not None:
     )
 
     # Calcul de la H52 et LT
-    # Assurez-vous que 'H52' et 'Objectif_LT' sont des colonnes valides dans df_portfolio avant d'y accéder.
-    # Si H52 ou Objectif_LT sont des prix absolus dans la devise d'origine, ils doivent être convertis.
-    # Pour l'instant, je vais supposer qu'ils sont déjà dans la devise cible ou que leur conversion est gérée ailleurs.
-    # Si 'H52' et 'Objectif_LT' sont déjà des pourcentages ou des valeurs relatives par rapport au prix actuel,
-    # cette logique de conversion n'est pas nécessaire ici.
     df_portfolio['H52 (%)'] = np.where(
-        (df_portfolio['Prix Actuel'].notna()) & (df_portfolio['Prix Actuel'] != 0) & (df_portfolio['H52'].notna()),
+        df_portfolio['Prix Actuel'] != 0,
         ((df_portfolio['Prix Actuel'] - df_portfolio['H52']) / df_portfolio['Prix Actuel']) * 100,
         0
     )
     df_portfolio['LT (%)'] = np.where(
-        (df_portfolio['Prix Actuel'].notna()) & (df_portfolio['Prix Actuel'] != 0) & (df_portfolio['Objectif_LT'].notna()),
+        df_portfolio['Prix Actuel'] != 0,
         ((df_portfolio['Prix Actuel'] - df_portfolio['Objectif_LT']) / df_portfolio['Prix Actuel']) * 100,
         0
     )
@@ -290,21 +333,16 @@ if st.session_state.df is not None:
         print("DEBUG: Sauvegarde des totaux quotidiens...")
         total_acquisition_value = df_portfolio['Acquisition (Devise Cible)'].sum()
         total_current_value = df_portfolio['Valeur Actuelle'].sum()
-        
-        # S'assurer que H52 et Objectif_LT sont traités correctement pour les totaux.
-        # Si ce sont des valeurs monétaires, summez-les après conversion.
-        # Si ce sont des prix, vous devrez peut-être calculer une valeur équivalente du portefeuille
-        # à ces niveaux de prix. Pour l'exemple, je vais sommer les colonnes si elles existent.
-        total_h52_value = df_portfolio['H52'].sum() if 'H52' in df_portfolio.columns else 0 
-        total_lt_value = df_portfolio['Objectif_LT'].sum() if 'Objectif_LT' in df_portfolio.columns else 0
+        total_h52_value = df_portfolio['H52'].sum() if 'H52' in df_portfolio.columns else 0 # Assuming H52 will be calculated elsewhere
+        total_lt_value = df_portfolio['Objectif_LT'].sum() if 'Objectif_LT' in df_portfolio.columns else 0 # Assuming LT will be calculated elsewhere
 
         with st.spinner("Sauvegarde des totaux quotidiens du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
             save_daily_totals(
                 current_date,
                 total_acquisition_value,
                 total_current_value,
-                total_h52_value, # Ceci doit être la somme des valeurs H52 converties si elles sont monétaires.
-                total_lt_value, # Ceci doit être la somme des valeurs Objectif_LT converties si elles sont monétaires.
+                total_h52_value,
+                total_lt_value,
                 st.session_state.devise_cible
             )
         st.session_state.df_historical_totals = load_historical_data() # Recharger l'historique après sauvegarde
@@ -312,48 +350,59 @@ if st.session_state.df is not None:
     else:
         print(f"DEBUG: Totaux quotidiens déjà à jour pour {current_date}.")
 
+
+# Example calculations - PLACE THESE BEFORE THE 'with onglets[0]:' block
+# Ensure st.session_state.df and st.session_state.df_historical_totals exist and are populated
+# with the necessary columns (e.g., 'Valeur Actuelle', 'Valeur H52', etc.)
+
+if 'df' in st.session_state and not st.session_state.df.empty:
+    total_valeur = st.session_state.df['Valeur Totale'].sum() # Example
+    total_actuelle = st.session_state.df['Valeur Actuelle'].sum() # Example
+    total_h52 = st.session_state.df['Valeur H52'].sum() # Example
+    total_lt = st.session_state.df['Valeur LT'].sum() # Example
+else:
+    # Provide default values if df is empty or not yet loaded
+    total_valeur = 0.0
+    total_actuelle = 0.0
+    total_h52 = 0.0
+    total_lt = 0.0
+
+# st.session_state.df = fetch_yahoo_data(...) # Your data loading line
+# if 'df' in st.session_state and not st.session_state.df.empty: # Add check here
+#     st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
+# OR, if it's within a function:
+# st.write(df.columns.tolist())
+
+# A good general spot if you're unsure is just before the `st.tabs` block:
+if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty:
+    st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
+else:
+    st.write("DEBUG: st.session_state.df is empty or not a DataFrame yet.")
+
+
+
 # --- Onglets de l'application ---
 onglets = st.tabs([
     "Synthèse", "Portefeuille", "Performance",
     "OD Comptables", "Transactions", "Taux de Change", "Paramètres"
 ])
 
-with onglets[0]:
-    # Calcul des totaux nécessaires pour afficher_synthese_globale
-    # Ces sommes doivent être effectuées sur le df_portfolio qui est dans st.session_state.df
-    if st.session_state.df is not None and not st.session_state.df.empty:
-        total_valeur = st.session_state.df['Acquisition (Devise Cible)'].sum()
-        total_actuelle = st.session_state.df['Valeur Actuelle'].sum()
-        
-        # Pour H52 et LT, si ce sont des prix par titre, vous devez les convertir en valeur du portefeuille
-        # à ces niveaux de prix. Si ce sont des valeurs totales déjà, utilisez-les directement.
-        # Si 'H52' et 'Objectif_LT' sont les prix de chaque titre, nous devons les multiplier par la quantité
-        # et les convertir à la devise cible pour obtenir des totaux significatifs.
-        total_h52 = (st.session_state.df['Quantité'] * st.session_state.df.apply(
-            lambda row: convertir(row['H52'], row['Devise'], st.session_state.devise_cible, st.session_state.fx_rates)
-            if 'H52' in row and row['Devise'] != st.session_state.devise_cible else row.get('H52', 0), axis=1
-        )).sum()
-        
-        total_lt = (st.session_state.df['Quantité'] * st.session_state.df.apply(
-            lambda row: convertir(row['Objectif_LT'], row['Devise'], st.session_state.devise_cible, st.session_state.fx_rates)
-            if 'Objectif_LT' in row and row['Devise'] != st.session_state.devise_cible else row.get('Objectif_LT', 0), axis=1
-        )).sum()
+if not st.session_state.df.empty: # Check if it's not empty before printing columns
+    st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
 
-        afficher_synthese_globale(
-            total_valeur, # Ceci est la "total_acquisition_value"
-            total_actuelle, # Ceci est la "total_current_value"
-            total_h52, # Ceci est la "total_h52_value" calculée pour le portefeuille
-            total_lt, # Ceci est la "total_lt_value" calculée pour le portefeuille
-            st.session_state.df_historical_totals,
-            st.session_state.devise_cible,
-            st.session_state.target_allocations,
-            st.session_state.target_volatility
-        )
-    else:
-        st.warning("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets pour voir la synthèse.")
+with onglets[0]:
+    afficher_synthese_globale(
+        total_valeur,
+        total_actuelle,
+        total_h52,
+        total_lt,
+        st.session_state.df_historical_totals,
+        st.session_state.devise_cible,
+        st.session_state.target_allocations,
+        st.session_state.target_volatility
+    )
 
 with onglets[1]:
-    # La fonction afficher_portefeuille est bien appelée ici
     afficher_portefeuille(st.session_state.df, st.session_state.devise_cible)
 
     # Bouton pour enregistrer un snapshot manuel du portefeuille
@@ -363,6 +412,7 @@ with onglets[1]:
             save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible)
         st.session_state.portfolio_journal = load_portfolio_journal() # Recharger le journal après sauvegarde
         st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
+
 
 with onglets[2]:
     if st.session_state.df is None:
