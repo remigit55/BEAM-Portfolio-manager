@@ -118,6 +118,7 @@ if 'df_historical_totals' in st.session_state and st.session_state.df_historical
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
     """Charge ou recharge le portefeuille en fonction de la source."""
+    st.write("DEBUG: Entering load_or_reload_portfolio with source_type:", source_type)
     df_loaded = None
     if source_type == "fichier" and uploaded_file:
         df_loaded, status = load_data(uploaded_file)
@@ -140,7 +141,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
                 st.error(f"Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers', 'Symbol'). Colonnes trouvées: {df_loaded.columns.tolist()}")
                 st.session_state.df = pd.DataFrame()
                 return
-        # Nettoyage et conversion des données
+        # Vérifier et initialiser les colonnes nécessaires
         required_columns = ['Quantité', 'Acquisition', 'Objectif_LT', 'Catégorie', 'Devise']
         missing_columns = [col for col in required_columns if col not in df_loaded.columns]
         if missing_columns:
@@ -153,10 +154,11 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
                 elif col == 'Devise':
                     df_loaded[col] = st.session_state.devise_cible
 
+        # Nettoyage et conversion des colonnes
         df_loaded['Quantité'] = pd.to_numeric(df_loaded['Quantité'], errors='coerce').fillna(0)
         df_loaded['Acquisition'] = pd.to_numeric(df_loaded['Acquisition'], errors='coerce').fillna(0)
         df_loaded['Objectif_LT'] = pd.to_numeric(df_loaded['Objectif_LT'], errors='coerce').fillna(0)
-        df_loaded['Catégorie'] = df_loaded['Catégorie'].fillna('Non classé')
+        df_loaded['Catégorie'] = df_loaded['Catégorie'].astype(str).fillna('Non classé')
         df_loaded['Devise'] = df_loaded['Devise'].astype(str).fillna(st.session_state.devise_cible)
 
         st.session_state.df = df_loaded
@@ -165,7 +167,6 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
 
         st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
-        st.write("DEBUG (SUCCESS): Is st.session_state.df empty?", st.session_state.df.empty)
         st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
         st.success("Portefeuille chargé avec succès.")
         st.rerun()
@@ -422,6 +423,7 @@ with onglets[5]:
 
 with onglets[6]:
     from parametres import afficher_parametres_globaux
+    st.write("DEBUG: Calling afficher_parametres_globaux with load_or_reload_portfolio")
     afficher_parametres_globaux(load_or_reload_portfolio)
 
 st.markdown("---")
