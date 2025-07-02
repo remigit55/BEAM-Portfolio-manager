@@ -1,5 +1,3 @@
-# historical_data_fetcher.py
-
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
@@ -49,10 +47,49 @@ def fetch_stock_history(Ticker, start_date, end_date):
         return pd.Series(dtype='float64')
 
 @st.cache_data(ttl=3600)
-def fetch_historical_fx_rates(target_currency, start_date, end_date):
-    """Récupère les taux de change historiques via yfinance."""
-    # [Unchanged code, as it does not involve GBP-specific logic]
-    # ... (same as original)
+def fetch_historical_fx_rates(source_currencies, target_currency, start_date, end_date):
+    """
+    Récupère les taux de change historiques pour les paires de devises via Yahoo Finance.
+    
+    Args:
+        source_currencies: List of source currencies (e.g., ['USD', 'GBP']).
+        target_currency: Target currency (e.g., 'EUR').
+        start_date: Start date for historical data.
+        end_date: End date for historical data.
+    
+    Returns:
+        pd.DataFrame: Columns ['Date', 'Currency_Pair', 'Rate'].
+    """
+    fx_data = []
+    for source_currency in source_currencies:
+        if source_currency == target_currency:
+            continue
+        pair = f"{source_currency}{target_currency}=X"  # e.g., USDEUR=X
+        try:
+            ticker = yf.Ticker(pair)
+            hist = ticker.history(start=start_date, end=end_date + timedelta(days=1), interval="1d", progress=False)
+            if not hist.empty:
+                hist = hist[['Close']].reset_index()
+                hist['Currency_Pair'] = f"{source_currency}{target_currency}"
+                hist['Date'] = pd.to_datetime(hist['Date']).dt.date
+                hist = hist.rename(columns={'Close': 'Rate'})
+                fx_data.append(hist[['Date', 'Currency_Pair', 'Rate']])
+            else:
+                st.warning(f"Aucune donnée de taux de change pour {pair} entre {start_date} et {end_date}.")
+        except Exception as e:
+            st.error(f"Erreur lors de la récupération des taux pour {pair} : {builtins.str(type(e).__name__)} - {builtins.str(e)}")
+    
+    if fx_data:
+        df = pd.concat(fx_data, ignore_index=True)
+        df['Date'] = pd.to_datetime(df['Date'])
+        # Forward-fill missing rates to handle gaps
+        df = df.pivot(index='Date', columns='Currency_Pair', values='Rate').ffill().bfill().reset_index()
+        df = df.melt(id_vars=['Date'], var_name='Currency_Pair', value_name='Rate')
+        df = df.dropna(subset=['Rate'])
+        return df
+    else:
+        st.warning("Aucun taux de change historique récupéré. Retour d'un DataFrame vide.")
+        return pd.DataFrame(columns=['Date', 'Currency_Pair', 'Rate'])
 
 @st.cache_data(ttl=3600)
 def get_all_historical_data(tickers, currencies, start_date, end_date, target_currency):
@@ -70,7 +107,7 @@ def get_all_historical_data(tickers, currencies, start_date, end_date, target_cu
             prices = prices.reindex(business_days).ffill().bfill()
             historical_prices[ticker] = prices
 
-    historical_fx_df = fetch_historical_fx_rates(target_currency, start_date, end_date)
-    historical_fx = {col: historical_fx_df[col] for col in historical_fx_df.columns}
+    historical_fx_df = fetch_historical_fx_rates(currencies, target_currency, start_date, end_date)
+    historical_fx = {row['Currency_Pair']: row['Rate'] for _, row in historical_fx_df.iterrows()}
             
     return historical_prices, historical_fx
