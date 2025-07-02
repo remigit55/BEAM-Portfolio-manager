@@ -18,8 +18,8 @@ def afficher_tableau_taux_change(devise_cible, fx_rates):
     """
     Affiche les taux de change dans un tableau standard Streamlit (st.dataframe).
     """
-    st.header("Taux de Change Actuels")
-    st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier ou toutes les 60 secondes, ou lors d'un changement de devise cible.")
+    # st.header("Taux de Change Actuels")
+    # st.info("Les taux sont automatiquement mis à jour à chaque chargement de fichier ou toutes les 60 secondes, ou lors d'un changement de devise cible.")
 
     if st.button("Actualiser les taux", key="manual_fx_refresh_btn_in_tab"):
         with st.spinner("Mise à jour manuelle des devises..."):
