@@ -1,143 +1,136 @@
 import streamlit as st
 import pandas as pd
-import datetime
+import json
 
-def afficher_parametres_globaux():
+def afficher_parametres_globaux(load_or_reload_portfolio):
     """
-    Gère la sélection de la devise de référence, les sources de données (importation de fichier
-    et URL Google Sheets), et d'autres paramètres.
+    Affiche l'interface des paramètres globaux pour gérer le portefeuille, la devise cible,
+    la volatilité cible et les allocations cibles.
     """
-    # --- 1. Choix de la Devise de Référence ---
-    st.markdown("#### Devise de Référence")
+    st.write("DEBUG: Entering afficher_parametres_globaux")
+    st.write("DEBUG: load_or_reload_portfolio type:", type(load_or_reload_portfolio))
+    st.write("DEBUG: Session state keys:", list(st.session_state.keys()))
+    st.header("Paramètres Globaux")
 
-    previous_devise = st.session_state.get("devise_cible", "EUR")
-    available_currencies = ["EUR", "USD", "GBP", "JPY", "CAD", "CHF"]
-    st.session_state.devise_cible = st.selectbox(
-        "Sélectionnez la devise de référence pour l'affichage des valeurs du portefeuille et des taux de change.",
-        available_currencies,
-        index=available_currencies.index(st.session_state.get("devise_cible", "EUR")),
-        key="devise_selector_settings"
+    # Section pour charger le portefeuille
+    st.subheader("Chargement du portefeuille")
+    source_type = st.radio("Source des données du portefeuille", ["Fichier Excel/CSV", "Google Sheets"], key="source_type")
+    st.write("DEBUG: Selected source_type:", source_type)
+
+    if source_type == "Fichier Excel/CSV":
+        uploaded_file = st.file_uploader("Choisir un fichier Excel ou CSV", type=["csv", "xlsx"], key="portfolio_file")
+        st.write("DEBUG: uploaded_file:", uploaded_file)
+        if uploaded_file is not None:
+            try:
+                st.write("DEBUG: Calling load_or_reload_portfolio with source_type='fichier', uploaded_file=", uploaded_file.name)
+                load_or_reload_portfolio(source_type="fichier", uploaded_file=uploaded_file)
+            except Exception as e:
+                st.error(f"Erreur lors du chargement du fichier: {e}")
+                st.write("DEBUG: Exception in load_or_reload_portfolio (fichier):", str(e))
+        else:
+            st.info("Veuillez charger un fichier Excel ou CSV.")
+            st.write("DEBUG: No file uploaded")
+
+    else:  # Google Sheets
+        google_sheets_url = st.text_input(
+            "URL de Google Sheets",
+            value=st.session_state.get("google_sheets_url", ""),
+            key="google_sheets_url_input"
+        )
+        st.write("DEBUG: google_sheets_url:", google_sheets_url)
+        if google_sheets_url and google_sheets_url != st.session_state.get("google_sheets_url", ""):
+            if not isinstance(google_sheets_url, str) or not google_sheets_url.strip():
+                st.error("Erreur: L'URL de Google Sheets doit être une chaîne non vide.")
+                st.write("DEBUG: Invalid google_sheets_url type or empty")
+            else:
+                try:
+                    st.write("DEBUG: Calling load_or_reload_portfolio with source_type='google_sheets', google_sheets_url=", google_sheets_url)
+                    st.session_state.google_sheets_url = google_sheets_url
+                    load_or_reload_portfolio(source_type="google_sheets", google_sheets_url=google_sheets_url)
+                except Exception as e:
+                    st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
+                    st.write("DEBUG: Exception in load_or_reload_portfolio (google_sheets):", str(e))
+        else:
+            st.info("Veuillez fournir une URL Google Sheets valide.")
+            st.write("DEBUG: No Google Sheets URL provided or unchanged")
+
+    # Section pour la devise cible
+    st.subheader("Devise cible")
+    devise_options = ["EUR", "USD", "CAD", "GBP", "CHF", "JPY"]
+    current_devise = st.session_state.get("devise_cible", "EUR")
+    st.write("DEBUG: Current devise_cible:", current_devise, "type:", type(current_devise))
+    devise_cible = st.selectbox(
+        "Sélectionner la devise cible",
+        options=devise_options,
+        index=devise_options.index(current_devise) if current_devise in devise_options else 0,
+        key="devise_cible_select"
     )
-
-    if st.session_state.devise_cible != previous_devise:
-        st.session_state.last_update_time_fx = datetime.datetime.min
-        st.success(f"Devise de référence définie sur **{st.session_state.devise_cible}**. Les taux de change seront mis à jour au prochain rechargement.")
+    if devise_cible != current_devise:
+        st.write("DEBUG: Devise cible changed to:", devise_cible)
+        st.session_state.devise_cible = devise_cible
+        st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)  # Force FX rates update
         st.rerun()
 
-    st.markdown("---")
-
-    # --- 2. Sources de Données du Portefeuille ---
-    st.markdown("#### Sources de Données et Importation")
-    st.markdown("##### Importer un fichier CSV ou Excel")
-    uploaded_file = st.file_uploader("Choisissez un fichier", type=["csv", "xlsx"], key="file_uploader_settings")
-    if uploaded_file is not None:
-        if "uploaded_file_id" not in st.session_state or st.session_state.uploaded_file_id != uploaded_file.file_id:
-            try:
-                with st.spinner("Chargement du fichier..."):
-                    if uploaded_file.name.endswith('.csv'):
-                        df_uploaded = pd.read_csv(uploaded_file)
-                    elif uploaded_file.name.endswith('.xlsx'):
-                        df_uploaded = pd.read_excel(uploaded_file)
-
-                    st.session_state.df = df_uploaded
-                    st.session_state.uploaded_file_id = uploaded_file.file_id
-                    st.session_state.url_data_loaded = False
-                    st.success("Fichier importé avec succès !")
-
-                    st.session_state.sort_column = None
-                    st.session_state.sort_direction = "asc"
-                    st.session_state.ticker_names_cache = {}
-                    st.session_state.last_update_time_fx = datetime.datetime.min
-
-                    st.cache_data.clear()
-                    st.cache_resource.clear()
-
-                    st.rerun()
-            except Exception as e:
-                st.error(f"❌ Erreur lors de la lecture du fichier : {e}")
-                st.session_state.df = None
-
-    st.markdown("<br>", unsafe_allow_html=True) 
-    st.markdown("##### Charger depuis Google Sheets (URL)")
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQiqdLmDURL-e4NP8FdSfk5A7kEhQV1Rt4zRBEL8pWu32TJ23nCFr43_rOjhqbAxg/pub?gid=1944300861&single=true&output=csv"
-    st.markdown(f"L'application charge les données du portefeuille depuis cette source par défaut : [Google Sheets CSV]({csv_url})")
-
-    if st.button("Rafraîchir les données depuis Google Sheets URL", key="refresh_portfolio_button_url"):
-        try:
-            with st.spinner("Chargement des données du portefeuille depuis Google Sheets..."):
-                import requests
-                from io import StringIO
-                
-                response = requests.get(csv_url)
-                response.encoding = 'utf-8'
-                df_url = pd.read_csv(StringIO(response.text))
-
-                st.session_state.df = df_url
-                st.session_state.uploaded_file_id = "url_source_" + str(datetime.datetime.now())
-                st.session_state.url_data_loaded = True
-                st.success("Données du portefeuille importées avec succès depuis l'URL.")
-
-            st.session_state.last_update_time_fx = datetime.datetime.min
-            st.rerun()
-        except Exception as e:
-            st.error(f"❌ Erreur lors de l'import des données du portefeuille depuis l'URL : {e}")
-
-    st.markdown("---")
-
-    # --- 3. Réglages des Objectifs de Répartition ---
-    st.markdown("#### Objectifs de Répartition par Catégorie")
-
-    with st.form("form_objectifs_catégories"):
-        st.write("Définissez les objectifs de répartition par catégorie (% du portefeuille).")
-        new_allocations = {}
-        total_alloc_input = 0
-
-        columns = st.columns(len(st.session_state["target_allocations"]))
-        for i, (cat, val) in enumerate(st.session_state["target_allocations"].items()):
-            with columns[i]:
-                pct = st.number_input(f"{cat}", min_value=0.0, max_value=100.0, value=val * 100, step=0.1, key=f"input_{cat}")
-                new_allocations[cat] = pct / 100
-                total_alloc_input += pct
-
-        st.markdown(f"**Total alloué : {total_alloc_input:.2f}%**")
-
-        submitted = st.form_submit_button("Enregistrer les objectifs")
-        if submitted:
-            if abs(total_alloc_input - 100.0) > 0.1:
-                st.error("❌ La somme des allocations doit faire exactement 100 %. Vous avez actuellement {:.2f} %.".format(total_alloc_input))
-            else:
-                st.session_state["target_allocations"] = new_allocations
-                st.success("✅ Objectifs mis à jour.")
-                st.rerun()
-
-    st.markdown("---")
-
-    # --- 4. Autres Réglages ---
-    st.markdown("#### Autres Réglages")
-    
-    # Ajout du paramètre pour l'objectif de volatilité
-    st.write("Définir l'objectif de volatilité annualisée pour le portefeuille.")
+    # Section pour la volatilité cible
+    st.subheader("Volatilité cible")
+    current_volatility = st.session_state.get("target_volatility", 0.15)
+    st.write("DEBUG: Current target_volatility:", current_volatility, "type:", type(current_volatility))
     target_volatility = st.number_input(
-        "Objectif de volatilité annualisée (%)",
+        "Volatilité cible (en %)",
         min_value=0.0,
         max_value=100.0,
-        value=st.session_state.get("target_volatility", 15.0),
+        value=float(current_volatility * 100) if isinstance(current_volatility, (int, float)) else 15.0,
         step=0.1,
         key="target_volatility_input"
     )
-    if target_volatility != st.session_state.get("target_volatility", 15.0):
-        st.session_state.target_volatility = target_volatility / 100  # Convertir en décimal
-        st.success(f"✅ Objectif de volatilité défini à {target_volatility:.1f}%.")
+    if target_volatility != current_volatility * 100:
+        st.write("DEBUG: Target volatility changed to:", target_volatility)
+        st.session_state.target_volatility = target_volatility / 100.0
         st.rerun()
 
-    st.markdown("Cette section peut contenir d'autres options de configuration à l'avenir.")
-
-    st.markdown("---")
-    
-    # --- 5. Informations sur les Données ---
-    st.markdown("#### Informations sur les Données")
-
-    if "last_yfinance_update" in st.session_state and st.session_state["last_yfinance_update"]:
-        st.write(f"Dernière mise à jour des données : **{st.session_state['last_yfinance_update']}**")
+    # Section pour les allocations cibles
+    st.subheader("Allocations cibles par catégorie")
+    if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty and 'Catégorie' in st.session_state.df.columns:
+        categories = st.session_state.df['Catégorie'].unique().tolist()
+        st.write("DEBUG: Categories found in DataFrame:", categories)
     else:
-        st.info("Aucune donnée yfinance n'a été chargée pour le moment.")
+        categories = []
+        st.write("DEBUG: No valid categories found in DataFrame")
+
+    target_allocations = st.session_state.target_allocations.copy() if isinstance(st.session_state.target_allocations, dict) else {}
+    st.write("DEBUG: Current target_allocations:", target_allocations)
+
+    for category in categories:
+        if not isinstance(category, str):
+            st.warning(f"Catégorie invalide: {category} (type: {type(category)}). Ignorée.")
+            continue
+        allocation = st.number_input(
+            f"Allocation cible pour {category} (en %)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(target_allocations.get(category, 0.0)),
+            step=1.0,
+            key=f"allocation_{safe_escape(category)}"
+        )
+        target_allocations[category] = allocation
+
+    if st.button("Enregistrer les allocations cibles", key="save_allocations"):
+        total_allocation = sum(target_allocations.values())
+        if abs(total_allocation - 100.0) > 0.01:
+            st.error(f"Erreur: La somme des allocations ({total_allocation}%) doit être égale à 100%.")
+            st.write("DEBUG: Invalid total allocation:", total_allocation)
+        else:
+            st.write("DEBUG: Saving target_allocations:", target_allocations)
+            st.session_state.target_allocations = target_allocations
+            st.success("Allocations cibles enregistrées avec succès.")
+
+    # Afficher l'état actuel
+    st.subheader("État actuel des paramètres")
+    st.write(f"**Devise cible**: {st.session_state.devise_cible}")
+    st.write(f"**Volatilité cible**: {st.session_state.target_volatility * 100:.1f}%")
+    st.write("**Allocations cibles**:")
+    if st.session_state.target_allocations:
+        for cat, alloc in st.session_state.target_allocations.items():
+            st.write(f"{cat}: {alloc:.1f}%")
+    else:
+        st.write("Aucune allocation cible définie.")
