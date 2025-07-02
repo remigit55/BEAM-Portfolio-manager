@@ -1,83 +1,118 @@
-# portfolio_journal.py
 import pandas as pd
-import os
-from datetime import datetime
+from datetime import datetime, date
+from sqlalchemy import create_engine, Column, Integer, String, Date, Text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 import json
+import os
 
-JOURNAL_FILE = "portfolio_journal.json" # Nous utiliserons JSON pour la flexibilité
+# Configuration de la base de données SQLite
+DATABASE_URL = "sqlite:///portfolio.db"
+Engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=Engine)
+Base = declarative_base()
 
-def save_portfolio_snapshot(date, df_portfolio_state, target_currency):
+# Définition du modèle de données pour les snapshots du portefeuille
+class PortfolioSnapshot(Base):
+    __tablename__ = 'portfolio_snapshots'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_date = Column(Date, unique=True, nullable=False) # Date du snapshot
+    target_currency = Column(String) # Devise cible pour ce snapshot
+    portfolio_data_json = Column(Text) # Stockage du DataFrame sous forme de JSON
+
+    def __repr__(self):
+        return f"<PortfolioSnapshot(date='{self.snapshot_date}', currency='{self.target_currency}')>"
+
+# Assure-toi que les tables sont créées (à appeler une seule fois au démarrage de l'app ou lors de l'initialisation)
+def initialize_portfolio_journal_db():
+    Base.metadata.create_all(Engine)
+
+# Appelle l'initialisation de la base de données
+initialize_portfolio_journal_db()
+
+def save_portfolio_snapshot(snapshot_date, df_portfolio_state, target_currency):
     """
-    Sauvegarde un snapshot complet de l'état du portefeuille pour une date donnée.
-    Le DataFrame est converti en format JSON pour le stockage.
+    Sauvegarde un snapshot complet de l'état du portefeuille pour une date donnée dans la base de données SQLite.
+    Le DataFrame est converti en JSON pour le stockage.
     """
     if df_portfolio_state is None or df_portfolio_state.empty:
+        print(f"DEBUG: df_portfolio_state est vide ou None pour la date {snapshot_date}. Rien à sauvegarder.")
         return
 
-    # Nettoyons le DataFrame avant de le sauvegarder pour ne garder que les colonnes pertinentes
-    # Cela évite de sauvegarder des colonnes temporaires ou calculées qui ne sont pas la "source"
     cols_to_save = [
         "Ticker", "Quantité", "Acquisition", "Devise", "Catégorie", "Objectif_LT"
     ]
-    # S'assurer que seules les colonnes existantes sont sauvegardées
     df_save = df_portfolio_state.copy()
     existing_cols = [col for col in cols_to_save if col in df_save.columns]
     df_save = df_save[existing_cols]
 
-    # Convertir les types pour la sérialisation JSON si nécessaire
     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
         if col in df_save.columns:
-            df_save[col] = pd.to_numeric(df_save[col], errors='coerce') # Ensure numeric
-            df_save[col] = df_save[col].fillna(0) # Fill NaN for JSON serialization
+            df_save[col] = pd.to_numeric(df_save[col], errors='coerce')
+            df_save[col] = df_save[col].fillna(0)
 
-    snapshot_data = {
-        "date": date.strftime("%Y-%m-%d"),
-        "target_currency": target_currency,
-        "portfolio_data": df_save.to_dict(orient="records") # Convert DataFrame to list of dicts
-    }
+    portfolio_data_json = df_save.to_json(orient="records")
 
-    all_snapshots = []
-    if os.path.exists(JOURNAL_FILE):
-        with open(JOURNAL_FILE, 'r') as f:
-            try:
-                all_snapshots = json.load(f)
-            except json.JSONDecodeError:
-                all_snapshots = [] # Handle empty or corrupt file
+    session = Session()
+    try:
+        # Vérifier si un snapshot pour cette date existe déjà
+        existing_snapshot = session.query(PortfolioSnapshot).filter_by(snapshot_date=snapshot_date).first()
 
-    # Check if a snapshot for this date already exists and update it
-    found = False
-    for i, snapshot in enumerate(all_snapshots):
-        if snapshot["date"] == snapshot_data["date"]:
-            all_snapshots[i] = snapshot_data
-            found = True
-            break
-    if not found:
-        all_snapshots.append(snapshot_data)
+        if existing_snapshot:
+            # Mettre à jour l'enregistrement existant
+            existing_snapshot.target_currency = target_currency
+            existing_snapshot.portfolio_data_json = portfolio_data_json
+            print(f"DEBUG: Snapshot du {snapshot_date} mis à jour.")
+        else:
+            # Créer un nouvel enregistrement
+            new_snapshot = PortfolioSnapshot(
+                snapshot_date=snapshot_date,
+                target_currency=target_currency,
+                portfolio_data_json=portfolio_data_json
+            )
+            session.add(new_snapshot)
+            print(f"DEBUG: Nouveau snapshot du {snapshot_date} créé.")
 
-    # Sort snapshots by date
-    all_snapshots.sort(key=lambda x: x["date"])
-
-    with open(JOURNAL_FILE, 'w') as f:
-        json.dump(all_snapshots, f, indent=4)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"ERREUR lors de la sauvegarde du snapshot: {e}")
+    finally:
+        session.close()
 
 def load_portfolio_journal():
     """
-    Charge le journal historique du portefeuille.
+    Charge le journal historique du portefeuille depuis la base de données SQLite.
     Retourne une liste de dictionnaires, chaque dict contenant 'date', 'target_currency' et 'portfolio_data'.
     'portfolio_data' est un DataFrame Pandas.
     """
-    if os.path.exists(JOURNAL_FILE):
-        with open(JOURNAL_FILE, 'r') as f:
-            try:
-                all_snapshots = json.load(f)
-                for snapshot in all_snapshots:
-                    snapshot['date'] = datetime.strptime(snapshot['date'], "%Y-%m-%d").date()
-                    snapshot['portfolio_data'] = pd.DataFrame(snapshot['portfolio_data'])
+    session = Session()
+    try:
+        all_snapshots = session.query(PortfolioSnapshot).order_by(PortfolioSnapshot.snapshot_date).all()
+
+        loaded_data = []
+        for snapshot_obj in all_snapshots:
+            portfolio_df = pd.DataFrame()
+            if snapshot_obj.portfolio_data_json:
+                try:
+                    portfolio_df = pd.DataFrame(json.loads(snapshot_obj.portfolio_data_json))
                     # Reconverting types might be necessary if JSON serialization changed them
                     for col in ["Quantité", "Acquisition", "Objectif_LT"]:
-                        if col in snapshot['portfolio_data'].columns:
-                            snapshot['portfolio_data'][col] = pd.to_numeric(snapshot['portfolio_data'][col], errors='coerce')
-                return all_snapshots
-            except json.JSONDecodeError:
-                return [] # Handle empty or corrupt file
-    return []
+                        if col in portfolio_df.columns:
+                            portfolio_df[col] = pd.to_numeric(portfolio_df[col], errors='coerce')
+                except json.JSONDecodeError as e:
+                    print(f"WARNING: Erreur de décodage JSON pour le snapshot du {snapshot_obj.snapshot_date}: {e}")
+                    portfolio_df = pd.DataFrame() # Retourne un DataFrame vide en cas d'erreur
+
+            loaded_data.append({
+                "date": snapshot_obj.snapshot_date,
+                "target_currency": snapshot_obj.target_currency,
+                "portfolio_data": portfolio_df
+            })
+        print(f"DEBUG: {len(loaded_data)} snapshots chargés depuis la base de données.")
+        return loaded_data
+    except Exception as e:
+        print(f"ERREUR lors du chargement du journal: {e}")
+        return []
+    finally:
+        session.close()
