@@ -16,6 +16,33 @@ if not callable(str):
 
 print(f"Type de str dans streamlit_app.py : {type(builtins.str)}")
 
+# --- Fonction de conversion de devise ---
+def convertir(montant, devise_source, devise_cible, fx_rates):
+    """
+    Convertit un montant d'une devise source vers une devise cible en utilisant les taux de change fournis.
+    """
+    if montant is None or pd.isna(montant):
+        return 0.0
+
+    if devise_source == devise_cible:
+        return montant
+    
+    # Construire la clé de conversion (ex: USDCAD, EURUSD)
+    taux_key = f"{devise_source}{devise_cible}"
+    
+    # Vérifier si le taux direct existe
+    if taux_key in fx_rates:
+        return montant * fx_rates[taux_key]
+    
+    # Vérifier si le taux inverse existe (ex: si EURUSD existe, utiliser 1/USD EUR)
+    inverse_taux_key = f"{devise_cible}{devise_source}"
+    if inverse_taux_key in fx_rates and fx_rates[inverse_taux_key] != 0:
+        return montant / fx_rates[inverse_taux_key]
+    
+    # Si aucun taux direct ou inverse n'est trouvé, retourner le montant original avec un avertissement
+    st.warning(f"Taux de change non trouvé pour {devise_source} vers {devise_cible}. Le montant n'a pas été converti.")
+    return montant
+
 # Importation des modules fonctionnels
 from portfolio_display import afficher_portefeuille, afficher_synthese_globale
 from performance import display_performance_history
@@ -44,28 +71,44 @@ initialize_portfolio_journal_db()
 initialize_historical_data_db()
 
 
-# Initialisation des variables d'état de session si elles n'existent pas
-# Assurez-vous que toutes les clés nécessaires existent avant utilisation
-if "df" not in st.session_state:
+# --- Initialisation des session_state ---
+if 'df' not in st.session_state:
     st.session_state.df = None
-if "df_transactions" not in st.session_state:
-    st.session_state.df_transactions = pd.DataFrame(columns=['Date', 'Type', 'Ticker', 'Quantité', 'Prix', 'Devise', 'Frais', 'Notes'])
-if "fx_rates" not in st.session_state:
+if 'fx_rates' not in st.session_state:
     st.session_state.fx_rates = {}
-if "last_update_time_fx" not in st.session_state:
-    st.session_state.last_update_time_fx = datetime.datetime.min
-if "last_yfinance_update" not in st.session_state:
-    st.session_state.last_yfinance_update = datetime.datetime.min
-if "data_source_type" not in st.session_state:
-    st.session_state.data_source_type = "file" # Valeur par défaut
-if "google_sheets_url" not in st.session_state:
-    st.session_state.google_sheets_url = ""
-if "devise_cible" not in st.session_state:
-    st.session_state.devise_cible = "EUR" # Initialisation avec une valeur par défaut
-if "target_allocations" not in st.session_state:
-    st.session_state.target_allocations = {} # Initialise les allocations cibles (si non déjà faites)
-if "target_volatility" not in st.session_state:
+if 'last_update_time_fx' not in st.session_state:
+    st.session_state.last_update_time_fx = datetime.datetime.min # Pour forcer la 1ère maj
+if 'devise_cible' not in st.session_state:
+    st.session_state.devise_cible = "EUR"
+if 'target_allocations' not in st.session_state:
+    st.session_state.target_allocations = {}
+
+# Initialisation robuste de portfolio_journal
+if 'portfolio_journal' not in st.session_state:
+    try:
+        st.session_state.portfolio_journal = load_portfolio_journal()
+    except Exception as e:
+        st.error(f"Erreur lors du chargement du journal du portefeuille: {e}. Initialisation à une liste vide.")
+        st.session_state.portfolio_journal = [] # Fallback to empty list
+
+# Initialisation robuste de df_historical_totals
+if 'df_historical_totals' not in st.session_state:
+    try:
+        st.session_state.df_historical_totals = load_historical_data()
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des totaux historiques: {e}. Initialisation à un DataFrame vide.")
+        st.session_state.df_historical_totals = pd.DataFrame() # Fallback to empty DataFrame
+
+if 'df_initial_import' not in st.session_state: # Pour garder une trace du DF initialement importé
+    st.session_state.df_initial_import = None
+if 'last_yahoo_update_time' not in st.session_state:
+    st.session_state.last_yahoo_update_time = datetime.datetime.min
+if 'last_momentum_update_time' not in st.session_state:
+    st.session_state.last_momentum_update_time = datetime.datetime.min
+if 'target_volatility' not in st.session_state:
     st.session_state.target_volatility = 0.15 # 15% par défaut (en décimal)
+if 'google_sheets_url' not in st.session_state:
+    st.session_state.google_sheets_url = "" # Initialise l'URL Google Sheets
 
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
@@ -91,7 +134,7 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.session_state.df_initial_import = df_loaded.copy() # Garder une copie de l'original
 
         # Forcer une mise à jour des prix et momentum après un chargement/changement de fichier
-        st.session_state.last_yahoo_update_time = datetime.datetime.min 
+        st.session_state.last_yahoo_update_time = datetime.datetime.min
         st.session_state.last_momentum_update_time = datetime.datetime.min
 
         st.success("Portefeuille chargé avec succès.")
@@ -106,7 +149,7 @@ def fetch_current_yahoo_data():
     tickers = st.session_state.df['Ticker'].dropna().unique().tolist() if st.session_state.df is not None else []
 
     # Vérifier si la dernière mise à jour est trop récente (moins de 10 minutes)
-    if (datetime.datetime.now() - st.session_state.last_yahoo_update_time).total_seconds() < 600 and st.session_state.yahoo_data:
+    if (datetime.datetime.now() - st.session_state.last_yahoo_update_time).total_seconds() < 600 and 'yahoo_data' in st.session_state:
         print("DEBUG: Yahoo data from cache (less than 10 mins old).")
         return st.session_state.yahoo_data
 
@@ -121,7 +164,7 @@ def fetch_current_momentum_data():
     tickers = st.session_state.df['Ticker'].dropna().unique().tolist() if st.session_state.df is not None else []
 
     # Vérifier si la dernière mise à jour est trop récente (moins de 60 minutes)
-    if (datetime.datetime.now() - st.session_state.last_momentum_update_time).total_seconds() < 3600 and st.session_state.momentum_data:
+    if (datetime.datetime.now() - st.session_state.last_momentum_update_time).total_seconds() < 3600 and 'momentum_data' in st.session_state:
         print("DEBUG: Momentum data from cache (less than 60 mins old).")
         return st.session_state.momentum_data
 
@@ -184,8 +227,6 @@ if st.session_state.df is not None:
     current_prices = fetch_current_yahoo_data()
     momentum_data = fetch_current_momentum_data()
     fx_rates = fetch_current_fx_rates()
-    # LA LIGNE 'devise_cible = st.session_state.devise_cible' A ÉTÉ SUPPRIMÉE ICI
-
     df_portfolio = st.session_state.df.copy()
 
     # Fusionner les prix actuels et le momentum avec le DataFrame du portefeuille
@@ -252,7 +293,7 @@ if st.session_state.df is not None:
                 total_current_value,
                 total_h52_value,
                 total_lt_value,
-                st.session_state.devise_cible # <<<--- MODIFIÉ
+                st.session_state.devise_cible
             )
         st.session_state.df_historical_totals = load_historical_data() # Recharger l'historique après sauvegarde
         st.info(f"Totaux quotidiens du {current_date.strftime('%Y-%m-%d')} enregistrés.")
@@ -270,19 +311,19 @@ with onglets[0]:
     afficher_synthese_globale(
         st.session_state.df,
         st.session_state.df_historical_totals,
-        st.session_state.devise_cible, # <<<--- MODIFIÉ
+        st.session_state.devise_cible,
         st.session_state.target_allocations,
         st.session_state.target_volatility
     )
 
 with onglets[1]:
-    afficher_portefeuille(st.session_state.df, st.session_state.devise_cible) # <<<--- MODIFIÉ
+    afficher_portefeuille(st.session_state.df, st.session_state.devise_cible)
 
     # Bouton pour enregistrer un snapshot manuel du portefeuille
     current_date = datetime.date.today()
     if st.button(f"Enregistrer le snapshot du portefeuille ({current_date.strftime('%Y-%m-%d')})", key="save_snapshot_btn"):
         with st.spinner("Enregistrement du snapshot quotidien du portefeuille...\nLe snapshot sera ajouté à l'historique ou mis à jour si un snapshot existe déjà pour aujourd'hui."):
-            save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible) # <<<--- MODIFIÉ
+            save_portfolio_snapshot(current_date, st.session_state.df, st.session_state.devise_cible)
         st.session_state.portfolio_journal = load_portfolio_journal() # Recharger le journal après sauvegarde
         st.info(f"Snapshot du portefeuille du {current_date.strftime('%Y-%m-%d')} enregistré pour l'historique.")
 
