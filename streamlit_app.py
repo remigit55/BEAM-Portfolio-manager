@@ -63,42 +63,60 @@ from data_loader import load_data, save_data, load_portfolio_from_google_sheets
 # Configuration de la page
 st.set_page_config(page_title="BEAM Portfolio Manager", layout="wide")
 
-# Configuration de l'actualisation automatique pour les données
-st_autorefresh(interval=600 * 1000, key="data_refresh_auto")
-if 'data_refresh_auto' not in st.session_state:
-    st.session_state.data_refresh_auto = 0
+# Configuration de l'actualisation automatique pour les données (disabled for debugging)
+# st_autorefresh(interval=600 * 1000, key="data_refresh_auto")
 
 # --- Initialisation des bases de données SQLite ---
 initialize_portfolio_journal_db()
 initialize_historical_data_db()
 
 # --- Initialisation des session_state ---
-if 'df' not in st.session_state:
-    st.session_state.df = pd.DataFrame()
-if 'fx_rates' not in st.session_state:
-    st.session_state.fx_rates = {}
-if 'last_update_time_fx' not in st.session_state:
-    st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
-if 'devise_cible' not in st.session_state:
-    st.session_state.devise_cible = "EUR"
-if 'target_allocations' not in st.session_state:
-    st.session_state.target_allocations = {}
-if 'portfolio_journal' not in st.session_state:
-    st.session_state.portfolio_journal = []
-if 'df_historical_totals' not in st.session_state:
-    st.session_state.df_historical_totals = pd.DataFrame()
-if 'df_initial_import' not in st.session_state:
-    st.session_state.df_initial_import = None
-if 'last_yahoo_update_time' not in st.session_state:
-    st.session_state.last_yahoo_update_time = datetime.datetime.now(datetime.timezone.utc)
-if 'last_momentum_update_time' not in st.session_state:
-    st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
-if 'target_volatility' not in st.session_state:
-    st.session_state.target_volatility = 0.15
-if 'google_sheets_url' not in st.session_state:
-    st.session_state.google_sheets_url = ""
-if 'initial_portfolio_loaded_from_journal' not in st.session_state:
-    st.session_state.initial_portfolio_loaded_from_journal = False
+def initialize_session_state():
+    if 'df' not in st.session_state:
+        st.session_state.df = pd.DataFrame()
+    if 'fx_rates' not in st.session_state:
+        st.session_state.fx_rates = {}
+    if 'last_update_time_fx' not in st.session_state:
+        st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
+    if 'devise_cible' not in st.session_state:
+        st.session_state.devise_cible = "EUR"
+    if 'target_allocations' not in st.session_state:
+        st.session_state.target_allocations = {}
+    if 'portfolio_journal' not in st.session_state:
+        st.session_state.portfolio_journal = []
+    if 'df_historical_totals' not in st.session_state:
+        st.session_state.df_historical_totals = pd.DataFrame()
+    if 'df_initial_import' not in st.session_state:
+        st.session_state.df_initial_import = None
+    if 'last_yahoo_update_time' not in st.session_state:
+        st.session_state.last_yahoo_update_time = datetime.datetime.now(datetime.timezone.utc)
+    if 'last_momentum_update_time' not in st.session_state:
+        st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
+    if 'target_volatility' not in st.session_state:
+        st.session_state.target_volatility = 0.15
+    if 'google_sheets_url' not in st.session_state:
+        st.session_state.google_sheets_url = ""
+    if 'initial_portfolio_loaded_from_journal' not in st.session_state:
+        st.session_state.initial_portfolio_loaded_from_journal = False
+    if 'data_refresh_auto' not in st.session_state:
+        st.session_state.data_refresh_auto = 0
+    if 'portfolio_file' not in st.session_state:
+        st.session_state.portfolio_file = None
+    if 'portfolio_file_trigger' not in st.session_state:
+        st.session_state.portfolio_file_trigger = False
+    if 'source_type' not in st.session_state:
+        st.session_state.source_type = "Fichier Excel/CSV"
+    if 'google_sheets_url_input' not in st.session_state:
+        st.session_state.google_sheets_url_input = ""
+    if 'devise_cible_select' not in st.session_state:
+        st.session_state.devise_cible_select = "EUR"
+    if 'target_volatility_input' not in st.session_state:
+        st.session_state.target_volatility_input = 15.0
+    if 'save_allocations' not in st.session_state:
+        st.session_state.save_allocations = False
+    st.write("DEBUG: Session state initialized:", {k: type(v).__name__ for k, v in st.session_state.items()})
+
+initialize_session_state()
 
 # Tentative de chargement des données si les objets sont vides (première exécution)
 if 'portfolio_journal' in st.session_state and not st.session_state.portfolio_journal:
@@ -482,7 +500,13 @@ with onglets[6]:
     st.write("DEBUG: Before calling afficher_parametres_globaux, session state:", {k: type(v).__name__ for k, v in st.session_state.items()})
     st.write("DEBUG: Full session state before afficher_parametres_globaux:", {k: str(v)[:100] + "..." if len(str(v)) > 100 else str(v) for k, v in st.session_state.items()})
     st.write("DEBUG: Calling afficher_parametres_globaux with load_or_reload_portfolio")
-    afficher_parametres_globaux(load_or_reload_portfolio)
+    # Guard to ensure session state is initialized
+    required_keys = ['portfolio_file', 'source_type', 'google_sheets_url_input', 'devise_cible_select', 'target_volatility_input', 'save_allocations']
+    if all(key in st.session_state for key in required_keys):
+        afficher_parametres_globaux(load_or_reload_portfolio)
+    else:
+        st.error("Erreur: Session state non initialisé correctement. Veuillez recharger l'application.")
+        st.write("DEBUG: Missing session state keys:", [key for key in required_keys if key not in st.session_state])
 
 st.markdown("---")
 st.caption(f"Dernière mise à jour de l'interface : {datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y %H:%M:%S')}")
