@@ -14,7 +14,6 @@ if not callable(str):
     str = builtins.str
     builtins.str = str
 
-print(f"Type de str dans streamlit_app.py : {type(builtins.str)}")
 
 # --- Fonction de conversion de devise ---
 def convertir(montant, devise_source, devise_cible, fx_rates):
@@ -114,74 +113,52 @@ def initialize_session_state():
         st.session_state.target_volatility_input = 15.0
     if 'save_allocations' not in st.session_state:
         st.session_state.save_allocations = False
-    st.write("DEBUG: Session state initialized:", {k: type(v).__name__ for k, v in st.session_state.items()})
 
 initialize_session_state()
 
 # Tentative de chargement des données si les objets sont vides (première exécution)
 if 'portfolio_journal' in st.session_state and not st.session_state.portfolio_journal:
     try:
-        st.write("DEBUG: Loading portfolio journal")
         loaded_journal = load_portfolio_journal()
-        st.write("DEBUG: load_portfolio_journal returned:", loaded_journal, "type:", type(loaded_journal))
         if loaded_journal:
             st.session_state.portfolio_journal = loaded_journal
-        else:
-            st.write("DEBUG: No portfolio journal data loaded")
     except Exception as e:
         st.error(f"Erreur lors du chargement du journal du portefeuille: {e}")
-        st.write("DEBUG: Exception in load_portfolio_journal:", str(e))
 
 if 'df_historical_totals' in st.session_state and st.session_state.df_historical_totals.empty:
     try:
-        st.write("DEBUG: Loading historical data")
         loaded_historical = load_historical_data()
-        st.write("DEBUG: load_historical_data returned:", loaded_historical, "type:", type(loaded_historical))
         if not loaded_historical.empty:
             st.session_state.df_historical_totals = loaded_historical
-        else:
-            st.write("DEBUG: No historical data loaded")
     except Exception as e:
         st.error(f"Erreur lors du chargement des totaux historiques: {e}")
-        st.write("DEBUG: Exception in load_historical_data:", str(e))
 
 # --- Fonction pour charger ou recharger le portefeuille ---
 def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=None):
     """Charge ou recharge le portefeuille en fonction de la source."""
-    st.write("DEBUG: Entering load_or_reload_portfolio with source_type:", source_type, "type:", type(source_type))
-    st.write("DEBUG: uploaded_file:", uploaded_file, "type:", type(uploaded_file))
-    st.write("DEBUG: google_sheets_url:", google_sheets_url, "type:", type(google_sheets_url))
     df_loaded = None
     if source_type == "fichier" and uploaded_file is not None:
         try:
             df_loaded, status = load_data(uploaded_file)
-            st.write("DEBUG: load_data returned df_loaded:", df_loaded, "status:", status)
             if status != "success" or df_loaded is None:
                 st.error(f"Échec du chargement du fichier: {status}")
-                st.write("DEBUG: load_data failed with status:", status)
                 return
         except Exception as e:
             st.error(f"Erreur lors du chargement du fichier: {e}")
-            st.write("DEBUG: Exception in load_data:", str(e))
             return
     elif source_type == "google_sheets" and google_sheets_url:
         if not isinstance(google_sheets_url, str) or not google_sheets_url.strip():
             st.error("Erreur: L'URL de Google Sheets doit être une chaîne non vide.")
-            st.write("DEBUG: Invalid google_sheets_url")
             return
         try:
             df_loaded = load_portfolio_from_google_sheets(google_sheets_url)
-            st.write("DEBUG: load_portfolio_from_google_sheets returned:", df_loaded)
             if df_loaded is None:
                 st.error("Échec du chargement depuis Google Sheets. Vérifiez l'URL et les permissions.")
-                st.write("DEBUG: load_portfolio_from_google_sheets returned None")
                 return
         except Exception as e:
             st.error(f"Erreur lors du chargement depuis Google Sheets: {e}")
-            st.write("DEBUG: Exception in load_portfolio_from_google_sheets:", str(e))
             return
     else:
-        st.write("DEBUG: No valid input provided for load_or_reload_portfolio, returning")
         return
 
     if df_loaded is not None and not df_loaded.empty:
@@ -192,7 +169,6 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
                 df_loaded.rename(columns={ticker_col: 'Ticker'}, inplace=True)
             else:
                 st.error(f"Le fichier importé doit contenir une colonne 'Ticker' ou équivalente ('Tickers', 'Symbol'). Colonnes trouvées: {df_loaded.columns.tolist()}")
-                st.write("DEBUG: Missing Ticker column, found columns:", df_loaded.columns.tolist())
                 st.session_state.df = pd.DataFrame()
                 return
         # Vérifier et initialiser les colonnes nécessaires
@@ -218,7 +194,6 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
             df_loaded['Devise'] = df_loaded['Devise'].astype(str).fillna(st.session_state.devise_cible)
         except Exception as e:
             st.error(f"Erreur lors du nettoyage des colonnes: {e}")
-            st.write("DEBUG: Exception in column cleaning:", str(e))
             return
 
         st.session_state.df = df_loaded
@@ -226,15 +201,10 @@ def load_or_reload_portfolio(source_type, uploaded_file=None, google_sheets_url=
         st.session_state.last_yahoo_update_time = datetime.datetime.now(datetime.timezone.utc)
         st.session_state.last_momentum_update_time = datetime.datetime.now(datetime.timezone.utc)
 
-        st.write("DEBUG (SUCCESS): st.session_state.df successfully loaded with columns:", st.session_state.df.columns.tolist())
-        st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
         st.success("Portefeuille chargé avec succès.")
-        # st.rerun()  # Commented out to avoid rerun loops during debugging
-        st.write("DEBUG: Portfolio loaded, st.rerun() skipped for debugging")
     else:
         st.session_state.df = pd.DataFrame()
-        st.error("DEBUG (ERROR): Failed to load portfolio data or DataFrame is empty. Check your data source.")
-        st.write("DEBUG: df_loaded:", df_loaded)
+        st.error("Échec du chargement des données du portefeuille ou DataFrame vide. Vérifiez votre source de données.")
 
 # --- Récupération des données Yahoo Finance (prix actuels) ---
 def fetch_current_yahoo_data():
@@ -247,10 +217,8 @@ def fetch_current_yahoo_data():
         st.session_state.yahoo_data = {}
 
     if (datetime.datetime.now(datetime.timezone.utc) - st.session_state.last_yahoo_update_time).total_seconds() < 600 and 'yahoo_data' in st.session_state:
-        print("DEBUG: Yahoo data from cache (less than 10 mins old).")
         return st.session_state.yahoo_data
 
-    print("DEBUG: Fetching Yahoo data from source...")
     current_prices = fetch_yahoo_data(tickers)
     if not isinstance(current_prices, dict):
         st.error("Erreur: fetch_yahoo_data n'a pas retourné un dictionnaire.")
@@ -270,10 +238,8 @@ def fetch_current_momentum_data():
         st.session_state.momentum_data = {}
 
     if (datetime.datetime.now(datetime.timezone.utc) - st.session_state.last_momentum_update_time).total_seconds() < 3600 and 'momentum_data' in st.session_state:
-        print("DEBUG: Momentum data from cache (less than 60 mins old).")
         return st.session_state.momentum_data
 
-    print("DEBUG: Fetching momentum data from source...")
     momentum_data = fetch_momentum_data(tickers)
     if not isinstance(momentum_data, dict):
         st.error("Erreur: fetch_momentum_data n'a pas retourné un dictionnaire.")
@@ -291,7 +257,6 @@ def fetch_current_fx_rates():
     time_diff = (current_time - st.session_state.last_update_time_fx).total_seconds()
 
     if time_diff > 600 or st.session_state.get("last_devise_cible_for_currency_update") != st.session_state.devise_cible:
-        print("DEBUG: Fetching FX rates from source...")
         try:
             st.session_state.fx_rates = fetch_fx_rates(st.session_state.devise_cible)
             if not isinstance(st.session_state.fx_rates, dict):
@@ -299,48 +264,37 @@ def fetch_current_fx_rates():
                 st.session_state.fx_rates = {}
             st.session_state.last_update_time_fx = datetime.datetime.now(datetime.timezone.utc)
             st.session_state.last_devise_cible_for_currency_update = st.session_state.devise_cible
-            print(f"DEBUG: Taux de change mis à jour pour {st.session_state.devise_cible}")
         except Exception as e:
             st.error(f"Erreur lors de la récupération des taux de change: {e}")
             st.session_state.fx_rates = {}
-    else:
-        print("DEBUG: FX rates from cache (less than 10 mins old).")
     
     return st.session_state.fx_rates
 
 # --- Chargement initial des données ---
 google_sheets_url_from_state = st.session_state.get("google_sheets_url", "")
-st.write("DEBUG: Initial google_sheets_url_from_state:", google_sheets_url_from_state)
 
 if st.session_state.df.empty and google_sheets_url_from_state:
     with st.spinner("Chargement du portefeuille depuis Google Sheets..."):
         try:
-            st.write("DEBUG: Attempting to load portfolio from Google Sheets with URL:", google_sheets_url_from_state)
             load_or_reload_portfolio("google_sheets", google_sheets_url=google_sheets_url_from_state)
         except Exception as e:
             st.error(f"Erreur lors du chargement initial depuis Google Sheets: {e}")
-            st.write("DEBUG: Exception in initial Google Sheets load:", str(e))
 
 if st.session_state.df.empty:
     if 'portfolio_journal' in st.session_state and st.session_state.portfolio_journal and not st.session_state.get('initial_portfolio_loaded_from_journal', False):
         with st.spinner("Chargement du portefeuille depuis le dernier snapshot..."):
             try:
                 latest_snapshot = st.session_state.portfolio_journal[-1]
-                st.write("DEBUG: Latest snapshot:", latest_snapshot, "type:", type(latest_snapshot))
                 if not isinstance(latest_snapshot['portfolio_data'], pd.DataFrame):
                     st.error("Erreur: Le snapshot du journal ne contient pas un DataFrame valide.")
-                    st.write("DEBUG: Invalid portfolio_data type in snapshot:", type(latest_snapshot['portfolio_data']))
                 else:
                     st.session_state.df = latest_snapshot['portfolio_data']
                     st.session_state.devise_cible = latest_snapshot['target_currency']
                     st.session_state.df_initial_import = st.session_state.df.copy()
                     st.session_state.initial_portfolio_loaded_from_journal = True
                     st.success(f"Portefeuille chargé depuis le snapshot du {latest_snapshot['date'].strftime('%Y-%m-%d')}.")
-                    # st.rerun()  # Commented out to avoid rerun loops during debugging
-                    st.write("DEBUG: Portfolio loaded from journal, st.rerun() skipped for debugging")
             except Exception as e:
                 st.error(f"Erreur lors du chargement du snapshot: {e}")
-                st.write("DEBUG: Exception in portfolio journal load:", str(e))
 
 if st.session_state.df.empty:
     st.info("Veuillez importer un fichier Excel ou CSV via l'onglet 'Paramètres' ou charger depuis l'URL de Google Sheets.")
@@ -351,9 +305,6 @@ if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.emp
     momentum_data = fetch_current_momentum_data()
     fx_rates = fetch_current_fx_rates()
     df_portfolio = st.session_state.df.copy()
-
-    st.write("DEBUG: Columns in df_portfolio before mapping:", df_portfolio.columns.tolist())
-    st.write("DEBUG: DataFrame dtypes:", df_portfolio.dtypes.to_dict())
 
     df_portfolio['Prix Actuel'] = df_portfolio['Ticker'].map(current_prices)
     df_portfolio['Momentum'] = df_portfolio['Ticker'].map(momentum_data.get('momentum_score', {}))
@@ -396,7 +347,6 @@ if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.emp
     last_recorded_date = df_hist_totals["Date"].max().date() if not df_hist_totals.empty else None
 
     if last_recorded_date != current_date:
-        print("DEBUG: Sauvegarde des totaux quotidiens...")
         total_acquisition_value = df_portfolio['Acquisition (Devise Cible)'].sum()
         total_current_value = df_portfolio['Valeur Actuelle'].sum()
         total_h52_value = df_portfolio['H52'].sum() if 'H52' in df_portfolio.columns else 0
@@ -414,7 +364,7 @@ if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.emp
         st.session_state.df_historical_totals = load_historical_data()
         st.info(f"Totaux quotidiens du {current_date.strftime('%Y-%m-%d')} enregistrés.")
     else:
-        print(f"DEBUG: Totaux quotidiens déjà à jour pour {current_date}.")
+        pass # Totaux quotidiens déjà à jour
 else:
     st.warning("Aucune donnée de portefeuille valide ou colonne 'Ticker' manquante. Veuillez charger un fichier ou une URL Google Sheets valide.")
 
@@ -431,20 +381,11 @@ else:
     total_h52 = 0.0
     total_lt = 0.0
 
-if isinstance(st.session_state.df, pd.DataFrame) and not st.session_state.df.empty:
-    st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
-    st.write("DEBUG: DataFrame dtypes:", st.session_state.df.dtypes.to_dict())
-else:
-    st.write("DEBUG: st.session_state.df is empty or not a DataFrame yet.")
-
 # --- Onglets de l'application ---
 onglets = st.tabs([
     "Synthèse", "Portefeuille", "Performance",
     "OD Comptables", "Transactions", "Taux de Change", "Paramètres"
 ])
-
-if not st.session_state.df.empty:
-    st.write("DEBUG: Columns in st.session_state.df:", st.session_state.df.columns.tolist())
 
 with onglets[0]:
     afficher_synthese_globale(
@@ -462,8 +403,6 @@ with onglets[1]:
     if st.session_state.df is None or st.session_state.df.empty or 'Ticker' not in st.session_state.df.columns:
         st.warning("Aucune donnée de portefeuille valide ou colonne 'Ticker' manquante pour afficher le portefeuille.")
     else:
-        st.write("DEBUG: Calling afficher_portefeuille with df columns:", st.session_state.df.columns.tolist())
-        st.write("DEBUG: devise_cible:", st.session_state.devise_cible)
         afficher_portefeuille(st.session_state.df, st.session_state.devise_cible)
 
     current_date = datetime.date.today()
@@ -499,16 +438,12 @@ with onglets[5]:
 
 with onglets[6]:
     from parametres import afficher_parametres_globaux
-    st.write("DEBUG: Before calling afficher_parametres_globaux, session state:", {k: type(v).__name__ for k, v in st.session_state.items()})
-    st.write("DEBUG: Full session state before afficher_parametres_globaux:", {k: str(v)[:100] + "..." if len(str(v)) > 100 else str(v) for k, v in st.session_state.items()})
-    st.write("DEBUG: Calling afficher_parametres_globaux with load_or_reload_portfolio")
     # Guard to ensure session state is initialized
     required_keys = ['portfolio_file', 'source_type', 'google_sheets_url_input', 'devise_cible_select', 'target_volatility_input', 'save_allocations']
     if all(key in st.session_state for key in required_keys):
         afficher_parametres_globaux(load_or_reload_portfolio)
     else:
         st.error("Erreur: Session state non initialisé correctement. Veuillez recharger l'application.")
-        st.write("DEBUG: Missing session state keys:", [key for key in required_keys if key not in st.session_state])
 
 st.markdown("---")
 st.caption(f"Dernière mise à jour de l'interface : {datetime.datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y %H:%M:%S')}")
